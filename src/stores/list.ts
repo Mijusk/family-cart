@@ -1,6 +1,17 @@
-import { computed, ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { defineStore } from 'pinia'
-import * as seed from '@/mocks/seed'
+import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import {
+  fromItem,
+  toItem,
+  toProduct,
+  toTrip,
+  type ItemRow,
+  type ItemUpdate,
+  type ProductRow,
+  type TripRow,
+} from '@/lib/mappers'
 import type { Item, Product, Trip } from '@/types'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
@@ -24,16 +35,32 @@ export interface TripSummary {
   items: Item[]
 }
 
+/** How far back the history goes. */
+const HISTORY_DAYS = 60
+
 const byNewest = (a: Item, b: Item) => b.addedAt.localeCompare(a.addedAt)
 const isOnList = (item: Item) => item.status === 'pending' || item.status === 'not_found'
 
+function upsert<T extends { id: string }>(list: Ref<T[]>, row: T) {
+  const index = list.value.findIndex((x) => x.id === row.id)
+  if (index === -1) list.value.push(row)
+  else list.value[index] = row
+}
+
+/**
+ * Every action updates local state first (so the UI reacts instantly) and then writes to
+ * Supabase. Realtime echoes the row back to every device, including this one, where
+ * upsert() makes the echo a no-op. If a write fails, the store reloads from the server.
+ */
 export const useListStore = defineStore('list', () => {
   const groupStore = useGroupStore()
   const toast = useToastStore()
 
-  const items = ref<Item[]>(structuredClone(seed.items))
-  const products = ref<Product[]>(structuredClone(seed.products))
-  const trips = ref<Trip[]>(structuredClone(seed.trips))
+  const groupId = ref<string | null>(null)
+  const items = ref<Item[]>([])
+  const products = ref<Product[]>([])
+  const trips = ref<Trip[]>([])
+  let channel: RealtimeChannel | null = null
 
   // ── Getters ────────────────────────────────────────────────
 
@@ -90,9 +117,88 @@ export const useListStore = defineStore('list', () => {
       .map((product) => ({ product, pending: pendingKeys.has(product.normalizedName) }))
   }
 
+  // ── Loading & realtime ─────────────────────────────────────
+
+  async function load(gid: string) {
+    groupId.value = gid
+    await refresh()
+    subscribe(gid)
+  }
+
+  async function refresh() {
+    const gid = groupId.value
+    if (!gid) return
+    const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString()
+    const [itemsRes, productsRes, tripsRes] = await Promise.all([
+      supabase.from('items').select().eq('group_id', gid).or(`status.neq.purchased,purchased_at.gte."${since}"`),
+      supabase.from('products').select().eq('group_id', gid),
+      supabase.from('trips').select().eq('group_id', gid).or(`finished_at.is.null,finished_at.gte."${since}"`),
+    ])
+    if (itemsRes.error) throw itemsRes.error
+    if (productsRes.error) throw productsRes.error
+    if (tripsRes.error) throw tripsRes.error
+    items.value = itemsRes.data.map(toItem)
+    products.value = productsRes.data.map(toProduct)
+    trips.value = tripsRes.data.map(toTrip)
+  }
+
+  function subscribe(gid: string) {
+    if (channel) void supabase.removeChannel(channel)
+    const filter = `group_id=eq.${gid}`
+    channel = supabase
+      .channel(`list:${gid}`)
+      .on<ItemRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'items', filter }, (p) =>
+        upsert(items, toItem(p.new)),
+      )
+      .on<ItemRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'items', filter }, (p) =>
+        upsert(items, toItem(p.new)),
+      )
+      // Delete events can't be filtered and only carry the id; unknown ids are simply ignored.
+      .on<ItemRow>('postgres_changes', { event: 'DELETE', schema: 'public', table: 'items' }, (p) => {
+        if (p.old.id) removeLocal(p.old.id)
+      })
+      .on<TripRow>('postgres_changes', { event: '*', schema: 'public', table: 'trips', filter }, (p) => {
+        if (p.eventType !== 'DELETE') upsert(trips, toTrip(p.new))
+      })
+      .on<ProductRow>('postgres_changes', { event: '*', schema: 'public', table: 'products', filter }, (p) => {
+        if (p.eventType !== 'DELETE') upsert(products, toProduct(p.new))
+      })
+      // Catch up on anything missed before the listeners were live: SUBSCRIBED also fires after a
+      // reconnect (phone back from background), and the system event when Postgres changes actually start.
+      .on('system', {}, (p: RealtimeSystemPayload) => {
+        if (p.extension === 'postgres_changes' && p.status === 'ok') refresh().catch(console.error)
+      })
+      .subscribe((state) => {
+        if (state === 'SUBSCRIBED') refresh().catch(console.error)
+      })
+  }
+
+  /**
+   * Queues a Supabase write. Writes run one after another so the server sees them in the
+   * order they happened (a trip is created before items reference it, an add before its undo).
+   * Takes a function because query builders only fire when awaited. On failure it tells the
+   * user and resyncs with the server.
+   */
+  let writes: Promise<void> = Promise.resolve()
+  function persist(request: () => PromiseLike<{ error: unknown }>) {
+    writes = writes.then(async () => {
+      let error: unknown
+      try {
+        ;({ error } = await request())
+      } catch (e) {
+        error = e // a rejected write must not stall the queue
+      }
+      if (!error) return
+      console.error(error)
+      toast.show('No se pudo guardar el cambio. Revisa la conexión.')
+      await refresh().catch(console.error)
+    })
+  }
+
   // ── Internal helpers ───────────────────────────────────────
 
-  function rememberProduct(name: string, quantity: number) {
+  /** Optimistic copy of what the items trigger does on the server. */
+  function rememberProductLocally(name: string, quantity: number) {
     const key = normalizeName(name)
     const product = products.value.find((p) => p.normalizedName === key)
     if (product) {
@@ -102,7 +208,7 @@ export const useListStore = defineStore('list', () => {
     } else {
       products.value.push({
         id: newId(),
-        groupId: groupStore.group.id,
+        groupId: groupId.value!,
         normalizedName: key,
         displayName: name,
         lastQuantity: quantity,
@@ -115,15 +221,31 @@ export const useListStore = defineStore('list', () => {
     return items.value.find((i) => i.id === id)
   }
 
-  /** Puts back a snapshot taken before an edit or delete. */
-  function restore(snapshot: Item) {
-    const index = items.value.findIndex((i) => i.id === snapshot.id)
-    if (index === -1) items.value.push(snapshot)
-    else items.value[index] = snapshot
+  function removeLocal(id: string) {
+    items.value = items.value.filter((i) => i.id !== id)
   }
 
-  function removeById(id: string) {
-    items.value = items.value.filter((i) => i.id !== id)
+  function updateRemote(id: string, changes: ItemUpdate) {
+    persist(() => supabase.from('items').update(changes).eq('id', id))
+  }
+
+  /** Undo for edits and merges: puts name, quantity and note back as they were. */
+  function restoreFields(snapshot: Item) {
+    const item = findItem(snapshot.id)
+    if (!item) return
+    Object.assign(item, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note })
+    updateRemote(snapshot.id, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note })
+  }
+
+  /** Undo for deletes: inserts the row again with the same id. */
+  function restoreDeleted(snapshot: Item) {
+    upsert(items, snapshot)
+    persist(() => supabase.from('items').insert(fromItem(snapshot)))
+  }
+
+  function removeItem(id: string) {
+    removeLocal(id)
+    persist(() => supabase.from('items').delete().eq('id', id))
   }
 
   // ── List actions ───────────────────────────────────────────
@@ -132,7 +254,7 @@ export const useListStore = defineStore('list', () => {
     const name = cleanDisplayName(input.name)
     const item: Item = {
       id: newId(),
-      groupId: groupStore.group.id,
+      groupId: groupId.value!,
       name,
       quantity: Math.max(1, input.quantity),
       note: input.note?.trim() || null,
@@ -144,8 +266,9 @@ export const useListStore = defineStore('list', () => {
       purchasedAt: null,
     }
     items.value.push(item)
-    rememberProduct(name, item.quantity)
-    toast.show(`Añadido: ${name}`, () => removeById(item.id))
+    rememberProductLocally(name, item.quantity)
+    persist(() => supabase.from('items').insert(fromItem(item)))
+    toast.show(`Añadido: ${name}`, () => removeItem(item.id))
     return item
   }
 
@@ -154,13 +277,20 @@ export const useListStore = defineStore('list', () => {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
-    item.quantity += Math.max(1, quantity)
-    const extraNote = note?.trim()
+    const add = Math.max(1, quantity)
+    const extraNote = note?.trim() || null
+    item.quantity = Math.min(999, item.quantity + add)
     if (extraNote && extraNote !== item.note) {
       item.note = item.note ? `${item.note} · ${extraNote}` : extraNote
     }
-    rememberProduct(item.name, quantity)
-    toast.show(`${item.name}: ahora ${item.quantity}`, () => restore(snapshot))
+    rememberProductLocally(item.name, add)
+    // The RPC adds on the server, so a concurrent add from another phone isn't lost.
+    persist(async () => {
+      const res = await supabase.rpc('merge_item', { item_id: id, add_quantity: add, extra_note: extraNote ?? undefined })
+      if (res.data) upsert(items, toItem(res.data))
+      return res
+    })
+    toast.show(`${item.name}: ahora ${item.quantity}`, () => restoreFields(snapshot))
   }
 
   /** Adds to the list, merging with a pending line of the same product if there is one. */
@@ -179,15 +309,17 @@ export const useListStore = defineStore('list', () => {
     item.note = changes.note?.trim() || null
     const changed =
       item.name !== snapshot.name || item.quantity !== snapshot.quantity || item.note !== snapshot.note
-    if (changed) toast.show('Cambios guardados', () => restore(snapshot))
+    if (!changed) return
+    updateRemote(id, { name: item.name, quantity: item.quantity, note: item.note })
+    toast.show('Cambios guardados', () => restoreFields(snapshot))
   }
 
   function deleteItem(id: string) {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
-    removeById(id)
-    toast.show(`Borrado: ${item.name}`, () => restore(snapshot))
+    removeItem(id)
+    toast.show(`Borrado: ${item.name}`, () => restoreDeleted(snapshot))
   }
 
   // ── Shopping trip actions ──────────────────────────────────
@@ -196,12 +328,17 @@ export const useListStore = defineStore('list', () => {
     if (myActiveTrip.value) return myActiveTrip.value
     const trip: Trip = {
       id: newId(),
-      groupId: groupStore.group.id,
+      groupId: groupId.value!,
       memberId: groupStore.currentMemberId,
       startedAt: new Date().toISOString(),
       finishedAt: null,
     }
     trips.value.push(trip)
+    persist(() =>
+      supabase
+        .from('trips')
+        .insert({ id: trip.id, group_id: trip.groupId, member_id: trip.memberId, started_at: trip.startedAt }),
+    )
     return trip
   }
 
@@ -217,6 +354,7 @@ export const useListStore = defineStore('list', () => {
       item.status = 'in_cart'
       item.tripId = trip.id
     }
+    updateRemote(id, { status: item.status, trip_id: item.tripId })
   }
 
   function markNotFound(id: string) {
@@ -225,6 +363,7 @@ export const useListStore = defineStore('list', () => {
     if (!item || !trip) return
     item.status = 'not_found'
     item.tripId = trip.id
+    updateRemote(id, { status: item.status, trip_id: item.tripId })
   }
 
   /** Cart items become purchased; returns how many were bought. */
@@ -239,6 +378,7 @@ export const useListStore = defineStore('list', () => {
       item.purchasedAt = now
     }
     trip.finishedAt = now
+    persist(() => supabase.rpc('finish_trip', { trip_id: trip.id }))
     return bought.length
   }
 
@@ -251,6 +391,7 @@ export const useListStore = defineStore('list', () => {
       item.tripId = null
     }
     trip.finishedAt = new Date().toISOString()
+    persist(() => supabase.rpc('cancel_trip', { trip_id: trip.id }))
   }
 
   return {
@@ -266,6 +407,7 @@ export const useListStore = defineStore('list', () => {
     tripById,
     findPendingDuplicate,
     suggest,
+    load,
     addItem,
     mergeInto,
     addOrMerge,

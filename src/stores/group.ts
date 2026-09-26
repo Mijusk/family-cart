@@ -1,26 +1,187 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import * as seed from '@/mocks/seed'
+import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
+import { supabase } from '@/lib/supabase'
+import { toGroup, toMember, type GroupRow, type MemberRow } from '@/lib/mappers'
 import type { Group, Member } from '@/types'
+import { useListStore } from './list'
+
+/** loading → (no-group | ready); error if Supabase can't be reached. */
+export type SessionStatus = 'loading' | 'no-group' | 'ready' | 'error'
+
+export interface InvitePreview {
+  id: string
+  name: string
+  memberCount: number
+}
 
 export const useGroupStore = defineStore('group', () => {
-  const group = ref<Group>(structuredClone(seed.group))
-  const members = ref<Member[]>(structuredClone(seed.members))
-  const currentMemberId = ref(seed.CURRENT_MEMBER_ID)
+  const status = ref<SessionStatus>('loading')
+  const errorMessage = ref<string | null>(null)
+  const userId = ref<string | null>(null)
+  const current = ref<Group | null>(null)
+  const members = ref<Member[]>([])
+  let channel: RealtimeChannel | null = null
+  let initPromise: Promise<void> | null = null
 
-  const me = computed(() => members.value.find((m) => m.id === currentMemberId.value)!)
+  /** Screens behind the router guard only render once status is 'ready', so the group is always there. */
+  const group = computed(() => current.value!)
 
-  const inviteUrl = computed(() => `${window.location.origin}/unirse/${group.value.inviteCode}`)
+  const currentMemberId = computed(() => members.value.find((m) => m.userId === userId.value)?.id ?? '')
+
+  const inviteUrl = computed(() => `${window.location.origin}/unirse/${current.value?.inviteCode ?? ''}`)
 
   function isMe(id: string | null): boolean {
-    return id === currentMemberId.value
+    return id !== null && id === currentMemberId.value
   }
 
   /** Member name, or "Tú" for the current device's member. */
   function memberName(id: string | null): string {
     if (isMe(id)) return 'Tú'
-    return members.value.find((m) => m.id === id)?.name ?? 'Alguien'
+    const member = members.value.find((m) => m.id === id)
+    if (!member && id && !lookedUp.has(id)) {
+      lookedUp.add(id)
+      refreshSoon()
+    }
+    return member?.name ?? 'Alguien'
   }
 
-  return { group, members, currentMemberId, me, inviteUrl, isMe, memberName }
+  // An unknown member id means we missed someone joining; reload the member list (once per id).
+  const lookedUp = new Set<string>()
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined
+  function refreshSoon() {
+    if (refreshTimer || !current.value) return
+    const gid = current.value.id
+    refreshTimer = setTimeout(() => {
+      refresh(gid)
+        .catch(console.error)
+        .finally(() => (refreshTimer = undefined))
+    }, 300)
+  }
+
+  // ── Session ────────────────────────────────────────────────
+
+  /** Signs the device in (anonymously the first time) and loads its group. Safe to call repeatedly. */
+  function init(): Promise<void> {
+    initPromise ??= bootstrap()
+    return initPromise
+  }
+
+  async function bootstrap() {
+    status.value = 'loading'
+    errorMessage.value = null
+    try {
+      const { data } = await supabase.auth.getSession()
+      let uid = data.session?.user.id
+      if (!uid) {
+        const { data: signIn, error } = await supabase.auth.signInAnonymously()
+        if (error) throw error
+        uid = signIn.user!.id
+      }
+      userId.value = uid
+      await loadGroup()
+    } catch (e) {
+      console.error(e)
+      status.value = 'error'
+      errorMessage.value = e instanceof Error ? e.message : String(e)
+      initPromise = null
+    }
+  }
+
+  /** Loads the given group, or the one this device joined most recently. */
+  async function loadGroup(groupId?: string) {
+    let gid = groupId
+    if (!gid) {
+      const { data, error } = await supabase
+        .from('members')
+        .select('group_id')
+        .eq('user_id', userId.value!)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (error) throw error
+      gid = data[0]?.group_id
+    }
+    if (!gid) {
+      status.value = 'no-group'
+      return
+    }
+
+    await Promise.all([refresh(gid), useListStore().load(gid)])
+    subscribe(gid)
+    status.value = 'ready'
+  }
+
+  async function refresh(gid: string) {
+    const [groupRes, membersRes] = await Promise.all([
+      supabase.from('groups').select().eq('id', gid).single(),
+      supabase.from('members').select().eq('group_id', gid).order('created_at'),
+    ])
+    if (groupRes.error) throw groupRes.error
+    if (membersRes.error) throw membersRes.error
+    current.value = toGroup(groupRes.data)
+    members.value = membersRes.data.map(toMember)
+  }
+
+  function subscribe(gid: string) {
+    if (channel) void supabase.removeChannel(channel)
+    channel = supabase
+      .channel(`group:${gid}`)
+      .on<MemberRow>('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `group_id=eq.${gid}` }, (p) => {
+        if (p.eventType === 'DELETE') {
+          members.value = members.value.filter((m) => m.id !== p.old.id)
+          return
+        }
+        const member = toMember(p.new)
+        const index = members.value.findIndex((m) => m.id === member.id)
+        if (index === -1) members.value.push(member)
+        else members.value[index] = member
+      })
+      .on<GroupRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${gid}` }, (p) => {
+        current.value = toGroup(p.new)
+      })
+      // Catch up on anything missed before the listeners were live: SUBSCRIBED also fires after a
+      // reconnect (phone back from background), and the system event when Postgres changes actually start.
+      .on('system', {}, (p: RealtimeSystemPayload) => {
+        if (p.extension === 'postgres_changes' && p.status === 'ok') refresh(gid).catch(console.error)
+      })
+      .subscribe((state) => {
+        if (state === 'SUBSCRIBED') refresh(gid).catch(console.error)
+      })
+  }
+
+  // ── Create / join ──────────────────────────────────────────
+
+  async function createGroup(groupName: string, memberName: string) {
+    const { data, error } = await supabase.rpc('create_group', { group_name: groupName, member_name: memberName })
+    if (error) throw error
+    await loadGroup(data)
+  }
+
+  async function previewInvite(code: string): Promise<InvitePreview | null> {
+    const { data, error } = await supabase.rpc('group_by_invite', { code })
+    if (error) throw error
+    const row = data[0]
+    return row ? { id: row.id, name: row.name, memberCount: row.member_count } : null
+  }
+
+  async function joinGroup(code: string, memberName: string) {
+    const { data, error } = await supabase.rpc('join_group', { code, member_name: memberName })
+    if (error) throw error
+    await loadGroup(data)
+  }
+
+  return {
+    status,
+    errorMessage,
+    group,
+    members,
+    currentMemberId,
+    inviteUrl,
+    isMe,
+    memberName,
+    init,
+    createGroup,
+    previewInvite,
+    joinGroup,
+  }
 })

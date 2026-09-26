@@ -258,3 +258,48 @@ a {
   outline: none;
   border-color: var(--primary);
 }
+
+/* ── Onboarding (welcome, join, loading/error screens) ───── */
+
+.onboard {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px var(--gutter) calc(32px + var(--safe-bottom));
+}
+
+.onboard .display-title {
+  font-size: 2.25rem;
+}
+
+.onboard-form {
+  display: grid;
+  gap: 16px;
+  padding: 20px var(--gutter);
+  margin-inline: calc(-1 * var(--gutter));
+  background: var(--surface);
+  border-block: 1px solid var(--line);
+}
+
+@media (min-width: 592px) {
+  .onboard-form {
+    margin-inline: 0;
+    border-inline: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.form-error {
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}

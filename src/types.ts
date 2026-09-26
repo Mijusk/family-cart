@@ -1,4 +1,4 @@
-// Mirrors the planned Supabase tables (camelCase here; the data layer will map snake_case columns).
+// Domain types: the Supabase tables in camelCase (src/lib/mappers.ts converts rows).
 
 export type ItemStatus = 'pending' | 'in_cart' | 'purchased' | 'not_found'
 
@@ -12,6 +12,8 @@ export interface Group {
 export interface Member {
   id: string
   groupId: string
+  /** Anonymous auth user of the device this member uses (the "device token"). */
+  userId: string | null
   name: string
   createdAt: string
 }
@@ -33,7 +35,8 @@ export interface Item {
   quantity: number
   note: string | null
   status: ItemStatus
-  addedBy: string
+  /** Null if that member was removed from the group. */
+  addedBy: string | null
   addedAt: string
   tripId: string | null
   purchasedBy: string | null
