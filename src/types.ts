@@ -12,8 +12,6 @@ export interface Group {
 export interface Member {
   id: string
   groupId: string
-  /** Anonymous auth user of the device this member uses (the "device token"). */
-  userId: string | null
   name: string
   createdAt: string
 }

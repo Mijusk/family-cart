@@ -27,7 +27,9 @@ export const useGroupStore = defineStore('group', () => {
   /** Screens behind the router guard only render once status is 'ready', so the group is always there. */
   const group = computed(() => current.value!)
 
-  const currentMemberId = computed(() => members.value.find((m) => m.userId === userId.value)?.id ?? '')
+  /** The member this device acts as, from member_identities (several devices can share one member). */
+  const myMemberId = ref('')
+  const currentMemberId = computed(() => myMemberId.value)
 
   const inviteUrl = computed(() => `${window.location.origin}/unirse/${current.value?.inviteCode ?? ''}`)
 
@@ -90,22 +92,23 @@ export const useGroupStore = defineStore('group', () => {
 
   /** Loads the given group, or the one this device joined most recently. */
   async function loadGroup(groupId?: string) {
-    let gid = groupId
-    if (!gid) {
-      const { data, error } = await supabase
-        .from('members')
-        .select('group_id')
-        .eq('user_id', userId.value!)
-        .order('created_at', { ascending: false })
-        .limit(1)
-      if (error) throw error
-      gid = data[0]?.group_id
-    }
-    if (!gid) {
+    let query = supabase
+      .from('member_identities')
+      .select('group_id, member_id')
+      .eq('user_id', userId.value!)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    if (groupId) query = query.eq('group_id', groupId)
+    const { data, error } = await query
+    if (error) throw error
+    const identity = data[0]
+    if (!identity) {
       status.value = 'no-group'
       return
     }
 
+    const gid = identity.group_id
+    myMemberId.value = identity.member_id
     await Promise.all([refresh(gid), useListStore().load(gid)])
     subscribe(gid)
     status.value = 'ready'
@@ -164,8 +167,23 @@ export const useGroupStore = defineStore('group', () => {
     return row ? { id: row.id, name: row.name, memberCount: row.member_count } : null
   }
 
+  /** Existing member whose name matches once normalized (case, accents, spaces), if any. */
+  async function findMemberByName(code: string, memberName: string): Promise<{ id: string; name: string } | null> {
+    const { data, error } = await supabase.rpc('check_member_name', { code, member_name: memberName })
+    if (error) throw error
+    return data[0] ?? null
+  }
+
+  /** Creates a new member. The server refuses a name already taken in the group ("member name taken"). */
   async function joinGroup(code: string, memberName: string) {
     const { data, error } = await supabase.rpc('join_group', { code, member_name: memberName })
+    if (error) throw error
+    await loadGroup(data)
+  }
+
+  /** "It's me on another device": this device becomes that existing member. */
+  async function claimMember(code: string, memberId: string) {
+    const { data, error } = await supabase.rpc('claim_member', { code, member_id: memberId })
     if (error) throw error
     await loadGroup(data)
   }
@@ -182,6 +200,8 @@ export const useGroupStore = defineStore('group', () => {
     init,
     createGroup,
     previewInvite,
+    findMemberByName,
     joinGroup,
+    claimMember,
   }
 })

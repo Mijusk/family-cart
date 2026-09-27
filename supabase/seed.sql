@@ -1,5 +1,5 @@
 -- Demo group for local development. Join it at http://localhost:5180/unirse/HUERTA7Q4K
--- The demo members have no user_id: they are people "on other phones".
+-- The demo members have no linked device (member_identities): they are people "on other phones".
 -- The products catalog fills itself through the items trigger.
 
 insert into public.groups (id, name, invite_code, created_at) values

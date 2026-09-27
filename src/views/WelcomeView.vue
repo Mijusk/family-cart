@@ -212,19 +212,4 @@ const focusInput = useTemplateRef<HTMLInputElement>('focusInput')
   font-weight: 600;
 }
 
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: start;
-  min-height: 44px;
-  padding: 4px 4px;
-  color: var(--text-2);
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.back-link:hover {
-  color: var(--primary);
-}
 </style>

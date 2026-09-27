@@ -73,15 +73,34 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
-                },"members": {
+                },"member_identities": {
                   Row: {
-                    "created_at": string,"group_id": string,"id": string,"name": string,"user_id": string | null
+                    "created_at": string,"group_id": string,"member_id": string,"user_id": string
                   }
                   Insert: {
-                    "created_at"?: string,"group_id": string,"id"?: string,"name": string,"user_id"?: string | null
+                    "created_at"?: string,"group_id": string,"member_id": string,"user_id": string
                   }
                   Update: {
-                    "created_at"?: string,"group_id"?: string,"id"?: string,"name"?: string,"user_id"?: string | null
+                    "created_at"?: string,"group_id"?: string,"member_id"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "member_identities_member_id_group_id_fkey"
+      columns: ["member_id","group_id"]
+isOneToOne: false
+      referencedRelation: "members"
+      referencedColumns: ["id","group_id"]
+    }
+                  ]
+                },"members": {
+                  Row: {
+                    "created_at": string,"group_id": string,"id": string,"name": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"group_id": string,"id"?: string,"name": string
+                  }
+                  Update: {
+                    "created_at"?: string,"group_id"?: string,"id"?: string,"name"?: string
                   }
                   Relationships: [
                     {
@@ -144,6 +163,14 @@ isOneToOne: false
           Functions: {
             "cancel_trip":
 { Args: { "trip_id": string }; Returns: undefined
+                           },
+"check_member_name":
+{ Args: { "code": string,"member_name": string }; Returns: {
+              "id": string,"name": string
+            }[]
+                           },
+"claim_member":
+{ Args: { "code": string,"member_id": string }; Returns: string
                            },
 "create_group":
 { Args: { "group_name": string,"member_name": string }; Returns: string

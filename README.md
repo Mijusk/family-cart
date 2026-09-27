@@ -35,9 +35,14 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
 
 ## Cómo funciona
 
-- **Sin registro:** cada dispositivo inicia sesión como usuario anónimo de Supabase, y `members.user_id`
-  lo liga a un miembro del grupo (el "device token" del diseño original). Si se borran los datos del
-  navegador, esa persona tendrá que volver a unirse con el enlace.
+- **Sin registro:** cada dispositivo inicia sesión como usuario anónimo de Supabase, y
+  `member_identities` lo liga a un miembro del grupo (el "device token" del diseño original). Un
+  miembro puede tener varios dispositivos; el historial (`added_by`, `purchased_by`, `trips.member_id`)
+  apunta siempre al miembro, nunca al dispositivo.
+- **Unirse con un nombre que ya existe:** si el nombre coincide con el de un miembro (sin distinguir
+  mayúsculas, tildes ni espacios), la app pregunta si es la misma persona en otro dispositivo (se
+  vincula a ese miembro) o alguien distinto (se le pide un apodo o apellido: "Marta (García)"). Si se
+  borran los datos del navegador, basta con volver a unirse con el mismo nombre y elegir "Soy yo".
 - **Permisos:** RLS en todas las tablas: solo ves y tocas los datos de tus grupos. Crear y unirse a un
   grupo, sumar cantidades y finalizar/cancelar una compra son funciones SQL (RPC) atómicas, para que
   dos personas a la vez no se pisen.

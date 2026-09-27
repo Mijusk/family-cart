@@ -19,7 +19,6 @@ export const toGroup = (r: GroupRow): Group => ({
 export const toMember = (r: MemberRow): Member => ({
   id: r.id,
   groupId: r.group_id,
-  userId: r.user_id,
   name: r.name,
   createdAt: r.created_at,
 })
