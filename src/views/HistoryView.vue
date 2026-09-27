@@ -55,6 +55,10 @@ function whoBought(summary: TripSummary) {
           <span>{{ whoBought(summary) }}</span>
           <span>{{ timeOfDay(summary.trip.finishedAt!) }}</span>
         </p>
+        <p v-if="summary.trip.closedReason === 'timeout'" class="auto-closed">
+          <AppIcon name="history" :size="14" />
+          Cerrada automáticamente tras 4 horas sin finalizar
+        </p>
         <ul class="rows">
           <li v-for="item in summary.items" :key="item.id" class="history-row">
             <span class="text">
@@ -95,6 +99,17 @@ function whoBought(summary: TripSummary) {
 
 .section-title span:last-child {
   font-variant-numeric: tabular-nums;
+}
+
+.auto-closed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: -4px;
+  padding: 0 var(--gutter) 8px;
+  font-size: 0.8125rem;
+  font-style: italic;
+  color: var(--text-2);
 }
 
 .trip + .trip {

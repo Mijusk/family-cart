@@ -10,13 +10,14 @@ insert into public.members (id, group_id, name, created_at) values
   ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-000000000001', 'Daniel', now() - interval '40 days'),
   ('00000000-0000-4000-8000-0000000000a3', '00000000-0000-4000-8000-000000000001', 'Abuela Carmen', now() - interval '12 days');
 
-insert into public.trips (id, group_id, member_id, started_at, finished_at) values
+-- Daniel forgot to tap "Finalizar compra": the 4-hour timeout closed his trip.
+insert into public.trips (id, group_id, member_id, started_at, finished_at, closed_reason) values
   ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000a1',
-    now() - interval '9 days 4 hours', now() - interval '9 days 3 hours'),
+    now() - interval '9 days 4 hours', now() - interval '9 days 3 hours', 'manual'),
   ('00000000-0000-4000-8000-0000000000b2', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000a2',
-    now() - interval '5 days 7 hours', now() - interval '5 days 6 hours'),
+    now() - interval '5 days 7 hours', now() - interval '5 days 2 hours 45 minutes', 'timeout'),
   ('00000000-0000-4000-8000-0000000000b3', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000a1',
-    now() - interval '1 day 2 hours 40 minutes', now() - interval '1 day 2 hours');
+    now() - interval '1 day 2 hours 40 minutes', now() - interval '1 day 2 hours', 'manual');
 
 -- Oldest first, so the catalog's last_quantity ends up as the most recent one.
 insert into public.items (group_id, name, quantity, note, status, added_by, added_at, trip_id, purchased_by, purchased_at)

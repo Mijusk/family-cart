@@ -2,6 +2,9 @@
 
 export type ItemStatus = 'pending' | 'in_cart' | 'purchased' | 'not_found'
 
+/** manual: "Finalizar compra"; timeout: closed by the 4-hour job; cancelled: cart sent back to the list. */
+export type TripClosedReason = 'manual' | 'timeout' | 'cancelled'
+
 export interface Group {
   id: string
   name: string
@@ -47,4 +50,5 @@ export interface Trip {
   memberId: string
   startedAt: string
   finishedAt: string | null
+  closedReason: TripClosedReason | null
 }

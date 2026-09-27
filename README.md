@@ -50,6 +50,10 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
   en orden) y escuchan Realtime; al reconectar (móvil que vuelve de segundo plano) recargan todo.
 - **Catálogo de autocompletado:** lo mantiene un trigger sobre `items`.
 - **Historial:** se cargan las compras de los últimos 60 días.
+- **Compras olvidadas:** un job de `pg_cron` (cada 15 min, dentro de la base de datos) cierra cualquier
+  compra abierta hace más de 4 horas igual que "Finalizar compra": lo del carrito pasa a comprado a
+  nombre de quien la empezó. `trips.closed_reason` guarda cómo terminó (`manual`, `timeout` o
+  `cancelled`) y el historial avisa de las cerradas por tiempo.
 
 ```
 supabase/

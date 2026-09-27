@@ -1,4 +1,4 @@
-import type { Group, Item, Member, Product, Trip } from '@/types'
+import type { Group, Item, Member, Product, Trip, TripClosedReason } from '@/types'
 import type { Database } from './database.types'
 
 type Tables = Database['public']['Tables']
@@ -38,6 +38,8 @@ export const toTrip = (r: TripRow): Trip => ({
   memberId: r.member_id,
   startedAt: r.started_at,
   finishedAt: r.finished_at,
+  // A text column with a check constraint, so the generated type is plain string.
+  closedReason: r.closed_reason as TripClosedReason | null,
 })
 
 export const toItem = (r: ItemRow): Item => ({

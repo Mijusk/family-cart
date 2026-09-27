@@ -132,13 +132,13 @@ isOneToOne: false
                   ]
                 },"trips": {
                   Row: {
-                    "finished_at": string | null,"group_id": string,"id": string,"member_id": string,"started_at": string
+                    "closed_reason": string | null,"finished_at": string | null,"group_id": string,"id": string,"member_id": string,"started_at": string
                   }
                   Insert: {
-                    "finished_at"?: string | null,"group_id": string,"id"?: string,"member_id": string,"started_at"?: string
+                    "closed_reason"?: string | null,"finished_at"?: string | null,"group_id": string,"id"?: string,"member_id": string,"started_at"?: string
                   }
                   Update: {
-                    "finished_at"?: string | null,"group_id"?: string,"id"?: string,"member_id"?: string,"started_at"?: string
+                    "closed_reason"?: string | null,"finished_at"?: string | null,"group_id"?: string,"id"?: string,"member_id"?: string,"started_at"?: string
                   }
                   Relationships: [
                     {
@@ -171,6 +171,12 @@ isOneToOne: false
                            },
 "claim_member":
 { Args: { "code": string,"member_id": string }; Returns: string
+                           },
+"close_stale_trips":
+{ Args: { "max_age"?: string }; Returns: number
+                           },
+"close_trip":
+{ Args: { "reason": string,"target_trip_id": string }; Returns: number
                            },
 "create_group":
 { Args: { "group_name": string,"member_name": string }; Returns: string

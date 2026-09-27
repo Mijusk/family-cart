@@ -332,6 +332,7 @@ export const useListStore = defineStore('list', () => {
       memberId: groupStore.currentMemberId,
       startedAt: new Date().toISOString(),
       finishedAt: null,
+      closedReason: null,
     }
     trips.value.push(trip)
     persist(() =>
@@ -378,6 +379,7 @@ export const useListStore = defineStore('list', () => {
       item.purchasedAt = now
     }
     trip.finishedAt = now
+    trip.closedReason = 'manual'
     persist(() => supabase.rpc('finish_trip', { trip_id: trip.id }))
     return bought.length
   }
@@ -391,6 +393,7 @@ export const useListStore = defineStore('list', () => {
       item.tripId = null
     }
     trip.finishedAt = new Date().toISOString()
+    trip.closedReason = 'cancelled'
     persist(() => supabase.rpc('cancel_trip', { trip_id: trip.id }))
   }
 

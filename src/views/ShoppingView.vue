@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
@@ -11,7 +11,31 @@ const toast = useToastStore()
 const router = useRouter()
 
 // Opening this screen directly (reload, shared URL) starts a trip, same as the button on the list.
-list.startTrip()
+const tripId = list.startTrip().id
+/** Set when this screen closes the trip itself, so the watcher below doesn't react to it. */
+let leaving = false
+
+// The trip can also end while this screen is open: the 4-hour timeout, or this same member
+// finishing or cancelling it from another device. Tapping items would then do nothing.
+watch(
+  () => list.tripById(tripId)?.finishedAt,
+  (finishedAt) => {
+    if (!finishedAt || leaving) return
+    leaving = true
+    const reason = list.tripById(tripId)?.closedReason
+    if (reason === 'cancelled') {
+      toast.show('La compra se canceló desde otro dispositivo')
+      router.push({ name: 'list' })
+      return
+    }
+    toast.show(
+      reason === 'timeout'
+        ? 'Tu compra se cerró sola tras 4 horas sin finalizar'
+        : 'La compra se finalizó desde otro dispositivo',
+    )
+    router.push({ name: 'history' })
+  },
+)
 
 const toPick = computed(() => list.pendingItems.filter((i) => i.status === 'pending'))
 const notFound = computed(() => list.pendingItems.filter((i) => i.status === 'not_found'))
@@ -21,6 +45,7 @@ const total = computed(() => toPick.value.length + notFound.value.length + cart.
 const progress = computed(() => (total.value ? cart.value.length / total.value : 0))
 
 function finish() {
+  leaving = true
   const bought = list.finishTrip()
   toast.show(bought === 1 ? 'Compra guardada: 1 producto' : `Compra guardada: ${bought} productos`)
   router.push({ name: 'history' })
@@ -31,6 +56,7 @@ function cancel() {
   if (n && !window.confirm(`¿Cancelar la compra? ${n === 1 ? 'El producto del carrito vuelve' : `Los ${n} productos del carrito vuelven`} a la lista.`)) {
     return
   }
+  leaving = true
   list.cancelTrip()
   router.push({ name: 'list' })
 }
