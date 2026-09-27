@@ -94,13 +94,13 @@ isOneToOne: false
                   ]
                 },"members": {
                   Row: {
-                    "created_at": string,"group_id": string,"id": string,"name": string
+                    "created_at": string,"group_id": string,"id": string,"left_at": string | null,"name": string
                   }
                   Insert: {
-                    "created_at"?: string,"group_id": string,"id"?: string,"name": string
+                    "created_at"?: string,"group_id": string,"id"?: string,"left_at"?: string | null,"name": string
                   }
                   Update: {
-                    "created_at"?: string,"group_id"?: string,"id"?: string,"name"?: string
+                    "created_at"?: string,"group_id"?: string,"id"?: string,"left_at"?: string | null,"name"?: string
                   }
                   Relationships: [
                     {
@@ -197,6 +197,9 @@ isOneToOne: false
                            },
 "join_group":
 { Args: { "code": string,"member_name": string }; Returns: string
+                           },
+"leave_group":
+{ Args: { "gid": string }; Returns: boolean
                            },
 "merge_item":
 { Args: { "add_quantity": number,"extra_note"?: string,"item_id": string }; Returns: {

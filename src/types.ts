@@ -17,6 +17,17 @@ export interface Member {
   groupId: string
   name: string
   createdAt: string
+  /** Set when their last device left the group; kept so the history still shows their name. */
+  leftAt: string | null
+}
+
+/** A group this device belongs to, for the group switcher. */
+export interface Membership {
+  groupId: string
+  groupName: string
+  /** The member this device acts as in that group. */
+  memberId: string
+  joinedAt: string
 }
 
 /** Catalog entry used for autocomplete. */

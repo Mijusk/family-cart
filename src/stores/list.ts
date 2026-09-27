@@ -120,26 +120,51 @@ export const useListStore = defineStore('list', () => {
   // ── Loading & realtime ─────────────────────────────────────
 
   async function load(gid: string) {
+    unload()
     groupId.value = gid
     await refresh()
     subscribe(gid)
   }
 
+  /** Stops listening to the current group and drops its data (switching or leaving groups). */
+  function unload() {
+    if (channel) void supabase.removeChannel(channel)
+    channel = null
+    groupId.value = null
+    items.value = []
+    products.value = []
+    trips.value = []
+  }
+
+  /**
+   * Replaces local state with the server's. A snapshot taken while local changes are still
+   * on their way would silently undo them (e.g. drop a trip just started, so the app starts
+   * a second one), so it first waits for queued writes, and discards the snapshot and tries
+   * again if new changes were made while it was being fetched.
+   */
   async function refresh() {
     const gid = groupId.value
     if (!gid) return
-    const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString()
-    const [itemsRes, productsRes, tripsRes] = await Promise.all([
-      supabase.from('items').select().eq('group_id', gid).or(`status.neq.purchased,purchased_at.gte."${since}"`),
-      supabase.from('products').select().eq('group_id', gid),
-      supabase.from('trips').select().eq('group_id', gid).or(`finished_at.is.null,finished_at.gte."${since}"`),
-    ])
-    if (itemsRes.error) throw itemsRes.error
-    if (productsRes.error) throw productsRes.error
-    if (tripsRes.error) throw tripsRes.error
-    items.value = itemsRes.data.map(toItem)
-    products.value = productsRes.data.map(toProduct)
-    trips.value = tripsRes.data.map(toTrip)
+    for (;;) {
+      const seq = writeSeq
+      await writes
+      const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString()
+      const [itemsRes, productsRes, tripsRes] = await Promise.all([
+        supabase.from('items').select().eq('group_id', gid).or(`status.neq.purchased,purchased_at.gte."${since}"`),
+        supabase.from('products').select().eq('group_id', gid),
+        supabase.from('trips').select().eq('group_id', gid).or(`finished_at.is.null,finished_at.gte."${since}"`),
+      ])
+      // Switched group while loading: this answer belongs to the old one.
+      if (groupId.value !== gid) return
+      if (itemsRes.error) throw itemsRes.error
+      if (productsRes.error) throw productsRes.error
+      if (tripsRes.error) throw tripsRes.error
+      if (seq !== writeSeq) continue
+      items.value = itemsRes.data.map(toItem)
+      products.value = productsRes.data.map(toProduct)
+      trips.value = tripsRes.data.map(toTrip)
+      return
+    }
   }
 
   function subscribe(gid: string) {
@@ -180,7 +205,10 @@ export const useListStore = defineStore('list', () => {
    * user and resyncs with the server.
    */
   let writes: Promise<void> = Promise.resolve()
+  /** Bumped on every queued write, so refresh() can tell if its snapshot is already outdated. */
+  let writeSeq = 0
   function persist(request: () => PromiseLike<{ error: unknown }>) {
+    writeSeq++
     writes = writes.then(async () => {
       let error: unknown
       try {
@@ -191,7 +219,8 @@ export const useListStore = defineStore('list', () => {
       if (!error) return
       console.error(error)
       toast.show('No se pudo guardar el cambio. Revisa la conexión.')
-      await refresh().catch(console.error)
+      // Not awaited: refresh() waits for this queue to drain, which includes this very write.
+      void refresh().catch(console.error)
     })
   }
 
@@ -411,6 +440,7 @@ export const useListStore = defineStore('list', () => {
     findPendingDuplicate,
     suggest,
     load,
+    unload,
     addItem,
     mergeInto,
     addOrMerge,

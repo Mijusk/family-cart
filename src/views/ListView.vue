@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AddItemForm from '@/components/AddItemForm.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import PendingItemRow from '@/components/PendingItemRow.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
 import { useGroupStore } from '@/stores/group'
@@ -43,7 +44,7 @@ function goShopping() {
   <div class="page">
     <header class="page-header">
       <p class="eyebrow">Compra Familiar</p>
-      <h1 class="display-title">{{ groupStore.group.name }}</h1>
+      <GroupSwitcher />
       <p class="muted">{{ countLabel }}</p>
     </header>
 

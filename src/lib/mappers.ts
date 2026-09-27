@@ -21,6 +21,7 @@ export const toMember = (r: MemberRow): Member => ({
   groupId: r.group_id,
   name: r.name,
   createdAt: r.created_at,
+  leftAt: r.left_at,
 })
 
 export const toProduct = (r: ProductRow): Product => ({

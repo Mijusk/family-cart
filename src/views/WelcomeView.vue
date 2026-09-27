@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { useGroupStore } from '@/stores/group'
 import { friendlyError } from '@/utils/errors'
@@ -74,11 +74,23 @@ const focusInput = useTemplateRef<HTMLInputElement>('focusInput')
   <div class="onboard">
     <header>
       <p class="eyebrow">Compra Familiar</p>
-      <h1 class="display-title">La lista de la compra de toda la casa</h1>
-      <p v-if="mode === 'choose'" class="muted intro">
+      <!-- Reached from the group switcher when this device already has a group. -->
+      <template v-if="groupStore.status === 'ready'">
+        <h1 class="display-title">Añadir otro grupo</h1>
+        <p v-if="mode === 'choose'" class="muted intro">
+          Seguirás en {{ groupStore.group.name }}; podrás cambiar de grupo tocando su nombre.
+        </p>
+      </template>
+      <h1 v-else class="display-title">La lista de la compra de toda la casa</h1>
+      <p v-if="mode === 'choose' && groupStore.status !== 'ready'" class="muted intro">
         Cualquiera apunta lo que falta y quien va a comprar lo va marcando. Sin cuentas ni contraseñas.
       </p>
     </header>
+
+    <RouterLink v-if="mode === 'choose' && groupStore.status === 'ready'" :to="{ name: 'list' }" class="back-link">
+      <AppIcon name="back" :size="16" />
+      Volver a {{ groupStore.group.name }}
+    </RouterLink>
 
     <div v-if="mode === 'choose'" class="choice-list">
       <button type="button" class="choice" @click="choose('create')">

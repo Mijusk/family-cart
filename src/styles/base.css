@@ -314,6 +314,7 @@ a {
   color: var(--text-2);
   font-weight: 600;
   font-size: 0.9375rem;
+  text-decoration: none;
 }
 
 .back-link:hover {

@@ -25,7 +25,13 @@ const saving = ref(false)
 const error = ref<string | null>(null)
 const extraInput = useTemplateRef<HTMLInputElement>('extraInput')
 
-const alreadyMember = computed(() => groupStore.status === 'ready' && preview.value?.id === groupStore.group.id)
+/** Any of this device's groups, not only the one open now. */
+const alreadyMember = computed(() => !!preview.value && groupStore.isMemberOf(preview.value.id))
+
+async function openExisting() {
+  await groupStore.switchGroup(preview.value!.id)
+  await router.replace({ name: 'list' })
+}
 
 const membersLabel = computed(() => {
   const n = preview.value?.memberCount ?? 0
@@ -125,7 +131,7 @@ function changeName() {
     <template v-else-if="alreadyMember">
       <h1 class="display-title">{{ preview.name }}</h1>
       <p class="muted">Ya formas parte de este grupo.</p>
-      <RouterLink :to="{ name: 'list' }" class="btn btn-primary btn-block">Ir a la lista</RouterLink>
+      <button type="button" class="btn btn-primary btn-block" @click="openExisting">Ir a la lista</button>
     </template>
 
     <template v-else>

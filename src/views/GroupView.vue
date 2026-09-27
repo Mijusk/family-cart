@@ -1,19 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import { longDate, timeAgo } from '@/utils/date'
+import { friendlyError } from '@/utils/errors'
 import { initials } from '@/utils/text'
 
 const groupStore = useGroupStore()
 const toast = useToastStore()
+const router = useRouter()
 
 // Web Share and Clipboard need a secure context (HTTPS or localhost).
 const canShare = typeof navigator.share === 'function'
 
 const membersLabel = computed(() => {
-  const n = groupStore.members.length
+  const n = groupStore.activeMembers.length
   return n === 1 ? '1 miembro' : `${n} miembros`
 })
 
@@ -37,19 +41,40 @@ async function copy() {
     toast.show('No se pudo copiar: mantén pulsado el enlace')
   }
 }
+
+const leaving = ref(false)
+
+async function leave() {
+  const name = groupStore.group.name
+  const lastGroup = groupStore.memberships.length === 1
+  const question =
+    `¿Salir de ${name}? Dejarás de ver su lista en este dispositivo. Lo que compraste seguirá en su historial.` +
+    (lastGroup ? ' Es tu único grupo: volverás a la pantalla de bienvenida.' : '')
+  if (!window.confirm(question)) return
+  leaving.value = true
+  try {
+    await groupStore.leaveGroup()
+    toast.show(`Has salido de ${name}`)
+    await router.replace({ name: groupStore.status === 'no-group' ? 'welcome' : 'list' })
+  } catch (e) {
+    toast.show(friendlyError(e))
+  } finally {
+    leaving.value = false
+  }
+}
 </script>
 
 <template>
   <div class="page">
     <header class="page-header">
       <p class="eyebrow">Grupo</p>
-      <h1 class="display-title">{{ groupStore.group.name }}</h1>
+      <GroupSwitcher />
       <p class="muted">{{ membersLabel }} · desde el {{ longDate(groupStore.group.createdAt) }}</p>
     </header>
 
     <h2 class="section-title"><span>Quién está</span></h2>
     <ul class="rows">
-      <li v-for="member in groupStore.members" :key="member.id" class="member">
+      <li v-for="member in groupStore.activeMembers" :key="member.id" class="member">
         <span class="avatar" :class="{ me: groupStore.isMe(member.id) }" aria-hidden="true">
           {{ initials(member.name) }}
         </span>
@@ -85,10 +110,31 @@ async function copy() {
         </button>
       </div>
     </section>
+
+    <div class="leave">
+      <button type="button" class="btn btn-block leave-btn" :disabled="leaving" @click="leave">
+        {{ leaving ? 'Saliendo…' : 'Salir de este grupo' }}
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.leave {
+  margin-top: 32px;
+  padding: 0 var(--gutter);
+}
+
+.leave-btn {
+  border: 1.5px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  color: var(--warn);
+  background: transparent;
+}
+
+.leave-btn:hover {
+  background: var(--warn-soft);
+}
+
 .member {
   display: flex;
   align-items: center;

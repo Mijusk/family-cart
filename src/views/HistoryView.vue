@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
 import { useGroupStore } from '@/stores/group'
 import { useListStore, type TripSummary } from '@/stores/list'
@@ -41,7 +42,7 @@ function whoBought(summary: TripSummary) {
 <template>
   <div class="page">
     <header class="page-header">
-      <p class="eyebrow">Compra Familiar</p>
+      <GroupSwitcher variant="eyebrow" />
       <h1 class="display-title">Historial</h1>
       <p class="muted">Toca + para volver a apuntar algo en la lista.</p>
     </header>

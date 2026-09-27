@@ -28,8 +28,8 @@ abre una ventana privada para simular a otra persona de la familia.
 abres en el móvil conectado al mismo wifi. Si esa línea "Network" no aparece, revisa que el
 firewall de Windows no esté bloqueando el puerto.
 
-Para que el móvil también hable con Supabase, pon en `.env.local`
-`VITE_SUPABASE_URL=http://<IP-de-tu-PC>:54321` (127.0.0.1 en el móvil es el propio móvil, no tu PC).
+No hace falta tocar `.env.local` para el móvil: con Supabase local (`127.0.0.1`), la app usa
+el mismo host desde el que se abrió la página, así que en el móvil habla con la IP actual del PC.
 
 TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con TypeScript 7.
 
@@ -49,6 +49,10 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
 - **Tiempo real:** los stores aplican cada cambio en local al momento, lo guardan en Supabase (en cola,
   en orden) y escuchan Realtime; al reconectar (móvil que vuelve de segundo plano) recargan todo.
 - **Catálogo de autocompletado:** lo mantiene un trigger sobre `items`.
+- **Varios grupos:** un dispositivo puede estar en varios grupos (familia, amigos…). Se cambia
+  tocando el nombre del grupo arriba; el último abierto se recuerda en `localStorage`. "Salir de
+  este grupo" desvincula el dispositivo; si era el último de esa persona, el miembro queda marcado
+  (`members.left_at`) en vez de borrarse, para no perder sus compras del historial.
 - **Historial:** se cargan las compras de los últimos 60 días.
 - **Compras olvidadas:** un job de `pg_cron` (cada 15 min, dentro de la base de datos) cierra cualquier
   compra abierta hace más de 4 horas igual que "Finalizar compra": lo del carrito pasa a comprado a

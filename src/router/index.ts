@@ -46,6 +46,5 @@ router.beforeEach(async (to) => {
   // App.vue shows the error screen; let the navigation through so the URL is kept for a retry.
   if (groupStore.status === 'error') return true
   if (groupStore.status === 'no-group' && !to.meta.public) return { name: 'welcome' }
-  if (groupStore.status === 'ready' && to.name === 'welcome') return { name: 'list' }
   return true
 })
