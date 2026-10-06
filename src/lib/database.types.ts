@@ -38,13 +38,13 @@ export type Database = {
                   ]
                 },"items": {
                   Row: {
-                    "added_at": string,"added_by": string | null,"group_id": string,"id": string,"name": string,"note": string | null,"purchased_at": string | null,"purchased_by": string | null,"quantity": number,"status": Database["public"]['Enums']["item_status"],"trip_id": string | null
+                    "added_at": string,"added_by": string | null,"group_id": string,"id": string,"name": string,"note": string | null,"photo_path": string | null,"purchased_at": string | null,"purchased_by": string | null,"quantity": number,"status": Database["public"]['Enums']["item_status"],"trip_id": string | null
                   }
                   Insert: {
-                    "added_at"?: string,"added_by"?: string | null,"group_id": string,"id"?: string,"name": string,"note"?: string | null,"purchased_at"?: string | null,"purchased_by"?: string | null,"quantity"?: number,"status"?: Database["public"]['Enums']["item_status"],"trip_id"?: string | null
+                    "added_at"?: string,"added_by"?: string | null,"group_id": string,"id"?: string,"name": string,"note"?: string | null,"photo_path"?: string | null,"purchased_at"?: string | null,"purchased_by"?: string | null,"quantity"?: number,"status"?: Database["public"]['Enums']["item_status"],"trip_id"?: string | null
                   }
                   Update: {
-                    "added_at"?: string,"added_by"?: string | null,"group_id"?: string,"id"?: string,"name"?: string,"note"?: string | null,"purchased_at"?: string | null,"purchased_by"?: string | null,"quantity"?: number,"status"?: Database["public"]['Enums']["item_status"],"trip_id"?: string | null
+                    "added_at"?: string,"added_by"?: string | null,"group_id"?: string,"id"?: string,"name"?: string,"note"?: string | null,"photo_path"?: string | null,"purchased_at"?: string | null,"purchased_by"?: string | null,"quantity"?: number,"status"?: Database["public"]['Enums']["item_status"],"trip_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -209,6 +209,7 @@ isOneToOne: false
 "id": string,
 "name": string,
 "note": string | null,
+"photo_path": string | null,
 "purchased_at": string | null,
 "purchased_by": string | null,
 "quantity": number,

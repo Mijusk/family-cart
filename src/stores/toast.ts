@@ -5,6 +5,8 @@ export interface Toast {
   id: number
   message: string
   undo?: () => void
+  /** Runs when the toast goes away without being undone (timeout, OK, or replaced by another). */
+  done?: () => void
 }
 
 const DURATION_MS = 5000
@@ -14,21 +16,25 @@ export const useToastStore = defineStore('toast', () => {
   let nextId = 1
   let timer: ReturnType<typeof setTimeout> | undefined
 
-  function dismiss() {
+  function close(): Toast | null {
     clearTimeout(timer)
+    const toast = current.value
     current.value = null
+    return toast
   }
 
-  function show(message: string, undo?: () => void) {
-    clearTimeout(timer)
-    current.value = { id: nextId++, message, undo }
+  function dismiss() {
+    close()?.done?.()
+  }
+
+  function show(message: string, undo?: () => void, done?: () => void) {
+    dismiss()
+    current.value = { id: nextId++, message, undo, done }
     timer = setTimeout(dismiss, DURATION_MS)
   }
 
   function runUndo() {
-    const undo = current.value?.undo
-    dismiss()
-    undo?.()
+    close()?.undo?.()
   }
 
   return { current, show, dismiss, runUndo }

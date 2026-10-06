@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import PhotoThumb from '@/components/PhotoThumb.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
 import { useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
@@ -84,7 +85,8 @@ function cancel() {
     </h2>
     <ul v-if="toPick.length" class="rows">
       <li v-for="item in toPick" :key="item.id" class="shop-row">
-        <button type="button" class="pick" @click="list.toggleInCart(item.id)">
+        <PhotoThumb v-if="item.photoPath" class="shop-thumb" :path="item.photoPath" :alt="item.name" />
+        <button type="button" class="pick" :class="{ 'has-thumb': item.photoPath }" @click="list.toggleInCart(item.id)">
           <span class="box" aria-hidden="true" />
           <span class="text">
             <span class="name">{{ item.name }}</span>
@@ -109,7 +111,8 @@ function cancel() {
       </h2>
       <ul class="rows">
         <li v-for="item in notFound" :key="item.id" class="shop-row is-not-found">
-          <button type="button" class="pick" @click="list.toggleInCart(item.id)">
+          <PhotoThumb v-if="item.photoPath" class="shop-thumb" :path="item.photoPath" :alt="item.name" />
+          <button type="button" class="pick" :class="{ 'has-thumb': item.photoPath }" @click="list.toggleInCart(item.id)">
             <span class="box" aria-hidden="true" />
             <span class="text">
               <span class="name">{{ item.name }}</span>
@@ -128,7 +131,8 @@ function cancel() {
       </h2>
       <ul class="rows">
         <li v-for="item in cart" :key="item.id" class="shop-row in-cart">
-          <button type="button" class="pick" :aria-label="`Sacar ${item.name} del carrito`" @click="list.toggleInCart(item.id)">
+          <PhotoThumb v-if="item.photoPath" class="shop-thumb" :path="item.photoPath" :alt="item.name" />
+          <button type="button" class="pick" :class="{ 'has-thumb': item.photoPath }" :aria-label="`Sacar ${item.name} del carrito`" @click="list.toggleInCart(item.id)">
             <span class="box checked" aria-hidden="true"><AppIcon name="check" :size="18" /></span>
             <span class="text">
               <span class="name">{{ item.name }}</span>
@@ -219,6 +223,15 @@ function cancel() {
   min-height: 68px;
   padding: 10px 12px 10px var(--gutter);
   text-align: left;
+}
+
+.shop-thumb {
+  align-self: center;
+  margin-left: var(--gutter);
+}
+
+.pick.has-thumb {
+  padding-left: 12px;
 }
 
 .pick:active {

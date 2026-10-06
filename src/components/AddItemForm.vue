@@ -3,6 +3,7 @@ import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
 import { useListStore, type Suggestion } from '@/stores/list'
 import AppIcon from './AppIcon.vue'
+import PhotoPicker from './PhotoPicker.vue'
 import QuantityChip from './QuantityChip.vue'
 import QuantityStepper from './QuantityStepper.vue'
 
@@ -12,6 +13,7 @@ const groupStore = useGroupStore()
 const name = ref('')
 const quantity = ref(1)
 const note = ref('')
+const photo = ref<Blob | string | null>(null)
 const showNote = ref(false)
 const suggestionsOpen = ref(false)
 const highlighted = ref(-1)
@@ -29,6 +31,7 @@ function reset() {
   name.value = ''
   quantity.value = 1
   note.value = ''
+  photo.value = null
   showNote.value = false
   suggestionsOpen.value = false
   nameInput.value?.focus()
@@ -40,15 +43,18 @@ function pick(suggestion: Suggestion) {
   suggestionsOpen.value = false
 }
 
+/** The picker only ever holds a new photo here, never a stored path. */
+const newPhoto = () => (photo.value instanceof Blob ? photo.value : null)
+
 function addSeparately() {
   if (!canSubmit.value) return
-  list.addItem({ name: name.value, quantity: quantity.value, note: note.value })
+  list.addItem({ name: name.value, quantity: quantity.value, note: note.value, photo: newPhoto() })
   reset()
 }
 
 function mergeWithDuplicate() {
   if (!duplicate.value) return
-  list.mergeInto(duplicate.value.id, quantity.value, note.value)
+  list.mergeInto(duplicate.value.id, quantity.value, note.value, newPhoto())
   reset()
 }
 
@@ -76,39 +82,42 @@ function onKeydown(event: KeyboardEvent) {
 <template>
   <form class="add" autocomplete="off" @submit.prevent="submit">
     <label class="sr-only" for="new-item-name">Producto</label>
-    <div class="combo">
-      <input
-        id="new-item-name"
-        ref="nameInput"
-        v-model="name"
-        class="field name"
-        placeholder="¿Qué falta en casa?"
-        enterkeyhint="done"
-        role="combobox"
-        aria-autocomplete="list"
-        aria-controls="new-item-suggestions"
-        :aria-expanded="suggestions.length > 0"
-        @input="suggestionsOpen = true"
-        @focus="suggestionsOpen = true"
-        @blur="suggestionsOpen = false"
-        @keydown="onKeydown"
-      />
-      <ul v-if="suggestions.length" id="new-item-suggestions" class="suggestions" role="listbox">
-        <li v-for="(s, index) in suggestions" :key="s.product.id" role="option" :aria-selected="index === highlighted">
-          <!-- mousedown.prevent keeps focus in the input so blur doesn't close the list before the click lands -->
-          <button
-            type="button"
-            class="suggestion"
-            :class="{ active: index === highlighted }"
-            @mousedown.prevent
-            @click="pick(s)"
-          >
-            <span class="suggestion-name">{{ s.product.displayName }}</span>
-            <span v-if="s.pending" class="tag-pending">ya en la lista</span>
-            <QuantityChip :quantity="s.product.lastQuantity" muted />
-          </button>
-        </li>
-      </ul>
+    <div class="name-row">
+      <PhotoPicker v-model="photo" />
+      <div class="combo">
+        <input
+          id="new-item-name"
+          ref="nameInput"
+          v-model="name"
+          class="field name"
+          placeholder="¿Qué falta en casa?"
+          enterkeyhint="done"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="new-item-suggestions"
+          :aria-expanded="suggestions.length > 0"
+          @input="suggestionsOpen = true"
+          @focus="suggestionsOpen = true"
+          @blur="suggestionsOpen = false"
+          @keydown="onKeydown"
+        />
+        <ul v-if="suggestions.length" id="new-item-suggestions" class="suggestions" role="listbox">
+          <li v-for="(s, index) in suggestions" :key="s.product.id" role="option" :aria-selected="index === highlighted">
+            <!-- mousedown.prevent keeps focus in the input so blur doesn't close the list before the click lands -->
+            <button
+              type="button"
+              class="suggestion"
+              :class="{ active: index === highlighted }"
+              @mousedown.prevent
+              @click="pick(s)"
+            >
+              <span class="suggestion-name">{{ s.product.displayName }}</span>
+              <span v-if="s.pending" class="tag-pending">ya en la lista</span>
+              <QuantityChip :quantity="s.product.lastQuantity" muted />
+            </button>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <input
@@ -172,8 +181,15 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+.name-row {
+  display: flex;
+  gap: 8px;
+}
+
 .combo {
   position: relative;
+  flex: 1;
+  min-width: 0;
 }
 
 .name {

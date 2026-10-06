@@ -46,6 +46,8 @@ export interface Item {
   name: string
   quantity: number
   note: string | null
+  /** Object in the item-photos bucket: `<groupId>/<uuid>.jpg`. */
+  photoPath: string | null
   status: ItemStatus
   /** Null if that member was removed from the group. */
   addedBy: string | null

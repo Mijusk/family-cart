@@ -12,6 +12,7 @@ import {
   type ProductRow,
   type TripRow,
 } from '@/lib/mappers'
+import { deletePhoto, newPhotoPath, showPhotoLocally, uploadPhoto } from '@/lib/photos'
 import type { Item, Product, Trip } from '@/types'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
@@ -22,7 +23,12 @@ export interface NewItem {
   name: string
   quantity: number
   note?: string | null
+  /** Already shrunk (see shrinkPhoto). */
+  photo?: Blob | null
 }
+
+/** For edits: a new photo, null to remove it, undefined to leave it as it is. */
+export type PhotoChange = Blob | null | undefined
 
 export interface Suggestion {
   product: Product
@@ -254,16 +260,72 @@ export const useListStore = defineStore('list', () => {
     items.value = items.value.filter((i) => i.id !== id)
   }
 
+  /**
+   * Deletes a file nothing points to any more. Queued behind the writes that stopped using
+   * it; if it fails, all that's left is a stray file, so the user isn't bothered.
+   */
+  function removePhoto(path: string) {
+    writes = writes
+      .then(() => deletePhoto(path))
+      .then(({ error }) => {
+        if (error) console.error(error)
+      }, console.error)
+  }
+
+  /** Once an edit or delete can no longer be undone, the photo it replaced can go. */
+  function dropIfUnused(id: string, path: string | null) {
+    if (path && findItem(id)?.photoPath !== path) removePhoto(path)
+  }
+
+  /**
+   * Runs inside a queued write. If the upload fails the item goes back to its previous
+   * photo (or none) and the user is told; the rest of the change is still saved.
+   */
+  async function uploadFor(id: string, path: string, photo: Blob, previous: string | null): Promise<boolean> {
+    let error: unknown
+    try {
+      ;({ error } = await uploadPhoto(path, photo))
+    } catch (e) {
+      error = e
+    }
+    if (!error) return true
+    console.error(error)
+    const item = findItem(id)
+    if (item?.photoPath === path) item.photoPath = previous
+    toast.show('No se pudo subir la foto. Revisa la conexión.')
+    return false
+  }
+
+  /** New photo (or none) for an existing item. The old file stays until the change can't be undone. */
+  function setPhoto(item: Item, photo: Blob | null) {
+    const { id } = item
+    const previous = item.photoPath
+    const path = photo && newPhotoPath(item.groupId)
+    if (photo && path) showPhotoLocally(path, photo)
+    item.photoPath = path
+    persist(async () => {
+      if (photo && path && !(await uploadFor(id, path, photo, previous))) return { error: null }
+      return supabase.from('items').update({ photo_path: path }).eq('id', id)
+    })
+  }
+
   function updateRemote(id: string, changes: ItemUpdate) {
     persist(() => supabase.from('items').update(changes).eq('id', id))
   }
 
-  /** Undo for edits and merges: puts name, quantity and note back as they were. */
+  /** Undo for edits and merges: puts name, quantity, note and photo back as they were. */
   function restoreFields(snapshot: Item) {
     const item = findItem(snapshot.id)
     if (!item) return
-    Object.assign(item, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note })
-    updateRemote(snapshot.id, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note })
+    const discarded = item.photoPath !== snapshot.photoPath ? item.photoPath : null
+    Object.assign(item, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note, photoPath: snapshot.photoPath })
+    updateRemote(snapshot.id, {
+      name: snapshot.name,
+      quantity: snapshot.quantity,
+      note: snapshot.note,
+      photo_path: snapshot.photoPath,
+    })
+    if (discarded) removePhoto(discarded)
   }
 
   /** Undo for deletes: inserts the row again with the same id. */
@@ -272,21 +334,33 @@ export const useListStore = defineStore('list', () => {
     persist(() => supabase.from('items').insert(fromItem(snapshot)))
   }
 
-  function removeItem(id: string) {
+  /** Deletes the row but keeps its photo, so the delete can still be undone. */
+  function deleteRow(id: string) {
     removeLocal(id)
     persist(() => supabase.from('items').delete().eq('id', id))
+  }
+
+  /** Undo for adds: the row and its photo go for good. */
+  function removeItem(id: string) {
+    const path = findItem(id)?.photoPath
+    deleteRow(id)
+    if (path) removePhoto(path)
   }
 
   // ── List actions ───────────────────────────────────────────
 
   function addItem(input: NewItem): Item {
     const name = cleanDisplayName(input.name)
+    const photo = input.photo ?? null
+    const photoPath = photo && newPhotoPath(groupId.value!)
+    if (photo && photoPath) showPhotoLocally(photoPath, photo)
     const item: Item = {
       id: newId(),
       groupId: groupId.value!,
       name,
       quantity: Math.max(1, input.quantity),
       note: input.note?.trim() || null,
+      photoPath,
       status: 'pending',
       addedBy: groupStore.currentMemberId,
       addedAt: new Date().toISOString(),
@@ -296,13 +370,16 @@ export const useListStore = defineStore('list', () => {
     }
     items.value.push(item)
     rememberProductLocally(name, item.quantity)
-    persist(() => supabase.from('items').insert(fromItem(item)))
+    persist(async () => {
+      const uploaded = !photo || !photoPath || (await uploadFor(item.id, photoPath, photo, null))
+      return supabase.from('items').insert({ ...fromItem(item), photo_path: uploaded ? photoPath : null })
+    })
     toast.show(`Añadido: ${name}`, () => removeItem(item.id))
     return item
   }
 
   /** Adds quantity to an existing pending line instead of creating a duplicate. */
-  function mergeInto(id: string, quantity: number, note?: string | null) {
+  function mergeInto(id: string, quantity: number, note?: string | null, photo?: Blob | null) {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
@@ -313,42 +390,58 @@ export const useListStore = defineStore('list', () => {
       item.note = item.note ? `${item.note} · ${extraNote}` : extraNote
     }
     rememberProductLocally(item.name, add)
+    // Queued before the RPC, whose answer then already carries the new photo.
+    if (photo) setPhoto(item, photo)
     // The RPC adds on the server, so a concurrent add from another phone isn't lost.
     persist(async () => {
       const res = await supabase.rpc('merge_item', { item_id: id, add_quantity: add, extra_note: extraNote ?? undefined })
       if (res.data) upsert(items, toItem(res.data))
       return res
     })
-    toast.show(`${item.name}: ahora ${item.quantity}`, () => restoreFields(snapshot))
+    toast.show(
+      `${item.name}: ahora ${item.quantity}`,
+      () => restoreFields(snapshot),
+      () => dropIfUnused(id, snapshot.photoPath),
+    )
   }
 
   /** Adds to the list, merging with a pending line of the same product if there is one. */
   function addOrMerge(input: NewItem) {
     const duplicate = findPendingDuplicate(input.name)
-    if (duplicate) mergeInto(duplicate.id, input.quantity, input.note)
+    if (duplicate) mergeInto(duplicate.id, input.quantity, input.note, input.photo)
     else addItem(input)
   }
 
-  function updateItem(id: string, changes: Pick<Item, 'name' | 'quantity' | 'note'>) {
+  function updateItem(id: string, changes: Pick<Item, 'name' | 'quantity' | 'note'> & { photo?: PhotoChange }) {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
     item.name = cleanDisplayName(changes.name) || item.name
     item.quantity = Math.max(1, changes.quantity)
     item.note = changes.note?.trim() || null
-    const changed =
+    const photoChanged = changes.photo !== undefined && (changes.photo !== null || item.photoPath !== null)
+    const fieldsChanged =
       item.name !== snapshot.name || item.quantity !== snapshot.quantity || item.note !== snapshot.note
-    if (!changed) return
-    updateRemote(id, { name: item.name, quantity: item.quantity, note: item.note })
-    toast.show('Cambios guardados', () => restoreFields(snapshot))
+    if (!fieldsChanged && !photoChanged) return
+    if (fieldsChanged) updateRemote(id, { name: item.name, quantity: item.quantity, note: item.note })
+    if (photoChanged) setPhoto(item, changes.photo ?? null)
+    toast.show(
+      'Cambios guardados',
+      () => restoreFields(snapshot),
+      () => dropIfUnused(id, snapshot.photoPath),
+    )
   }
 
   function deleteItem(id: string) {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
-    removeItem(id)
-    toast.show(`Borrado: ${item.name}`, () => restoreDeleted(snapshot))
+    deleteRow(id)
+    toast.show(
+      `Borrado: ${item.name}`,
+      () => restoreDeleted(snapshot),
+      () => dropIfUnused(id, snapshot.photoPath),
+    )
   }
 
   // ── Shopping trip actions ──────────────────────────────────
