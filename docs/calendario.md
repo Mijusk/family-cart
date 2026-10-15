@@ -26,8 +26,8 @@ La compra sigue existiendo como otra sección de la misma app.
 9. **El calendario es de cada persona**, organizado en carpetas ("Ejercicio", "Trabajo", "Universidad"…). Compartir una carpeta comparte todos sus eventos.
 10. **Se comparte solo con grupos.** Para compartir con una persona concreta se crea un grupo pequeño ("Pareja", "Padres").
 11. **Un evento puede sumar grupos**, nunca restarlos. Lo privado va en una carpeta sin grupos.
-12. **Modo "ocupado":** una carpeta se puede compartir con un grupo mostrando solo "ocupado" (sin título ni detalles). Desactivado por defecto.
-13. **Repeticiones:** puntual, diaria, semanal (uno o varios días), cada dos semanas y mensual (mismo día del mes), con fecha de fin opcional.
+12. **Modo "ocupado":** una carpeta se puede compartir con un grupo mostrando solo "ocupado" (sin título ni detalles). Desactivado por defecto. Los administradores de ese grupo **no** pueden editar una carpeta compartida en modo ocupado; solo las compartidas en completo.
+13. **Repeticiones:** puntual, diaria, semanal (uno o varios días), cada dos semanas y mensual (mismo día del mes), con fecha de fin opcional. **Cruzar medianoche:** si la hora de fin es menor que la de inicio (23:00–01:00), el evento acaba al día siguiente (sin fecha de fin; como máximo 24 h).
 14. **Por defecto,** el evento nuevo va a la última carpeta usada, con sus grupos.
 15. **Ediciones simultáneas:** gana el último cambio, se ve un aviso de "X está editando este evento" y todo queda en el historial.
 16. **Tiempo real:** los cambios se ven al instante, como en la compra.
@@ -93,13 +93,14 @@ Las tres capas (rutina diaria, horario semanal, eventos puntuales) no necesitan 
 - `event_id`, `person_id`
 
 **event_exceptions**
-- `event_id`, `occurrence_date`, `status` (`cancelled` | `modified`), `overrides` (jsonb)
-- auditoría
+- `event_id`, `occurrence_date`, `status` (`cancelled` | `modified`), `overrides` (jsonb: solo `title`, `notes`, `location`, `all_day`, `start_date`, `start_time`, `end_time`)
+- `created_*` y `updated_*`; quitar una excepción borra la fila y queda en `event_history`.
 
 **event_history**
-- `id`, `event_id`, `action` (`create` | `update` | `delete` | `restore` | `purge`)
-- `changed_by`, `changed_at`, `before`, `after` (jsonb)
-- Lo rellena un **trigger**; el front nunca escribe aquí.
+- `id`, `event_id`, `calendar_id`, `action` (`create` | `update` | `delete` | `restore` | `purge`)
+- `changed_by`, `changed_at`, `before`, `after` (jsonb, solo los campos que cambian)
+- Lo rellena un **trigger**; el front nunca escribe aquí. Los cambios de excepciones, grupos extra y participantes se guardan como `update` del evento.
+- Sin claves foráneas: tras eliminar un evento queda su línea mínima, y `calendar_id` dice quién puede leerla (quien edita la carpeta).
 
 Las tablas de la compra (`products`, `items`, `trips`) se mantienen y siguen apuntando a `members.id`. Desaparecen `member_identities` y el login anónimo.
 
@@ -119,9 +120,17 @@ Con `level = busy` solo ve la franja horaria, con el texto "Ocupado". Esto se re
 - es administrador de un grupo en el que esa carpeta está compartida, o
 - (persona sin cuenta) es administrador de un grupo del que esa persona es miembro.
 
-**Puede compartir una carpeta con un grupo** quien puede editarla y es miembro activo de ese grupo.
+(La segunda regla solo con `level = full`.)
 
-Funciones auxiliares: `my_person_id()`, `is_active_member(gid)`, `is_group_admin(gid)`, `can_edit_calendar(cid)`, `can_view_event(eid)`.
+**Puede compartir una carpeta con un grupo** quien puede editarla y es miembro activo de ese grupo, siempre que el dueño también sea miembro activo. Lo mismo para añadir un grupo a un evento.
+
+**Participantes:** los añade quien edita el evento, entre las personas con las que comparte grupo. Un participante puede quitarse él mismo.
+
+**Salir de un grupo** borra los `calendar_shares` y `event_shares` de sus carpetas con ese grupo y le quita como participante de los eventos compartidos con él. Si vuelve, comparte de nuevo.
+
+Funciones auxiliares: `my_person_id()`, `is_group_member(gid)` (el `is_active_member` del diseño), `is_group_admin(gid)`, `can_edit_calendar(cid)`, `can_view_calendar(cid)`, `can_view_event(eid)`, `can_edit_event(eid)`, `can_share_calendar(cid, gid)`, `can_share_event(eid, gid)`.
+
+El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y excepciones (sin título, notas ni lugar) de los eventos que el usuario no puede ver completos.
 
 ## 6. Registro de cambios
 
@@ -135,7 +144,8 @@ Funciones auxiliares: `my_person_id()`, `is_active_member(gid)`, `is_group_admin
 - **Borrado en bloque:** al borrar una carpeta, sus eventos se marcan con el mismo `deletion_batch`. Restaurarla devuelve exactamente ese lote.
 - **Restaurar** devuelve también sus grupos compartidos.
 - **Quién la ve:** quien puede editar esa carpeta.
-- **Vaciado:** tarea programada en Postgres que elimina lo que lleva más de 30 días borrado. También se puede eliminar a mano.
+- **Vaciado:** tarea programada en Postgres (`empty_trash()`, cada noche a las 04:00 UTC) que elimina lo que lleva más de 30 días borrado. También se puede eliminar a mano.
+- **RPCs:** `delete_event`, `restore_event`, `delete_calendar`, `restore_calendar`, `purge_event`, `purge_calendar`. Un evento borrado junto con su carpeta solo vuelve restaurando la carpeta.
 - Al eliminar definitivamente se conserva una línea mínima en el historial (título, quién y cuándo).
 
 ## 8. Pantallas V1
@@ -173,7 +183,7 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 - **Vistas de semana y mes:** componente propio o librería para Vue.
 - **Fechas:** cálculo de repeticiones y cambio de hora en el navegador.
 - **Emails de Supabase:** el remitente por defecto tiene un límite bajo de envíos; para producción hará falta un SMTP propio (p. ej. Resend).
-- **Casos límite:** eventos que cruzan medianoche, todo el día, cambiar una serie "a partir de esta semana".
+- **Casos límite:** todo el día, cambiar una serie "a partir de esta semana".
 
 ## 11. Forma de trabajo
 
@@ -183,7 +193,7 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 ## 12. Orden de trabajo
 
 1. **PR 1 — Cuentas y grupos** ✅: login con email, `people`, roles, aprobación de entrada, secciones por grupo. La compra sigue funcionando.
-2. **PR 2 — Esquema del calendario:** tablas, permisos, historial y papelera, con pruebas de RLS.
+2. **PR 2 — Esquema del calendario** ✅: tablas, permisos, historial y papelera, con pruebas de RLS.
 3. **PR 3 — Evento y Hoy.**
 4. **PR 4 — Semana y Mes.**
 5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera.**

@@ -21,6 +21,11 @@ decisiones tomadas con Luis y plan de PRs (§12).
   `status` pending/active, `left_at`; nunca se borran) → `groups` (`timezone`,
   `shopping_enabled`, `calendar_enabled`).
 - Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial.
+- Calendario: `calendars` (carpetas de una persona) → `events` (repetición en columnas
+  simples) + `event_exceptions`, `event_participants`. Se comparte con grupos vía
+  `calendar_shares` (`full`/`busy`) y `event_shares`. El modo ocupado se lee solo con la RPC
+  `busy_events(gid)`. Borrado suave con `deletion_batch` y RPCs de papelera; `event_history`
+  lo escriben triggers.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 
@@ -48,7 +53,8 @@ npm run build      # vue-tsc + vite build
 
 Datos de prueba (`seed.sql`), contraseña `demo1234`: `marta@ejemplo.com` (admin),
 `daniel@ejemplo.com` (miembro), `lucia@ejemplo.com` (pendiente); perfiles sin cuenta
-Abuela Carmen y Pablo (código `PABLO7Q4KM`); grupo "Casa Martín" (invitación `HUERTA7Q4K`).
+Abuela Carmen y Pablo (código `PABLO7Q4KM`); grupo "Casa Martín" (invitación `HUERTA7Q4K`). Calendario: "Trabajo" de Marta y "Colegio" de
+Pablo compartidos en completo, "Gimnasio" de Daniel en modo ocupado, "Médico" de Marta privado.
 
 ## Convenciones
 
@@ -65,8 +71,8 @@ Abuela Carmen y Pablo (código `PABLO7Q4KM`); grupo "Casa Martín" (invitación 
 
 - Luis (frontend dev) revisa todo. Un PR por bloque del plan, en rama `feat/...`;
   nunca commits directos a `main`.
-- Migraciones: mientras no haya datos reales, se puede editar la migración consolidada;
-  cuando haya producción, solo migraciones nuevas.
+- Migraciones: una nueva por PR (Luis las aplica en Supabase Cloud). Mientras no haya datos
+  reales se puede rehacer una migración que aún no esté aplicada.
 - Si el entorno de Claude no puede instalar dependencias ni levantar Docker (sandbox en
   la nube), probar el SQL en un Postgres local con un stub de Supabase **incluyendo
   `alter default privileges ... grant all on tables to anon, authenticated`**, y pedir a
