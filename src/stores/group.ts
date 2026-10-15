@@ -1,18 +1,27 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
+import { isAuthRetryableFetchError, type RealtimeChannel, type RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { toGroup, toMember, type GroupRow, type MemberRow } from '@/lib/mappers'
-import type { Group, Member, Membership } from '@/types'
+import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
+import type { Group, Member, MemberRole, Membership, Person } from '@/types'
 import { useListStore } from './list'
 
-/** loading → (no-group | ready); error if Supabase can't be reached. */
-export type SessionStatus = 'loading' | 'no-group' | 'ready' | 'error'
+/**
+ * loading → signed-out | no-group | ready; error if Supabase can't be reached.
+ * no-group: signed in, but not an active member of any group (maybe waiting for approval).
+ */
+export type SessionStatus = 'loading' | 'signed-out' | 'no-group' | 'ready' | 'error'
 
 export interface InvitePreview {
   id: string
   name: string
   memberCount: number
+}
+
+export interface GroupSettings {
+  name?: string
+  shoppingEnabled?: boolean
+  calendarEnabled?: boolean
 }
 
 /** Last group opened on this device, so the app reopens it next time. */
@@ -40,24 +49,36 @@ export const useGroupStore = defineStore('group', () => {
   const status = ref<SessionStatus>('loading')
   const errorMessage = ref<string | null>(null)
   const userId = ref<string | null>(null)
+  const email = ref<string | null>(null)
+  /** The signed-in person. */
+  const me = ref<Person | null>(null)
   const current = ref<Group | null>(null)
+  /** Everyone who has ever been in the current group, pending requests included. */
   const members = ref<Member[]>([])
-  /** Every group this device belongs to, newest first. */
+  /** Every group this person is in or has asked to join, newest first. */
   const memberships = ref<Membership[]>([])
   let channel: RealtimeChannel | null = null
+  let myChannel: RealtimeChannel | null = null
   /** Group being shown (or opened); late answers for any other group are discarded. */
   let activeGroupId: string | null = null
   let initPromise: Promise<void> | null = null
+  let listening = false
 
   /** Screens behind the router guard only render once status is 'ready', so the group is always there. */
   const group = computed(() => current.value!)
 
-  /** The member this device acts as, from member_identities (several devices can share one member). */
+  /** The member this person is in the current group. */
   const myMemberId = ref('')
   const currentMemberId = computed(() => myMemberId.value)
 
   /** People currently in the group; those who left stay in `members` so the history keeps their names. */
-  const activeMembers = computed(() => members.value.filter((m) => !m.leftAt))
+  const activeMembers = computed(() => members.value.filter((m) => m.status === 'active' && !m.leftAt))
+  const pendingMembers = computed(() => members.value.filter((m) => m.status === 'pending' && !m.leftAt))
+
+  const isAdmin = computed(() => members.value.some((m) => m.id === myMemberId.value && m.role === 'admin'))
+
+  const activeMemberships = computed(() => memberships.value.filter((m) => m.status === 'active'))
+  const pendingMemberships = computed(() => memberships.value.filter((m) => m.status === 'pending'))
 
   const inviteUrl = computed(() => `${window.location.origin}/unirse/${current.value?.inviteCode ?? ''}`)
 
@@ -65,7 +86,7 @@ export const useGroupStore = defineStore('group', () => {
     return id !== null && id === currentMemberId.value
   }
 
-  /** Member name, or "Tú" for the current device's member. */
+  /** Member name, or "Tú" for the signed-in person's member. */
   function memberName(id: string | null): string {
     if (isMe(id)) return 'Tú'
     const member = members.value.find((m) => m.id === id)
@@ -74,6 +95,10 @@ export const useGroupStore = defineStore('group', () => {
       refreshSoon()
     }
     return member?.name ?? 'Alguien'
+  }
+
+  function memberColor(id: string | null): string | undefined {
+    return members.value.find((m) => m.id === id)?.color
   }
 
   // An unknown member id means we missed someone joining; reload the member list (once per id).
@@ -91,28 +116,65 @@ export const useGroupStore = defineStore('group', () => {
 
   // ── Session ────────────────────────────────────────────────
 
-  /** Signs the device in (anonymously the first time) and loads its group. Safe to call repeatedly. */
+  /** Loads the session and its group. Safe to call repeatedly. */
   function init(): Promise<void> {
+    listenToAuth()
     initPromise ??= bootstrap()
     return initPromise
+  }
+
+  /** Starts over after signing in or out. */
+  function reload(): Promise<void> {
+    initPromise = null
+    return init()
   }
 
   async function bootstrap() {
     status.value = 'loading'
     errorMessage.value = null
     try {
-      const { data } = await supabase.auth.getSession()
-      let uid = data.session?.user.id
-      if (!uid) {
-        const { data: signIn, error } = await supabase.auth.signInAnonymously()
-        if (error) throw error
-        uid = signIn.user!.id
+      const { data, error } = await supabase.auth.getSession()
+      // Offline: show the retry screen. Any other auth error (an expired or revoked session) means
+      // signing in again.
+      if (error && isAuthRetryableFetchError(error)) throw error
+      const user = error ? null : data.session?.user
+      if (!user) {
+        clearSession()
+        status.value = 'signed-out'
+        return
       }
-      userId.value = uid
+      userId.value = user.id
+      email.value = user.email ?? null
+      // Sessions from before email accounts (anonymous devices) have no person: start over.
+      if (user.is_anonymous || !(await loadMe())) {
+        // Cleared first, so the SIGNED_OUT event this fires doesn't start another reload.
+        clearSession()
+        await supabase.auth.signOut({ scope: 'local' })
+        status.value = 'signed-out'
+        return
+      }
+      subscribeToMine()
       await loadGroup()
     } catch (e) {
       fail(e)
     }
+  }
+
+  /** Signing in or out on this tab or another one starts the app over for the new session. */
+  function listenToAuth() {
+    if (listening) return
+    listening = true
+    supabase.auth.onAuthStateChange((event, session) => {
+      const newUser = session?.user.id ?? null
+      const signedOut = event === 'SIGNED_OUT' && userId.value !== null
+      const otherUser = newUser !== null && userId.value !== null && newUser !== userId.value
+      if (signedOut || otherUser) {
+        // Deferred: Supabase calls this while holding its auth lock, and reload() queries again.
+        setTimeout(() => void reload(), 0)
+      } else if (event === 'USER_UPDATED' && session) {
+        email.value = session.user.email ?? null
+      }
+    })
   }
 
   /** Shows the error screen; its retry button runs init() again from scratch. */
@@ -123,11 +185,30 @@ export const useGroupStore = defineStore('group', () => {
     initPromise = null
   }
 
+  function clearSession() {
+    closeGroup()
+    if (myChannel) void supabase.removeChannel(myChannel)
+    myChannel = null
+    userId.value = null
+    email.value = null
+    me.value = null
+    memberships.value = []
+  }
+
+  /** Loads the signed-in person; false if this account has none. */
+  async function loadMe(): Promise<boolean> {
+    const { data, error } = await supabase.from('people').select().eq('user_id', userId.value!).maybeSingle()
+    if (error) throw error
+    me.value = data ? toPerson(data) : null
+    return !!data
+  }
+
   async function loadMemberships() {
     const { data, error } = await supabase
-      .from('member_identities')
-      .select('group_id, member_id, created_at')
-      .eq('user_id', userId.value!)
+      .from('members')
+      .select('id, group_id, role, status, created_at')
+      .eq('person_id', me.value!.id)
+      .is('left_at', null)
       .order('created_at', { ascending: false })
     if (error) throw error
     if (!data.length) {
@@ -146,7 +227,9 @@ export const useGroupStore = defineStore('group', () => {
     memberships.value = data.map((d) => ({
       groupId: d.group_id,
       groupName: names.get(d.group_id) ?? '',
-      memberId: d.member_id,
+      memberId: d.id,
+      role: d.role as MemberRole,
+      status: d.status as Membership['status'],
       joinedAt: d.created_at,
     }))
   }
@@ -155,7 +238,8 @@ export const useGroupStore = defineStore('group', () => {
   async function loadGroup(groupId?: string) {
     await loadMemberships()
     const wanted = groupId ?? readActiveGroup()
-    const target = memberships.value.find((m) => m.groupId === wanted) ?? memberships.value[0]
+    const active = activeMemberships.value
+    const target = active.find((m) => m.groupId === wanted) ?? active[0]
     if (!target) {
       closeGroup()
       status.value = 'no-group'
@@ -188,7 +272,7 @@ export const useGroupStore = defineStore('group', () => {
 
   /** Every screen follows: lists, history and group all read the active group. */
   async function switchGroup(groupId: string) {
-    const target = memberships.value.find((m) => m.groupId === groupId)
+    const target = activeMemberships.value.find((m) => m.groupId === groupId)
     if (!target || groupId === current.value?.id) return
     status.value = 'loading'
     try {
@@ -198,8 +282,12 @@ export const useGroupStore = defineStore('group', () => {
     }
   }
 
-  function isMemberOf(groupId: string): boolean {
-    return memberships.value.some((m) => m.groupId === groupId)
+  function isActiveMemberOf(groupId: string): boolean {
+    return activeMemberships.value.some((m) => m.groupId === groupId)
+  }
+
+  function isPendingIn(groupId: string): boolean {
+    return pendingMemberships.value.some((m) => m.groupId === groupId)
   }
 
   async function refresh(gid: string) {
@@ -207,12 +295,23 @@ export const useGroupStore = defineStore('group', () => {
       supabase.from('groups').select().eq('id', gid).single(),
       supabase.from('members').select().eq('group_id', gid).order('created_at'),
     ])
-    // Switched group while loading: this answer belongs to the old one.
-    if (gid !== activeGroupId) return
     if (groupRes.error) throw groupRes.error
     if (membersRes.error) throw membersRes.error
+    const peopleRes = await supabase
+      .from('people')
+      .select()
+      .in(
+        'id',
+        membersRes.data.map((m) => m.person_id),
+      )
+    if (peopleRes.error) throw peopleRes.error
+    // Switched group while loading: this answer belongs to the old one.
+    if (gid !== activeGroupId) return
+    const people = new Map(peopleRes.data.map((p) => [p.id, toPerson(p)]))
     current.value = toGroup(groupRes.data)
-    members.value = membersRes.data.map(toMember)
+    members.value = membersRes.data.map((m) => toMember(m, people.get(m.person_id)))
+    const mine = people.get(me.value?.id ?? '')
+    if (mine) me.value = mine
     renameMembership(current.value)
   }
 
@@ -223,18 +322,14 @@ export const useGroupStore = defineStore('group', () => {
 
   function subscribe(gid: string) {
     if (channel) void supabase.removeChannel(channel)
+    // Member and person changes are rare (joins, approvals, renames): reloading the whole
+    // list is simpler than patching it, and keeps names and roles consistent.
     channel = supabase
       .channel(`group:${gid}`)
-      .on<MemberRow>('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `group_id=eq.${gid}` }, (p) => {
-        if (p.eventType === 'DELETE') {
-          members.value = members.value.filter((m) => m.id !== p.old.id)
-          return
-        }
-        const member = toMember(p.new)
-        const index = members.value.findIndex((m) => m.id === member.id)
-        if (index === -1) members.value.push(member)
-        else members.value[index] = member
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `group_id=eq.${gid}` }, () =>
+        refreshSoon(),
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'people' }, () => refreshSoon())
       .on<GroupRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'groups', filter: `id=eq.${gid}` }, (p) => {
         current.value = toGroup(p.new)
         renameMembership(current.value)
@@ -249,10 +344,41 @@ export const useGroupStore = defineStore('group', () => {
       })
   }
 
+  /**
+   * My own membership rows: being approved, removed or made admin anywhere. A pending request
+   * that gets approved opens that group; losing the current group opens another one.
+   */
+  function subscribeToMine() {
+    if (myChannel) void supabase.removeChannel(myChannel)
+    const pid = me.value!.id
+    myChannel = supabase
+      .channel(`person:${pid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `person_id=eq.${pid}` }, () => {
+        void onMyMembershipsChanged()
+      })
+      .subscribe()
+  }
+
+  async function onMyMembershipsChanged() {
+    try {
+      await loadMemberships()
+      const stillIn = current.value && isActiveMemberOf(current.value.id)
+      if (status.value === 'no-group' || (status.value === 'ready' && !stillIn)) {
+        await loadGroup()
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   // ── Create / join ──────────────────────────────────────────
 
-  async function createGroup(groupName: string, memberName: string) {
-    const { data, error } = await supabase.rpc('create_group', { group_name: groupName, member_name: memberName })
+  async function createGroup(groupName: string, sections: { shopping: boolean; calendar: boolean }) {
+    const { data, error } = await supabase.rpc('create_group', {
+      group_name: groupName,
+      with_shopping: sections.shopping,
+      with_calendar: sections.calendar,
+    })
     if (error) throw error
     await loadGroup(data)
   }
@@ -264,29 +390,38 @@ export const useGroupStore = defineStore('group', () => {
     return row ? { id: row.id, name: row.name, memberCount: row.member_count } : null
   }
 
-  /** Existing member whose name matches once normalized (case, accents, spaces), if any. */
-  async function findMemberByName(code: string, memberName: string): Promise<{ id: string; name: string } | null> {
-    const { data, error } = await supabase.rpc('check_member_name', { code, member_name: memberName })
+  /** Asks to join; an admin has to approve it. */
+  async function requestJoin(code: string) {
+    const { error } = await supabase.rpc('request_join', { code })
     if (error) throw error
-    return data[0] ?? null
+    await loadMemberships()
   }
 
-  /** Creates a new member. The server refuses a name already taken in the group ("member name taken"). */
-  async function joinGroup(code: string, memberName: string) {
-    const { data, error } = await supabase.rpc('join_group', { code, member_name: memberName })
+  /** Withdraws a pending request. */
+  async function cancelRequest(groupId: string) {
+    const { error } = await supabase.rpc('leave_group', { gid: groupId })
     if (error) throw error
-    await loadGroup(data)
+    await loadMemberships()
   }
 
-  /** "It's me on another device": this device becomes that existing member. */
-  async function claimMember(code: string, memberId: string) {
-    const { data, error } = await supabase.rpc('claim_member', { code, member_id: memberId })
+  async function previewClaim(code: string): Promise<{ id: string; displayName: string } | null> {
+    const { data, error } = await supabase.rpc('profile_by_claim_code', { code })
     if (error) throw error
-    await loadGroup(data)
+    const row = data[0]
+    return row ? { id: row.id, displayName: row.display_name } : null
+  }
+
+  /** This account becomes that profile, with its groups and history. */
+  async function claimProfile(code: string) {
+    const { error } = await supabase.rpc('claim_profile', { code })
+    if (error) throw error
+    await loadMe()
+    subscribeToMine()
+    await loadGroup()
   }
 
   /**
-   * Unlinks this device from the active group and opens the next one, if any.
+   * Leaves the active group and opens the next one, if any.
    * Returns the name of the group left.
    */
   async function leaveGroup(): Promise<string> {
@@ -295,7 +430,7 @@ export const useGroupStore = defineStore('group', () => {
     if (error) throw error
     memberships.value = memberships.value.filter((m) => m.groupId !== left.id)
     writeActiveGroup(null)
-    const next = memberships.value[0]
+    const next = activeMemberships.value[0]
     if (next) {
       status.value = 'loading'
       try {
@@ -310,25 +445,113 @@ export const useGroupStore = defineStore('group', () => {
     return left.name
   }
 
+  // ── Admin ──────────────────────────────────────────────────
+
+  async function rpcThenRefresh(run: () => PromiseLike<{ error: unknown }>) {
+    const { error } = await run()
+    if (error) throw error
+    await refresh(current.value!.id)
+  }
+
+  const approveMember = (memberId: string) =>
+    rpcThenRefresh(() => supabase.rpc('approve_member', { member_id: memberId }))
+
+  const rejectMember = (memberId: string) =>
+    rpcThenRefresh(() => supabase.rpc('reject_member', { member_id: memberId }))
+
+  const removeMember = (memberId: string) =>
+    rpcThenRefresh(() => supabase.rpc('remove_member', { member_id: memberId }))
+
+  const setMemberRole = (memberId: string, role: MemberRole) =>
+    rpcThenRefresh(() => supabase.rpc('set_member_role', { member_id: memberId, new_role: role }))
+
+  /** Adds someone without an account (a young child) to the current group. */
+  const createProfile = (displayName: string) =>
+    rpcThenRefresh(() => supabase.rpc('create_profile', { gid: current.value!.id, display_name: displayName }))
+
+  /** Code for that profile's owner to take it over from their own new account. */
+  async function createClaimCode(personId: string): Promise<string> {
+    const { data, error } = await supabase.rpc('create_claim_code', { pid: personId })
+    if (error) throw error
+    return data
+  }
+
+  /** The old invite link stops working. */
+  async function regenerateInviteCode() {
+    const { data, error } = await supabase.rpc('regenerate_invite_code', { gid: current.value!.id })
+    if (error) throw error
+    current.value = { ...current.value!, inviteCode: data }
+  }
+
+  async function updateGroup(settings: GroupSettings) {
+    const { data, error } = await supabase
+      .from('groups')
+      .update({
+        name: settings.name,
+        shopping_enabled: settings.shoppingEnabled,
+        calendar_enabled: settings.calendarEnabled,
+      })
+      .eq('id', current.value!.id)
+      .select()
+      .single()
+    if (error) throw error
+    current.value = toGroup(data)
+    renameMembership(current.value)
+  }
+
+  // ── Profile ────────────────────────────────────────────────
+
+  /** My own name and color, or those of a profile I manage. */
+  async function updatePerson(personId: string, changes: { displayName?: string; color?: string }) {
+    const { data, error } = await supabase
+      .from('people')
+      .update({ display_name: changes.displayName, color: changes.color })
+      .eq('id', personId)
+      .select()
+      .single()
+    if (error) throw error
+    if (personId === me.value?.id) me.value = toPerson(data)
+    if (current.value) await refresh(current.value.id)
+  }
+
   return {
     status,
     errorMessage,
+    email,
+    me,
     group,
     members,
     activeMembers,
+    pendingMembers,
+    isAdmin,
     memberships,
+    activeMemberships,
+    pendingMemberships,
     currentMemberId,
     inviteUrl,
     isMe,
     memberName,
+    memberColor,
     init,
+    reload,
     switchGroup,
-    isMemberOf,
+    isActiveMemberOf,
+    isPendingIn,
     leaveGroup,
     createGroup,
     previewInvite,
-    findMemberByName,
-    joinGroup,
-    claimMember,
+    requestJoin,
+    cancelRequest,
+    previewClaim,
+    claimProfile,
+    approveMember,
+    rejectMember,
+    removeMember,
+    setMemberRole,
+    createProfile,
+    createClaimCode,
+    regenerateInviteCode,
+    updateGroup,
+    updatePerson,
   }
 })

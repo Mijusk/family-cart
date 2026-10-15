@@ -1,19 +1,28 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useGroupStore } from '@/stores/group'
 import { useListStore } from '@/stores/list'
 import AppIcon, { type IconName } from './AppIcon.vue'
 
 const list = useListStore()
+const groupStore = useGroupStore()
 
-const tabs: { to: string; label: string; icon: IconName }[] = [
-  { to: '/', label: 'Lista', icon: 'list' },
-  { to: '/historial', label: 'Historial', icon: 'history' },
-  { to: '/grupo', label: 'Grupo', icon: 'group' },
-]
+/** Only the sections this group uses, plus the group itself. */
+const tabs = computed(() => {
+  const { shoppingEnabled, calendarEnabled } = groupStore.group
+  const all: { to: string; label: string; icon: IconName; show: boolean }[] = [
+    { to: '/', label: 'Lista', icon: 'list', show: shoppingEnabled },
+    { to: '/historial', label: 'Historial', icon: 'history', show: shoppingEnabled },
+    { to: '/calendario', label: 'Calendario', icon: 'calendar', show: calendarEnabled },
+    { to: '/grupo', label: 'Grupo', icon: 'group', show: true },
+  ]
+  return all.filter((tab) => tab.show)
+})
 </script>
 
 <template>
-  <nav class="nav" aria-label="Secciones">
+  <nav class="nav" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
     <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab" exact-active-class="active">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
@@ -42,7 +51,7 @@ const tabs: { to: string; label: string; icon: IconName }[] = [
 .tab {
   position: relative;
   flex: 1;
-  max-width: calc(var(--column) / 3);
+  max-width: calc(var(--column) / var(--tabs));
   display: flex;
   flex-direction: column;
   align-items: center;

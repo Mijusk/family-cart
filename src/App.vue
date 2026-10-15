@@ -1,22 +1,53 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import BottomNav from '@/components/BottomNav.vue'
 import UndoToast from '@/components/UndoToast.vue'
+import { sectionRedirect } from '@/router'
 import { useGroupStore } from '@/stores/group'
 
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
 
-const canShowRoute = computed(
-  () => groupStore.status === 'error' || groupStore.status === 'ready' || (groupStore.status === 'no-group' && route.meta.public),
+const canShowRoute = computed(() => {
+  if (route.meta.anyone) return groupStore.status !== 'loading'
+  switch (groupStore.status) {
+    case 'error':
+    case 'ready':
+      return true
+    case 'signed-out':
+      return !!route.meta.guest
+    case 'no-group':
+      return !!route.meta.public
+    default:
+      return false
+  }
+})
+
+// The session can change under the current screen: signing out (here or in another tab), being
+// removed from the group, or an admin switching off the section on screen.
+watch(
+  () => [groupStore.status, groupStore.status === 'ready' && groupStore.group] as const,
+  async ([status]) => {
+    // The sign-in screen moves on by itself once the new session has loaded.
+    if (route.meta.guest || route.meta.anyone) return
+    if (status === 'signed-out') {
+      await router.replace({ name: 'login' })
+    } else if (status === 'no-group' && !route.meta.public) {
+      await router.replace({ name: 'welcome' })
+    } else if (status === 'ready') {
+      const redirect = sectionRedirect(route)
+      if (redirect) await router.replace(redirect)
+    }
+  },
 )
 
 async function retry() {
   await groupStore.init()
   // The router guard let this route through while offline; apply its redirects now.
-  if (groupStore.status === 'no-group' && !route.meta.public) await router.replace({ name: 'welcome' })
+  if (groupStore.status === 'signed-out' && !route.meta.guest) await router.replace({ name: 'login' })
+  else if (groupStore.status === 'no-group' && !route.meta.public) await router.replace({ name: 'welcome' })
 }
 </script>
 
@@ -27,7 +58,7 @@ async function retry() {
       <!-- Screens that need a group never render without one (e.g. just after leaving the last group). -->
       <div v-if="!canShowRoute" class="onboard" aria-busy="true">
         <p class="eyebrow">Compra Familiar</p>
-        <p class="muted">Cargando la lista…</p>
+        <p class="muted">Cargando…</p>
       </div>
 
       <div v-else-if="groupStore.status === 'error'" class="onboard" role="alert">

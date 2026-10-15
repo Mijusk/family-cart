@@ -1,45 +1,28 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import AppIcon from '@/components/AppIcon.vue'
 import { useGroupStore, type InvitePreview } from '@/stores/group'
+import { useToastStore } from '@/stores/toast'
 import { friendlyError } from '@/utils/errors'
-import { cleanDisplayName } from '@/utils/text'
-
-/** name → (if the name is taken) confirm → (if they are different people) extra */
-type Step = 'name' | 'confirm' | 'extra'
 
 const groupStore = useGroupStore()
+const toast = useToastStore()
 const route = useRoute()
 const router = useRouter()
 
 const code = computed(() => String(route.params.code ?? ''))
 const preview = ref<InvitePreview | null>(null)
 const loading = ref(true)
-const step = ref<Step>('name')
-const memberName = ref('')
-const extra = ref('')
-/** Existing member with the same normalized name. */
-const match = ref<{ id: string; name: string } | null>(null)
 const saving = ref(false)
 const error = ref<string | null>(null)
-const extraInput = useTemplateRef<HTMLInputElement>('extraInput')
 
-/** Any of this device's groups, not only the one open now. */
-const alreadyMember = computed(() => !!preview.value && groupStore.isMemberOf(preview.value.id))
-
-async function openExisting() {
-  await groupStore.switchGroup(preview.value!.id)
-  await router.replace({ name: 'list' })
-}
+const alreadyMember = computed(() => !!preview.value && groupStore.isActiveMemberOf(preview.value.id))
+const waiting = computed(() => !!preview.value && groupStore.isPendingIn(preview.value.id))
 
 const membersLabel = computed(() => {
   const n = preview.value?.memberCount ?? 0
   return n === 1 ? '1 persona' : `${n} personas`
 })
-
-const baseName = computed(() => cleanDisplayName(memberName.value))
-const finalName = computed(() => `${baseName.value} (${cleanDisplayName(extra.value)})`)
 
 onMounted(async () => {
   try {
@@ -51,7 +34,19 @@ onMounted(async () => {
   }
 })
 
-/** Runs a step's server call with the shared saving/error handling. */
+async function openGroup() {
+  await groupStore.switchGroup(preview.value!.id)
+  await router.replace('/')
+}
+
+// Approval arrives in real time (see subscribeToMine in the group store): go straight in.
+watch(alreadyMember, (isMember, wasMember) => {
+  if (isMember && wasMember === false && !loading.value) {
+    toast.show(`Ya estás en ${preview.value!.name}`)
+    void openGroup()
+  }
+})
+
 async function run(action: () => Promise<void>) {
   if (saving.value) return
   saving.value = true
@@ -65,55 +60,13 @@ async function run(action: () => Promise<void>) {
   }
 }
 
-async function joinAs(name: string) {
-  await groupStore.joinGroup(code.value, name)
-  await router.replace({ name: 'list' })
-}
+const requestJoin = () => run(() => groupStore.requestJoin(code.value))
 
-function submitName() {
-  if (!baseName.value) return
-  return run(async () => {
-    const existing = await groupStore.findMemberByName(code.value, baseName.value)
-    if (existing) {
-      match.value = existing
-      step.value = 'confirm'
-      return
-    }
-    await joinAs(baseName.value)
+const withdraw = () =>
+  run(async () => {
+    await groupStore.cancelRequest(preview.value!.id)
+    toast.show('Has retirado tu solicitud')
   })
-}
-
-function itsMe() {
-  return run(async () => {
-    await groupStore.claimMember(code.value, match.value!.id)
-    await router.replace({ name: 'list' })
-  })
-}
-
-async function differentPeople() {
-  error.value = null
-  step.value = 'extra'
-  await nextTick()
-  extraInput.value?.focus()
-}
-
-function submitExtra() {
-  if (!extra.value.trim()) return
-  return run(async () => {
-    if (await groupStore.findMemberByName(code.value, finalName.value)) {
-      error.value = `También hay alguien llamado ${finalName.value}. Prueba con otro apodo o apellido.`
-      return
-    }
-    await joinAs(finalName.value)
-  })
-}
-
-function changeName() {
-  error.value = null
-  extra.value = ''
-  match.value = null
-  step.value = 'name'
-}
 </script>
 
 <template>
@@ -125,92 +78,50 @@ function changeName() {
     <template v-else-if="!preview">
       <h1 class="display-title">Invitación no encontrada</h1>
       <p class="muted">{{ error ?? 'Ese enlace no es válido. Pide a quien te lo envió que lo copie otra vez.' }}</p>
-      <RouterLink :to="{ name: 'list' }" class="btn btn-ghost">Volver</RouterLink>
+      <RouterLink to="/" class="btn btn-ghost">Volver</RouterLink>
     </template>
 
     <template v-else-if="alreadyMember">
       <h1 class="display-title">{{ preview.name }}</h1>
       <p class="muted">Ya formas parte de este grupo.</p>
-      <button type="button" class="btn btn-primary btn-block" @click="openExisting">Ir a la lista</button>
+      <button type="button" class="btn btn-primary btn-block" @click="openGroup">Ir al grupo</button>
+    </template>
+
+    <template v-else-if="waiting">
+      <header>
+        <p class="muted">Has pedido unirte a</p>
+        <h1 class="display-title">{{ preview.name }}</h1>
+      </header>
+      <section class="onboard-form" aria-live="polite">
+        <p>
+          Un administrador del grupo tiene que aceptarte. En cuanto lo haga entrarás solo; puedes cerrar la app mientras
+          tanto.
+        </p>
+        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+        <button type="button" class="btn btn-ghost btn-block" :disabled="saving" @click="withdraw">
+          Retirar la solicitud
+        </button>
+      </section>
+      <RouterLink to="/" class="back-link">Volver al inicio</RouterLink>
     </template>
 
     <template v-else>
       <header>
-        <p class="muted">Te han invitado a la lista de</p>
+        <p class="muted">Te han invitado a</p>
         <h1 class="display-title">{{ preview.name }}</h1>
-        <p class="muted">{{ membersLabel }} ya la usan</p>
+        <p class="muted">{{ membersLabel }} ya están dentro</p>
       </header>
-
-      <form v-if="step === 'name'" class="onboard-form" @submit.prevent="submitName">
-        <label class="label">
-          ¿Cómo te llamas?
-          <input
-            v-model="memberName"
-            class="field"
-            placeholder="Así te verán los demás"
-            maxlength="40"
-            autocomplete="given-name"
-          />
-        </label>
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <button type="submit" class="btn btn-primary btn-block" :disabled="!baseName || saving">
-          {{ saving ? 'Entrando…' : `Unirme a ${preview.name}` }}
-        </button>
-      </form>
-
-      <section v-else-if="step === 'confirm'" class="onboard-form" aria-live="polite">
-        <p class="question">
-          Ya hay alguien llamado <strong>{{ match!.name }}</strong> en este grupo. ¿Eres tú entrando desde otro
-          dispositivo, o sois personas distintas?
+      <section class="onboard-form">
+        <p>
+          Entrarás como <strong>{{ groupStore.me?.displayName }}</strong>. Un administrador del grupo tendrá que aceptar
+          tu solicitud.
         </p>
         <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <button type="button" class="btn btn-primary btn-block" :disabled="saving" @click="itsMe">
-          {{ saving ? 'Entrando…' : 'Soy yo, es solo otro dispositivo' }}
-        </button>
-        <button type="button" class="btn btn-ghost btn-block" :disabled="saving" @click="differentPeople">
-          Somos personas distintas
-        </button>
-        <button type="button" class="back-link" @click="changeName">
-          <AppIcon name="back" :size="16" />
-          Cambiar mi nombre
+        <button type="button" class="btn btn-primary btn-block" :disabled="saving" @click="requestJoin">
+          {{ saving ? 'Enviando…' : `Pedir unirme a ${preview.name}` }}
         </button>
       </section>
-
-      <form v-else class="onboard-form" @submit.prevent="submitExtra">
-        <label class="label">
-          Añade un apodo o apellido para distinguirte de {{ match!.name }}
-          <input
-            ref="extraInput"
-            v-model="extra"
-            class="field"
-            placeholder="Por ejemplo, un apellido"
-            maxlength="16"
-            autocomplete="off"
-          />
-        </label>
-        <p v-if="extra.trim()" class="muted preview-name">
-          Aparecerás como <strong>{{ finalName }}</strong>
-        </p>
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <button type="submit" class="btn btn-primary btn-block" :disabled="!extra.trim() || saving">
-          {{ saving ? 'Entrando…' : 'Unirme' }}
-        </button>
-        <button type="button" class="back-link" @click="step = 'confirm'">
-          <AppIcon name="back" :size="16" />
-          Volver
-        </button>
-      </form>
+      <RouterLink :to="{ name: 'account' }" class="back-link">¿No eres tú? Cambia de cuenta</RouterLink>
     </template>
   </div>
 </template>
-
-<style scoped>
-.question {
-  font-size: 1.0625rem;
-}
-
-.preview-name {
-  font-size: 0.9375rem;
-}
-
-</style>

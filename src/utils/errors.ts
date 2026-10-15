@@ -1,8 +1,26 @@
 /** Turns a Supabase/network error into something to show the family. */
 export function friendlyError(error: unknown): string {
   const message = error instanceof Error ? error.message : typeof error === 'object' && error && 'message' in error ? String(error.message) : ''
+
+  // Accounts (Supabase Auth)
+  if (/invalid login credentials/i.test(message)) return 'Email o contraseña incorrectos.'
+  if (/email not confirmed/i.test(message)) return 'Antes de entrar, confirma tu email con el enlace que te enviamos.'
+  if (/already registered|already been registered|already exists/i.test(message)) return 'Ya hay una cuenta con ese email. Prueba a entrar.'
+  if (/password should be|weak password|password.*characters/i.test(message)) return 'La contraseña es demasiado corta: usa al menos 8 caracteres.'
+  if (/same.*password|different from the old/i.test(message)) return 'La nueva contraseña tiene que ser distinta de la anterior.'
+  if (/invalid.*email|unable to validate email/i.test(message)) return 'Ese email no parece válido.'
+  if (/rate limit|too many|security purposes/i.test(message)) return 'Demasiados intentos seguidos. Espera un poco y vuelve a probar.'
+  if (/auth session missing|jwt expired|refresh token/i.test(message)) return 'Tu sesión ha caducado. Vuelve a entrar.'
+
+  // Groups and profiles
   if (/invalid invite code/i.test(message)) return 'Ese enlace de invitación no es válido o ha caducado.'
-  if (/member name taken/i.test(message)) return 'Ya hay alguien con ese nombre en el grupo. Prueba con otro.'
+  if (/invalid claim code/i.test(message)) return 'Ese código de perfil no existe o ya se ha usado.'
+  if (/account already in use/i.test(message)) return 'Esta cuenta ya está en algún grupo. Usa el código con una cuenta recién creada.'
+  if (/last admin/i.test(message)) return 'El grupo necesita al menos un administrador. Nombra a otro antes.'
+  if (/profile without account/i.test(message)) return 'Un perfil sin cuenta no puede ser administrador.'
+  if (/not an admin/i.test(message)) return 'Solo los administradores del grupo pueden hacer esto.'
+  if (/groups_some_section/i.test(message)) return 'El grupo necesita al menos una sección activa.'
+
   if (/fetch|network|Failed to/i.test(message)) return 'No hay conexión con el servidor. Inténtalo de nuevo.'
   return 'Algo ha fallado. Inténtalo de nuevo.'
 }

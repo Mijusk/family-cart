@@ -9,24 +9,49 @@ export interface Group {
   id: string
   name: string
   inviteCode: string
+  timezone: string
+  shoppingEnabled: boolean
+  calendarEnabled: boolean
   createdAt: string
 }
 
+export type MemberRole = 'admin' | 'member'
+
+/** pending: asked to join and waiting for an admin; active: in the group. */
+export type MemberStatus = 'pending' | 'active'
+
+/** A human. Without an account (a child without a phone) when hasAccount is false. */
+export interface Person {
+  id: string
+  displayName: string
+  color: string
+  hasAccount: boolean
+}
+
+/** A person inside a group. Name and color come from the person. */
 export interface Member {
   id: string
   groupId: string
+  personId: string
   name: string
+  color: string
+  hasAccount: boolean
+  role: MemberRole
+  status: MemberStatus
+  /** When they asked to join (or were added). */
   createdAt: string
-  /** Set when their last device left the group; kept so the history still shows their name. */
+  /** Set when they left or were removed; kept so the history still shows their name. */
   leftAt: string | null
 }
 
-/** A group this device belongs to, for the group switcher. */
+/** A group the signed-in person is in, or has asked to join. */
 export interface Membership {
   groupId: string
   groupName: string
-  /** The member this device acts as in that group. */
+  /** The member this person is in that group. */
   memberId: string
+  role: MemberRole
+  status: MemberStatus
   joinedAt: string
 }
 

@@ -11,7 +11,8 @@
     "db:start": "supabase start -x imgproxy,vector,logflare,supavisor,edge-runtime",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/lib/database.types.ts"
+    "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
+    "db:test": "docker exec -i supabase_db_family-cart psql -U postgres -d postgres < supabase/tests/permissions.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
