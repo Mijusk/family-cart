@@ -906,6 +906,11 @@ create policy "members delete their group's photos" on storage.objects
 -- A hosted project with "Automatically expose new tables" off grants nothing by default, so
 -- every table grant is explicit and matches what its RLS policies allow. Supabase grants
 -- EXECUTE on new functions to anon and authenticated, so internal ones are revoked from both.
+-- Local Supabase (and projects with the default setting) also grant ALL on every new table
+-- to anon and authenticated, so start from zero.
+
+revoke all on all tables in schema public from anon, authenticated;
+revoke all on all sequences in schema public from anon, authenticated;
 
 grant select on public.people to authenticated;
 grant update (display_name, color) on public.people to authenticated;
