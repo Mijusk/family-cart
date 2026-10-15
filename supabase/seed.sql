@@ -1,14 +1,74 @@
--- Demo group for local development. Join it at http://localhost:5180/unirse/HUERTA7Q4K
--- The demo members have no linked device (member_identities): they are people "on other phones".
--- The products catalog fills itself through the items trigger.
+-- Demo data for local development (npm run db:reset). Never runs against the hosted project.
+--
+-- Accounts (password for all: demo1234):
+--   marta@ejemplo.com   admin of "Casa Martín"
+--   daniel@ejemplo.com  member of "Casa Martín"
+--   lucia@ejemplo.com   has asked to join "Casa Martín" (pending): approve her as Marta
+-- Profiles without an account: Abuela Carmen, and Pablo (claim code PABLO7Q4KM: sign up with a
+-- new email and enter it under "Tengo un código de perfil").
+-- Invite link for "Casa Martín": /unirse/HUERTA7Q4K
 
-insert into public.groups (id, name, invite_code, created_at) values
-  ('00000000-0000-4000-8000-000000000001', 'Casa Martín', 'HUERTA7Q4K', now() - interval '62 days');
+-- ── Accounts (the on_auth_user_created trigger creates their people) ─────────
 
-insert into public.members (id, group_id, name, created_at) values
-  ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-000000000001', 'Marta', now() - interval '62 days'),
-  ('00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-000000000001', 'Daniel', now() - interval '40 days'),
-  ('00000000-0000-4000-8000-0000000000a3', '00000000-0000-4000-8000-000000000001', 'Abuela Carmen', now() - interval '12 days');
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change
+)
+select '00000000-0000-0000-0000-000000000000', v.id::uuid, 'authenticated', 'authenticated', v.email,
+       extensions.crypt('demo1234', extensions.gen_salt('bf')), now(),
+       '{"provider":"email","providers":["email"]}', jsonb_build_object('display_name', v.name),
+       now() - interval '62 days', now(), '', '', '', ''
+from (values
+  ('00000000-0000-4000-8000-0000000000c1', 'marta@ejemplo.com', 'Marta'),
+  ('00000000-0000-4000-8000-0000000000c2', 'daniel@ejemplo.com', 'Daniel'),
+  ('00000000-0000-4000-8000-0000000000c3', 'lucia@ejemplo.com', 'Lucía')
+) as v (id, email, name);
+
+insert into auth.identities (provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+select u.id::text, u.id, jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
+       'email', now(), now(), now()
+from auth.users u
+where u.id::text like '00000000-0000-4000-8000-0000000000c%';
+
+update public.people p set color = v.color
+from (values
+  ('00000000-0000-4000-8000-0000000000c1', '#a8522f'),
+  ('00000000-0000-4000-8000-0000000000c2', '#3b6fb6'),
+  ('00000000-0000-4000-8000-0000000000c3', '#7d4f9a')
+) as v (user_id, color)
+where p.user_id = v.user_id::uuid;
+
+-- ── Profiles without an account ──────────────────────────────────────────────
+
+insert into public.people (id, display_name, color, claim_code, created_by) values
+  ('00000000-0000-4000-8000-0000000000d1', 'Abuela Carmen', '#8f6a1f', null,
+    (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1')),
+  ('00000000-0000-4000-8000-0000000000d2', 'Pablo', '#277a7a', 'PABLO7Q4KM',
+    (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+
+-- ── Group ────────────────────────────────────────────────────────────────────
+
+insert into public.groups (id, name, invite_code, created_by, created_at) values
+  ('00000000-0000-4000-8000-000000000001', 'Casa Martín', 'HUERTA7Q4K',
+    (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'), now() - interval '62 days');
+
+insert into public.members (id, group_id, person_id, role, status, approved_at, created_at)
+select ('00000000-0000-4000-8000-0000000000' || v.member)::uuid, '00000000-0000-4000-8000-000000000001',
+       coalesce(
+         (select id from public.people where user_id = v.person::uuid),
+         v.person::uuid
+       ),
+       v.role, v.status, case when v.status = 'active' then now() - v.ago end, now() - v.ago
+from (values
+  ('a1', '00000000-0000-4000-8000-0000000000c1', 'admin',  'active',  interval '62 days'),
+  ('a2', '00000000-0000-4000-8000-0000000000c2', 'member', 'active',  interval '40 days'),
+  ('a3', '00000000-0000-4000-8000-0000000000d1', 'member', 'active',  interval '12 days'),
+  ('a4', '00000000-0000-4000-8000-0000000000d2', 'member', 'active',  interval '12 days'),
+  ('a5', '00000000-0000-4000-8000-0000000000c3', 'member', 'pending', interval '2 hours')
+) as v (member, person, role, status, ago);
+
+-- ── Shopping history ─────────────────────────────────────────────────────────
 
 -- Daniel forgot to tap "Finalizar compra": the 4-hour timeout closed his trip.
 insert into public.trips (id, group_id, member_id, started_at, finished_at, closed_reason) values

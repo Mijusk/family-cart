@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import ListView from '@/views/ListView.vue'
 
@@ -6,23 +6,58 @@ declare module 'vue-router' {
   interface RouteMeta {
     /** Full-screen views (shopping mode, onboarding) hide the bottom tab bar. */
     hideNav?: boolean
-    /** Reachable without belonging to a group. */
+    /** Reachable when signed in without belonging to a group. */
     public?: boolean
+    /** Sign-in screens: only when signed out (signed-in visitors are sent on). */
+    guest?: boolean
+    /** Reachable signed in or out (the password reset link). */
+    anyone?: boolean
+    /** Belongs to a section that a group can switch off. */
+    section?: 'shopping' | 'calendar'
   }
 }
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'list', component: ListView },
+    { path: '/', name: 'list', component: ListView, meta: { section: 'shopping' } },
     {
       path: '/compra',
       name: 'shopping',
       component: () => import('@/views/ShoppingView.vue'),
-      meta: { hideNav: true },
+      meta: { hideNav: true, section: 'shopping' },
     },
-    { path: '/historial', name: 'history', component: () => import('@/views/HistoryView.vue') },
+    {
+      path: '/historial',
+      name: 'history',
+      component: () => import('@/views/HistoryView.vue'),
+      meta: { section: 'shopping' },
+    },
+    {
+      path: '/calendario',
+      name: 'calendar',
+      component: () => import('@/views/CalendarView.vue'),
+      meta: { section: 'calendar' },
+    },
     { path: '/grupo', name: 'group', component: () => import('@/views/GroupView.vue') },
+    {
+      path: '/cuenta',
+      name: 'account',
+      component: () => import('@/views/AccountView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/entrar',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { hideNav: true, guest: true },
+    },
+    {
+      path: '/nueva-contrasena',
+      name: 'reset-password',
+      component: () => import('@/views/ResetPasswordView.vue'),
+      meta: { hideNav: true, anyone: true, public: true },
+    },
     {
       path: '/bienvenida',
       name: 'welcome',
@@ -40,11 +75,33 @@ export const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
+/** Where a screen of a switched-off section goes instead; null if it can be shown. */
+export function sectionRedirect(to: { meta: RouteMeta }) {
+  const groupStore = useGroupStore()
+  if (groupStore.status !== 'ready') return null
+  const { shoppingEnabled, calendarEnabled } = groupStore.group
+  if (to.meta.section === 'shopping' && !shoppingEnabled) return { name: 'calendar' }
+  if (to.meta.section === 'calendar' && !calendarEnabled) return { name: 'list' }
+  return null
+}
+
 router.beforeEach(async (to) => {
   const groupStore = useGroupStore()
   await groupStore.init()
   // App.vue shows the error screen; let the navigation through so the URL is kept for a retry.
   if (groupStore.status === 'error') return true
+  if (to.meta.anyone) return true
+
+  if (groupStore.status === 'signed-out') {
+    if (to.meta.guest) return true
+    // Back to where they were going after signing in (e.g. an invite link).
+    return { name: 'login', query: to.fullPath === '/' ? {} : { redirect: to.fullPath } }
+  }
+  if (to.meta.guest) {
+    const redirect = typeof to.query.redirect === 'string' && to.query.redirect.startsWith('/') ? to.query.redirect : '/'
+    return redirect
+  }
+
   if (groupStore.status === 'no-group' && !to.meta.public) return { name: 'welcome' }
-  return true
+  return sectionRedirect(to) ?? true
 })

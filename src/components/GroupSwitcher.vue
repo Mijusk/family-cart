@@ -57,7 +57,7 @@ function addGroup() {
 
     <div v-if="open" ref="menu" class="menu" role="menu" aria-label="Tus grupos">
       <button
-        v-for="m in groupStore.memberships"
+        v-for="m in groupStore.activeMemberships"
         :key="m.groupId"
         type="button"
         class="option"
