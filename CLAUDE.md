@@ -75,7 +75,7 @@ Pablo compartidos en completo, "Gimnasio" de Daniel en modo ocupado, "Médico" d
   reales se puede rehacer una migración que aún no esté aplicada.
 - Si el entorno de Claude no puede instalar dependencias ni levantar Docker (sandbox en
   la nube), probar el SQL en un Postgres local con un stub de Supabase **incluyendo
-  `alter default privileges ... grant all on tables to anon, authenticated`**, y pedir a
+  `alter default privileges ... grant all on tables to anon, authenticated`** y un `realtime.send(payload, event, topic, private)` falso, y pedir a
   Luis que ejecute `db:reset`, `db:test`, `db:types` y `build`. Para probar la interfaz sin
   Docker sirve PostgREST (binario estático) sobre ese Postgres, con un proxy de Vite de
   `/rest/v1` y una sesión con JWT firmado a mano en `localStorage`.

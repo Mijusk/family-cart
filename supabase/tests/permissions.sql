@@ -62,6 +62,7 @@ select tests.check('calendar: daniel sees 3 calendars, not Médico', (select cou
 select tests.check('calendar: daniel sees the exception of Clase', (select count(*) from event_exceptions) = 1);
 select tests.check('calendar: daniel reads the history of Oficina', exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f1' and action = 'create'));
 select tests.check('calendar: no history of the dentist for daniel', not exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f3'));
+select tests.expect_error('calendar: the busy broadcast is only for triggers', $$select notify_busy_groups('00000000-0000-4000-8000-0000000000e3')$$, 'permission denied');
 update events set title = 'Hackeado' where id = '00000000-0000-4000-8000-0000000000f1';
 select tests.check('calendar: daniel cannot edit Marta''s Oficina', (select title from events where id = '00000000-0000-4000-8000-0000000000f1') = 'Oficina');
 select tests.expect_error('calendar: daniel cannot add events to Trabajo',

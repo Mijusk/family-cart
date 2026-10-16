@@ -304,6 +304,16 @@ a {
   font-size: 0.9375rem;
 }
 
+.editing-notice {
+  margin: 0 var(--gutter) 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
 .back-link {
   display: inline-flex;
   align-items: center;

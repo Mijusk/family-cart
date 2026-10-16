@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { namesList, useEditors } from '@/lib/editors'
 import { historyText, repeatLabel, timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -38,6 +39,7 @@ const shownDay = computed(() =>
 const owner = computed(() => calendar.owners[eventId.value])
 const folder = computed(() => (event.value ? calendar.calendarById(event.value.calendarId) : undefined))
 const canEdit = computed(() => !!event.value && calendar.canEdit(event.value))
+const editors = useEditors(eventId)
 
 function groupName(id: string): string {
   return groupStore.activeMemberships.find((m) => m.groupId === id)?.groupName ?? 'otro grupo'
@@ -207,6 +209,10 @@ async function remove(scope: 'day' | 'series') {
           </li>
         </ul>
       </section>
+
+      <p v-if="editors.length" class="editing-notice" role="status">
+        {{ namesList(editors) }} {{ editors.length === 1 ? 'está' : 'están' }} editando este evento.
+      </p>
 
       <div v-if="canEdit" class="actions">
         <button type="button" class="btn btn-ghost" :aria-expanded="asking === 'edit'" @click="startEdit">
