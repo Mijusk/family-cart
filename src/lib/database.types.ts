@@ -557,9 +557,6 @@ isOneToOne: false
 "can_share_task_list":
 { Args: { "gid": string,"lid": string }; Returns: boolean
                            },
-"create_calendar_for":
-{ Args: { "color": string,"group_id": string,"name": string,"owner_id": string }; Returns: string
-                           },
 "can_use_group_folder":
 { Args: { "object_name": string }; Returns: boolean
                            },
@@ -583,6 +580,9 @@ isOneToOne: false
                            },
 "close_trip":
 { Args: { "reason": string,"target_trip_id": string }; Returns: number
+                           },
+"create_calendar_for":
+{ Args: { "color": string,"group_id": string,"name": string,"owner_id": string }; Returns: string
                            },
 "create_claim_code":
 { Args: { "pid": string }; Returns: string
