@@ -4,6 +4,7 @@ import { isAuthRetryableFetchError, type RealtimeChannel, type RealtimeSystemPay
 import { supabase } from '@/lib/supabase'
 import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
 import type { Group, Member, MemberRole, Membership, Person } from '@/types'
+import { errorText, isNetworkError } from '@/utils/errors'
 import { useCalendarStore } from './calendar'
 import { useListStore } from './list'
 import { useTasksStore } from './tasks'
@@ -51,6 +52,8 @@ function writeActiveGroup(groupId: string | null) {
 export const useGroupStore = defineStore('group', () => {
   const status = ref<SessionStatus>('loading')
   const errorMessage = ref<string | null>(null)
+  /** Whether the last failed load never reached the server, as opposed to the server answering with an error. */
+  const offline = ref(false)
   const userId = ref<string | null>(null)
   const email = ref<string | null>(null)
   /** The signed-in person. */
@@ -184,7 +187,8 @@ export const useGroupStore = defineStore('group', () => {
   function fail(e: unknown) {
     console.error(e)
     status.value = 'error'
-    errorMessage.value = e instanceof Error ? e.message : String(e)
+    errorMessage.value = errorText(e) || 'Error desconocido'
+    offline.value = isNetworkError(e) || isAuthRetryableFetchError(e)
     initPromise = null
   }
 
@@ -524,6 +528,7 @@ export const useGroupStore = defineStore('group', () => {
   return {
     status,
     errorMessage,
+    offline,
     email,
     me,
     group,

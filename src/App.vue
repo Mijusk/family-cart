@@ -63,8 +63,15 @@ async function retry() {
 
       <div v-else-if="groupStore.status === 'error'" class="onboard" role="alert">
         <p class="eyebrow">Family App</p>
-        <h1 class="display-title">No se pudo conectar</h1>
-        <p class="muted">Comprueba la conexión a internet e inténtalo otra vez.</p>
+        <template v-if="groupStore.offline">
+          <h1 class="display-title">No se pudo conectar</h1>
+          <p class="muted">Comprueba la conexión a internet e inténtalo otra vez.</p>
+        </template>
+        <template v-else>
+          <h1 class="display-title">Algo ha fallado al cargar</h1>
+          <p class="muted">El servidor ha respondido con un error. Si vuelve a pasar, pasa este detalle a quien mantiene la app:</p>
+          <p class="error-detail">{{ groupStore.errorMessage }}</p>
+        </template>
         <button type="button" class="btn btn-primary btn-block" @click="retry">Reintentar</button>
       </div>
 
@@ -78,6 +85,18 @@ async function retry() {
 <style scoped>
 .app.no-nav {
   --nav-height: 0px;
+}
+
+.error-detail {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .column {

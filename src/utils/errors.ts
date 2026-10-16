@@ -1,6 +1,6 @@
 /** Turns a Supabase/network error into something to show the family. */
 export function friendlyError(error: unknown): string {
-  const message = error instanceof Error ? error.message : typeof error === 'object' && error && 'message' in error ? String(error.message) : ''
+  const message = errorText(error)
 
   // Accounts (Supabase Auth)
   if (/invalid login credentials/i.test(message)) return 'Email o contraseña incorrectos.'
@@ -43,4 +43,16 @@ export function friendlyError(error: unknown): string {
 
   if (/fetch|network|Failed to/i.test(message)) return 'No hay conexión con el servidor. Inténtalo de nuevo.'
   return 'Algo ha fallado. Inténtalo de nuevo.'
+}
+
+/** The raw message of an error: Supabase query errors are plain objects, not `Error`s. */
+export function errorText(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error && 'message' in error) return String(error.message)
+  return typeof error === 'string' ? error : ''
+}
+
+/** True when the request never reached the server (offline, DNS, blocked), not when it answered with an error. */
+export function isNetworkError(error: unknown): boolean {
+  return /failed to fetch|fetch failed|networkerror|network request failed|load failed/i.test(errorText(error))
 }
