@@ -130,6 +130,8 @@ Con `level = busy` solo ve la franja horaria, con el texto "Ocupado". Esto se re
 
 Funciones auxiliares: `my_person_id()`, `is_group_member(gid)` (el `is_active_member` del diseño), `is_group_admin(gid)`, `can_edit_calendar(cid)`, `can_view_calendar(cid)`, `can_view_event(eid)`, `can_edit_event(eid)`, `can_share_calendar(cid, gid)`, `can_share_event(eid, gid)`.
 
+Para pintar eventos, `event_owners(ids)` da el dueño y el color de la carpeta de cada evento visible (aunque la carpeta sea privada, por ejemplo un evento visto como participante) y `editable_calendar_ids()` las carpetas en las que el usuario puede crear eventos.
+
 El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y excepciones (sin título, notas ni lugar) de los eventos que el usuario no puede ver completos.
 
 ## 6. Registro de cambios
@@ -155,11 +157,13 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - Crear grupo o unirse con código (queda pendiente de aprobación).
 
 **Calendario**
-- **Hoy:** lo de hoy de cada persona visible, agrupado por persona.
+- **Hoy:** lo de hoy de cada persona del grupo actual (yo primero), agrupado por persona, con flechas para pasar al día anterior o siguiente. Cada persona ve sus eventos, los que comparte el grupo, aquellos en los que participa y las franjas "Ocupado".
 - **Semana:** el grupo elegido, con filtros por persona y por carpeta.
 - **Mes:** solo eventos puntuales y excepciones.
 - **Persona:** el calendario de una persona.
 - **Evento:** crear y editar rápido, duplicar un día, elegir carpeta y grupos extra, icono ⓘ y aviso de "está editando".
+  - En un evento que se repite, editar o borrar pregunta "solo este día" (excepción) o "toda la serie".
+  - Si no hay carpeta, "Nueva carpeta…" en el propio formulario crea una privada (nombre y color); compartirla llega con "Mis carpetas".
 
 **Menú secundario**
 - **Mis carpetas:** crear carpetas y elegir con qué grupos se comparten (completo u ocupado).
@@ -194,7 +198,7 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 
 1. **PR 1 — Cuentas y grupos** ✅: login con email, `people`, roles, aprobación de entrada, secciones por grupo. La compra sigue funcionando.
 2. **PR 2 — Esquema del calendario** ✅: tablas, permisos, historial y papelera, con pruebas de RLS.
-3. **PR 3 — Evento y Hoy.**
+3. **PR 3 — Evento y Hoy** ✅.
 4. **PR 4 — Semana y Mes.**
 5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera.**
 6. **PR 6 — Tiempo real y aviso de "está editando".**

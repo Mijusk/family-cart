@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import { useListStore } from '@/stores/list'
 import AppIcon, { type IconName } from './AppIcon.vue'
 
 const list = useListStore()
+const route = useRoute()
+
+/** "/" only on the list itself; other tabs stay lit on their inner screens (an event of the calendar). */
+function isActive(to: string): boolean {
+  return to === '/' ? route.path === '/' : route.path === to || route.path.startsWith(`${to}/`)
+}
 const groupStore = useGroupStore()
 
 /** Only the sections this group uses, plus the group itself. */
@@ -23,7 +29,7 @@ const tabs = computed(() => {
 
 <template>
   <nav class="nav" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
-    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab" exact-active-class="active">
+    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab" :class="{ active: isActive(tab.to) }">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
         <span v-if="tab.to === '/' && list.pendingItems.length" class="badge">{{ list.pendingItems.length }}</span>

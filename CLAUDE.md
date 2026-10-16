@@ -76,6 +76,11 @@ Pablo compartidos en completo, "Gimnasio" de Daniel en modo ocupado, "Médico" d
 - Si el entorno de Claude no puede instalar dependencias ni levantar Docker (sandbox en
   la nube), probar el SQL en un Postgres local con un stub de Supabase **incluyendo
   `alter default privileges ... grant all on tables to anon, authenticated`**, y pedir a
-  Luis que ejecute `db:reset`, `db:test`, `db:types` y `build`.
+  Luis que ejecute `db:reset`, `db:test`, `db:types` y `build`. Para probar la interfaz sin
+  Docker sirve PostgREST (binario estático) sobre ese Postgres, con un proxy de Vite de
+  `/rest/v1` y una sesión con JWT firmado a mano en `localStorage`.
+- Lógica del calendario fuera de los componentes: fechas en `src/utils/days.ts`, repeticiones
+  en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts`, datos en
+  `src/stores/calendar.ts`.
 - Al desplegar en Supabase Cloud: proveedor Email activado, inicio de sesión anónimo
   desactivado, Site URL y Redirect URLs (`https://<app>.vercel.app/**`) configurados.

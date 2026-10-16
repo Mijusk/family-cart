@@ -1,4 +1,25 @@
-import type { Group, Item, Member, MemberRole, MemberStatus, Person, Product, Trip, TripClosedReason } from '@/types'
+import type {
+  BusyEvent,
+  Calendar,
+  CalendarEvent,
+  CalendarShare,
+  ClockTime,
+  EventException,
+  EventOverrides,
+  Group,
+  HistoryAction,
+  HistoryEntry,
+  Item,
+  Member,
+  MemberRole,
+  MemberStatus,
+  Person,
+  Product,
+  RepeatKind,
+  ShareLevel,
+  Trip,
+  TripClosedReason,
+} from '@/types'
 import type { Database } from './database.types'
 
 type Tables = Database['public']['Tables']
@@ -9,6 +30,14 @@ export type ProductRow = Tables['products']['Row']
 export type TripRow = Tables['trips']['Row']
 export type ItemRow = Tables['items']['Row']
 export type ItemUpdate = Tables['items']['Update']
+export type CalendarRow = Tables['calendars']['Row']
+export type CalendarShareRow = Tables['calendar_shares']['Row']
+export type EventRow = Tables['events']['Row']
+export type EventInsert = Tables['events']['Insert']
+export type EventExceptionRow = Tables['event_exceptions']['Row']
+export type EventHistoryRow = Tables['event_history']['Row']
+type Functions = Database['public']['Functions']
+export type BusyEventRow = Functions['busy_events']['Returns'][number]
 
 export const toGroup = (r: GroupRow): Group => ({
   id: r.id,
@@ -25,6 +54,7 @@ export const toPerson = (r: PersonRow): Person => ({
   displayName: r.display_name,
   color: r.color,
   hasAccount: r.user_id !== null,
+  lastCalendarId: r.last_calendar_id,
 })
 
 /** A member row plus its person; an unknown person (not loaded yet) shows as "Alguien". */
@@ -89,4 +119,124 @@ export const fromItem = (i: Item): Tables['items']['Insert'] => ({
   trip_id: i.tripId,
   purchased_by: i.purchasedBy,
   purchased_at: i.purchasedAt,
+})
+
+// ── Calendar ─────────────────────────────────────────────────
+
+/** Postgres returns times as 'HH:MM:SS'; the app works with 'HH:MM'. */
+const toClock = (t: string | null): ClockTime | null => (t ? t.slice(0, 5) : null)
+
+export const toCalendar = (r: CalendarRow): Calendar => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  name: r.name,
+  color: r.color,
+  position: r.position,
+})
+
+export const toCalendarShare = (r: CalendarShareRow): CalendarShare => ({
+  calendarId: r.calendar_id,
+  groupId: r.group_id,
+  // Text columns with check constraints, so the generated types are plain strings.
+  level: r.level as ShareLevel,
+})
+
+export const toEvent = (r: EventRow): CalendarEvent => ({
+  id: r.id,
+  calendarId: r.calendar_id,
+  title: r.title,
+  notes: r.notes,
+  location: r.location,
+  allDay: r.all_day,
+  startDate: r.start_date,
+  startTime: toClock(r.start_time),
+  endTime: toClock(r.end_time),
+  timezone: r.timezone,
+  repeat: r.repeat as RepeatKind,
+  repeatWeekdays: r.repeat_weekdays,
+  repeatUntil: r.repeat_until,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+  updatedBy: r.updated_by,
+  updatedAt: r.updated_at,
+})
+
+/** The writable fields of an event. */
+export const fromEvent = (
+  e: Pick<CalendarEvent, 'calendarId' | 'title' | 'notes' | 'location' | 'allDay' | 'startDate' | 'startTime' | 'endTime' | 'repeat' | 'repeatWeekdays' | 'repeatUntil'>,
+) => ({
+  calendar_id: e.calendarId,
+  title: e.title,
+  notes: e.notes,
+  location: e.location,
+  all_day: e.allDay,
+  start_date: e.startDate,
+  start_time: e.startTime,
+  end_time: e.endTime,
+  repeat: e.repeat,
+  repeat_weekdays: e.repeatWeekdays,
+  repeat_until: e.repeatUntil,
+})
+
+/** Overrides are stored with the column names of events. */
+const OVERRIDE_COLUMNS = {
+  title: 'title',
+  notes: 'notes',
+  location: 'location',
+  allDay: 'all_day',
+  startDate: 'start_date',
+  startTime: 'start_time',
+  endTime: 'end_time',
+} as const satisfies Record<keyof EventOverrides, string>
+
+export function toOverrides(json: unknown): EventOverrides {
+  const source = (json && typeof json === 'object' ? json : {}) as Record<string, unknown>
+  const overrides: Record<string, unknown> = {}
+  for (const [key, column] of Object.entries(OVERRIDE_COLUMNS)) {
+    if (!(column in source)) continue
+    const value = source[column]
+    overrides[key] = key === 'startTime' || key === 'endTime' ? toClock(value as string | null) : value
+  }
+  return overrides as EventOverrides
+}
+
+export function fromOverrides(overrides: EventOverrides): Record<string, unknown> {
+  const json: Record<string, unknown> = {}
+  for (const [key, column] of Object.entries(OVERRIDE_COLUMNS)) {
+    if (key in overrides) json[column] = overrides[key as keyof EventOverrides]
+  }
+  return json
+}
+
+export const toException = (r: Pick<EventExceptionRow, 'event_id' | 'occurrence_date' | 'status' | 'overrides'>): EventException => ({
+  eventId: r.event_id,
+  occurrenceDate: r.occurrence_date,
+  status: r.status as EventException['status'],
+  overrides: toOverrides(r.overrides),
+})
+
+export const toBusyEvent = (r: BusyEventRow): BusyEvent => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  allDay: r.all_day,
+  startDate: r.start_date,
+  startTime: toClock(r.start_time),
+  endTime: toClock(r.end_time),
+  repeat: r.repeat as RepeatKind,
+  // Columns of a function's result are typed as non-null, but these can be null.
+  repeatWeekdays: r.repeat_weekdays ?? null,
+  repeatUntil: r.repeat_until ?? null,
+  exceptions: ((r.exceptions ?? []) as { occurrence_date: string; status: string; overrides: unknown }[]).map((x) =>
+    toException({ event_id: r.id, occurrence_date: x.occurrence_date, status: x.status, overrides: x.overrides as never }),
+  ),
+})
+
+export const toHistoryEntry = (r: EventHistoryRow): HistoryEntry => ({
+  id: r.id,
+  eventId: r.event_id,
+  action: r.action as HistoryAction,
+  changedBy: r.changed_by,
+  changedAt: r.changed_at,
+  before: r.before as Record<string, unknown> | null,
+  after: r.after as Record<string, unknown> | null,
 })
