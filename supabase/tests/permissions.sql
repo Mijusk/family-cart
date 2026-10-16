@@ -112,16 +112,47 @@ select tests.check('calendar: history create, update, delete, restore',
 select tests.check('calendar: trashing is not an edit', (select updated_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
 insert into calendar_shares (calendar_id, group_id, level) values ('00000000-0000-4000-8000-0000000000e5', '00000000-0000-4000-8000-000000000001', 'busy');
 select tests.check('calendar: daniel shares Hospital as busy', (select shared_by = my_person_id() from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e5'));
+insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e7', my_person_id(), 'Diario');
+select tests.check('calendar: daniel creates a private folder', exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e7'));
 
+-- Busy mode hides the details from the rest of the group, not from its admins: check it as Marta
+-- while she is a plain member.
+reset role;
+update members set role = 'member' where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1');
+set role authenticated;
 select tests.as_user('marta@ejemplo.com');
-select tests.check('calendar: marta sees her own, Colegio, not the busy ones (7 events)', (select count(*) from events) = 7);
+select tests.check('calendar: a member sees her own, Colegio, not the busy ones (7 events)', (select count(*) from events) = 7);
 select tests.check('calendar: busy slots of Daniel''s folders', (select count(*) from busy_events('00000000-0000-4000-8000-000000000001')) = 3);
 select tests.check('calendar: busy slots carry the times', exists (select 1 from busy_events('00000000-0000-4000-8000-000000000001') where start_time = '19:00' and repeat_weekdays = '{2,4}'));
-select tests.check('calendar: marta cannot read the busy events', (select count(*) from events where calendar_id = '00000000-0000-4000-8000-0000000000e3') = 0);
+select tests.check('calendar: a member cannot read the busy events', (select count(*) from events where calendar_id = '00000000-0000-4000-8000-0000000000e3') = 0);
 select tests.check('calendar: busy folder name stays hidden', not exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e3'));
 select tests.check('calendar: but its share is visible', exists (select 1 from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e3' and level = 'busy'));
-select tests.check('calendar: admin cannot edit a busy share', not can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
-select tests.check('calendar: admin cannot edit Daniel''s private folder', not can_edit_calendar('00000000-0000-4000-8000-0000000000e5'));
+select tests.check('calendar: a member cannot edit a busy share', not can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
+reset role;
+update members set role = 'admin' where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1');
+set role authenticated;
+
+select tests.check('calendar: admin sees the busy ones in full too (10 events)', (select count(*) from events) = 10);
+select tests.check('calendar: so the admin gets no busy slots', (select count(*) from busy_events('00000000-0000-4000-8000-000000000001')) = 0);
+select tests.check('calendar: admin sees the busy folder', exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e3'));
+select tests.check('calendar: admin edits a busy share', can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
+update events set location = 'Polideportivo' where id = '00000000-0000-4000-8000-0000000000fa';
+select tests.check('calendar: admin edits an event of another account', (select location from events where id = '00000000-0000-4000-8000-0000000000fa') = 'Polideportivo');
+insert into events (id, calendar_id, title, start_date, all_day) values ('00000000-0000-4000-8000-0000000000fc', '00000000-0000-4000-8000-0000000000e3', 'Partido', current_date, true);
+select tests.check('calendar: admin adds an event to a busy share', (select created_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fc'));
+select tests.check('calendar: admin cannot edit Daniel''s private folder', not can_edit_calendar('00000000-0000-4000-8000-0000000000e7'));
+select tests.check('calendar: nor see it', not exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e7'));
+select tests.expect_error('calendar: nor add events to it',
+  $$insert into events (calendar_id, title, start_date, all_day) values ('00000000-0000-4000-8000-0000000000e7', 'x', current_date, true)$$, 'row-level security');
+select create_calendar_for((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'Clases', '#3b6fb6', '00000000-0000-4000-8000-000000000001');
+select tests.check('calendar: create_calendar_for gives Daniel a folder shared in full',
+  (select s.level = 'full' and s.shared_by = my_person_id() and c.created_by = my_person_id() and c.owner_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2')
+     from calendars c join calendar_shares s on s.calendar_id = c.id
+    where c.name = 'Clases'));
+select tests.expect_error('calendar: create_calendar_for only for active members',
+  $$select create_calendar_for((select id from people where user_id = '00000000-0000-4000-8000-0000000000c3'), 'x', '#3b6fb6', '00000000-0000-4000-8000-000000000001')$$, 'not a member');
+select tests.expect_error('calendar: create_calendar_for only in groups I administer',
+  $$select create_calendar_for((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'x', '#3b6fb6', '00000000-0000-4000-8000-000000000002')$$, 'not an admin');
 select tests.check('calendar: marta edits Pablo''s Colegio (manages his profile)', can_edit_calendar('00000000-0000-4000-8000-0000000000e4'));
 insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e6', '00000000-0000-4000-8000-0000000000d2', 'Pediatra');
 insert into events (id, calendar_id, title, start_date, all_day) values ('00000000-0000-4000-8000-0000000000fb', '00000000-0000-4000-8000-0000000000e6', 'Vacuna', current_date, true);
@@ -159,6 +190,9 @@ select tests.check('calendar: daniel does not see Pablo''s private folder', not 
 select tests.check('calendar: daniel cannot read the purged event''s line', not exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f4'));
 select tests.expect_error('calendar: daniel cannot purge Marta''s events', $$select delete_event('00000000-0000-4000-8000-0000000000f1')$$, 'event not found');
 delete from event_participants where event_id = '00000000-0000-4000-8000-0000000000f3' and person_id = my_person_id();
+select tests.check('calendar: daniel sees the folder Marta made him', exists (select 1 from calendars where name = 'Clases' and owner_id = my_person_id()));
+select tests.expect_error('calendar: a member cannot create folders for others',
+  $$select create_calendar_for((select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), 'x', '#3b6fb6', '00000000-0000-4000-8000-000000000001')$$, 'not an admin');
 select tests.check('calendar: daniel takes himself off the dentist', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f3'));
 insert into event_participants (event_id, person_id) values ('00000000-0000-4000-8000-0000000000fa', (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'));
 update calendar_shares set level = 'full' where calendar_id = '00000000-0000-4000-8000-0000000000e3';
@@ -166,7 +200,7 @@ update calendar_shares set level = 'full' where calendar_id = '00000000-0000-400
 select tests.as_user('marta@ejemplo.com');
 select tests.check('calendar: event_owners gives the owner of an event seen as participant',
   (select owner_id from event_owners(array['00000000-0000-4000-8000-0000000000fa']::uuid[])) = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'));
-select tests.check('calendar: editable calendars of marta', (select count(*) from editable_calendar_ids()) = 5);
+select tests.check('calendar: editable calendars of marta', (select count(*) from editable_calendar_ids()) = 7);
 select tests.check('calendar: admin edits once shared in full', can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
 update events set title = 'Crossfit (cambiado)' where id = '00000000-0000-4000-8000-0000000000f5';
 select tests.check('calendar: marta renames Crossfit', (select title from events where id = '00000000-0000-4000-8000-0000000000f5') = 'Crossfit (cambiado)');

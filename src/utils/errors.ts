@@ -22,6 +22,7 @@ export function friendlyError(error: unknown): string {
   if (/groups_some_section/i.test(message)) return 'El grupo necesita al menos una sección activa.'
 
   // Calendar
+  if (/not a member of the group/i.test(message)) return 'Esa persona ya no está en el grupo.'
   if (/calendar is deleted/i.test(message)) return 'Esa carpeta está en la papelera. Restáurala primero.'
   if (/event not found|calendar not found/i.test(message)) return 'Ese evento o carpeta ya no existe o no tienes permiso para cambiarlo.'
   if (/row-level security.*calendar_shares/i.test(message))
