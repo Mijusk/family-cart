@@ -39,7 +39,7 @@ async function submit() {
 <template>
   <div class="onboard">
     <header>
-      <p class="eyebrow">Compra Familiar</p>
+      <p class="eyebrow">Family App</p>
       <h1 class="display-title">{{ hasSession ? 'Nueva contraseña' : 'Enlace caducado' }}</h1>
     </header>
 

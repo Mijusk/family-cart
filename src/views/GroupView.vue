@@ -94,7 +94,7 @@ async function share() {
   try {
     await navigator.share({
       title: `Únete a ${groupStore.group.name}`,
-      text: `Únete a ${groupStore.group.name} en Compra Familiar`,
+      text: `Únete a ${groupStore.group.name} en Family App`,
       url: groupStore.inviteUrl,
     })
   } catch {

@@ -1,8 +1,8 @@
 # Family App (repo `family-cart`)
 
 App web familiar: lista de la compra compartida, tareas puntuales en listas compartibles y
-calendario por persona (rutina diaria, horario semanal, eventos puntuales) compartible con grupos. El nombre
-definitivo de la app está por decidir; en la interfaz aún pone "Compra Familiar".
+calendario por persona (rutina diaria, horario semanal, eventos puntuales) compartible con grupos. La app se
+llama **Family App** (el repo sigue siendo `family-cart`).
 
 **Antes de tocar nada del calendario, lee `docs/calendario.md`**: diseño completo,
 decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`.
