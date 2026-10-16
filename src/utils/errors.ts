@@ -21,6 +21,13 @@ export function friendlyError(error: unknown): string {
   if (/not an admin/i.test(message)) return 'Solo los administradores del grupo pueden hacer esto.'
   if (/groups_some_section/i.test(message)) return 'El grupo necesita al menos una sección activa.'
 
+  // Calendar
+  if (/calendar is deleted/i.test(message)) return 'Esa carpeta está en la papelera. Restáurala primero.'
+  if (/event not found|calendar not found/i.test(message)) return 'Ese evento o carpeta ya no existe o no tienes permiso para cambiarlo.'
+  if (/events_times/i.test(message)) return 'Revisa las horas: un evento con hora necesita inicio y fin distintos.'
+  if (/events_weekdays/i.test(message)) return 'Elige al menos un día de la semana para la repetición.'
+  if (/events_until/i.test(message)) return 'La repetición no puede terminar antes de empezar.'
+
   if (/fetch|network|Failed to/i.test(message)) return 'No hay conexión con el servidor. Inténtalo de nuevo.'
   return 'Algo ha fallado. Inténtalo de nuevo.'
 }

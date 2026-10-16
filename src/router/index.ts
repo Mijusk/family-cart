@@ -39,6 +39,24 @@ export const router = createRouter({
       component: () => import('@/views/CalendarView.vue'),
       meta: { section: 'calendar' },
     },
+    {
+      path: '/calendario/nuevo',
+      name: 'event-new',
+      component: () => import('@/views/EventFormView.vue'),
+      meta: { hideNav: true, section: 'calendar' },
+    },
+    {
+      path: '/calendario/evento/:id',
+      name: 'event',
+      component: () => import('@/views/EventView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
+      path: '/calendario/evento/:id/editar',
+      name: 'event-edit',
+      component: () => import('@/views/EventFormView.vue'),
+      meta: { hideNav: true, section: 'calendar' },
+    },
     { path: '/grupo', name: 'group', component: () => import('@/views/GroupView.vue') },
     {
       path: '/cuenta',

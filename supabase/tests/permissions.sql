@@ -43,6 +43,143 @@ grant execute on function tests.expect_error(text, text, text) to authenticated;
 
 set role authenticated;
 
+-- ── Calendar (runs first, on the untouched demo data) ──
+-- Seed: Marta's Trabajo (e1) and Pablo's Colegio (e4) shared in full with Casa Martín, Daniel's
+-- Gimnasio (e3) shared as busy, Marta's Médico (e2) private except Análisis (f4, extra group).
+reset role;
+insert into groups (id, name) values ('00000000-0000-4000-8000-000000000002', 'Otro grupo');
+set role authenticated;
+
+select tests.as_user('lucia@ejemplo.com');
+select tests.check('calendar: pending sees no calendars', (select count(*) from calendars) = 0);
+select tests.check('calendar: pending sees no events', (select count(*) from events) = 0);
+select tests.check('calendar: pending gets no busy slots', (select count(*) from busy_events('00000000-0000-4000-8000-000000000001')) = 0);
+
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('calendar: daniel sees full shares, the extra group and his own (8 events)', (select count(*) from events) = 8);
+select tests.check('calendar: daniel does not see Marta''s private dentist', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f3'));
+select tests.check('calendar: daniel sees 3 calendars, not Médico', (select count(*) from calendars) = 3);
+select tests.check('calendar: daniel sees the exception of Clase', (select count(*) from event_exceptions) = 1);
+select tests.check('calendar: daniel reads the history of Oficina', exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f1' and action = 'create'));
+select tests.check('calendar: no history of the dentist for daniel', not exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f3'));
+update events set title = 'Hackeado' where id = '00000000-0000-4000-8000-0000000000f1';
+select tests.check('calendar: daniel cannot edit Marta''s Oficina', (select title from events where id = '00000000-0000-4000-8000-0000000000f1') = 'Oficina');
+select tests.expect_error('calendar: daniel cannot add events to Trabajo',
+  $$insert into events (calendar_id, title, start_date, start_time, end_time) values ('00000000-0000-4000-8000-0000000000e1', 'x', current_date, '10:00', '11:00')$$, 'row-level security');
+select tests.expect_error('calendar: daniel cannot add exceptions to Oficina',
+  $$insert into event_exceptions (event_id, occurrence_date, status) values ('00000000-0000-4000-8000-0000000000f1', current_date, 'cancelled')$$, 'row-level security');
+select tests.expect_error('calendar: daniel cannot share Marta''s calendar',
+  $$insert into calendar_shares (calendar_id, group_id) values ('00000000-0000-4000-8000-0000000000e2', '00000000-0000-4000-8000-000000000001')$$, 'row-level security');
+select tests.expect_error('calendar: daniel cannot create a calendar for Marta',
+  $$insert into calendars (owner_id, name) values ((select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), 'x')$$, 'row-level security');
+
+with c as (insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e5', my_person_id(), 'Hospital') returning id)
+select tests.check('calendar: a new folder comes back from the insert (the app reads it at once)', (select count(*) from c) = 1);
+insert into events (id, calendar_id, title, start_date, start_time, end_time) values ('00000000-0000-4000-8000-0000000000fa', '00000000-0000-4000-8000-0000000000e5', 'Turno', current_date, '22:00', '06:00');
+select tests.check('calendar: night shift crosses midnight', (select end_time < start_time from events where id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.check('calendar: created_by is daniel', (select created_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.check('calendar: last calendar remembered', (select last_calendar_id from people where id = my_person_id()) = '00000000-0000-4000-8000-0000000000e5');
+select tests.expect_error('calendar: cannot set created_by',
+  $$insert into events (calendar_id, title, start_date, all_day, created_by) values ('00000000-0000-4000-8000-0000000000e5', 'x', current_date, true, '00000000-0000-4000-8000-0000000000d2')$$, 'permission denied');
+update events set title = 'Turno de noche', location = 'Hospital' where id = '00000000-0000-4000-8000-0000000000fa';
+select tests.check('calendar: history keeps only the changed fields',
+  (select before = '{"title": "Turno", "location": null}' and after = '{"title": "Turno de noche", "location": "Hospital"}'
+     from event_history where event_id = '00000000-0000-4000-8000-0000000000fa' and action = 'update'));
+select tests.check('calendar: updated_by is daniel', (select updated_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.expect_error('calendar: all-day without times',
+  $$insert into events (calendar_id, title, start_date, all_day, start_time, end_time) values ('00000000-0000-4000-8000-0000000000e5', 'x', current_date, true, '10:00', '11:00')$$, 'events_times');
+select tests.expect_error('calendar: start and end cannot match',
+  $$insert into events (calendar_id, title, start_date, start_time, end_time) values ('00000000-0000-4000-8000-0000000000e5', 'x', current_date, '10:00', '10:00')$$, 'events_times');
+select tests.expect_error('calendar: weekly needs weekdays',
+  $$insert into events (calendar_id, title, start_date, all_day, repeat) values ('00000000-0000-4000-8000-0000000000e5', 'x', current_date, true, 'weekly')$$, 'events_weekdays');
+select tests.expect_error('calendar: repeat end before start',
+  $$insert into events (calendar_id, title, start_date, all_day, repeat, repeat_until) values ('00000000-0000-4000-8000-0000000000e5', 'x', current_date, true, 'daily', current_date - 1)$$, 'events_until');
+select tests.expect_error('calendar: exceptions only override event fields',
+  $$insert into event_exceptions (event_id, occurrence_date, status, overrides) values ('00000000-0000-4000-8000-0000000000fa', current_date, 'modified', '{"calendar_id": "x"}')$$, 'event_exceptions_overrides');
+select tests.expect_error('calendar: cannot share with a group I am not in',
+  $$insert into calendar_shares (calendar_id, group_id) values ('00000000-0000-4000-8000-0000000000e5', '00000000-0000-4000-8000-000000000002')$$, 'row-level security');
+
+select tests.check('calendar: delete_event returns its batch', delete_event('00000000-0000-4000-8000-0000000000fa') is not null);
+select tests.check('calendar: deleted event is in daniel''s trash', (select deleted_at is not null and deleted_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
+update events set title = 'x' where id = '00000000-0000-4000-8000-0000000000fa';
+select tests.check('calendar: a deleted event cannot be edited', (select title from events where id = '00000000-0000-4000-8000-0000000000fa') = 'Turno de noche');
+select tests.expect_error('calendar: deleted_at only through the trash RPCs', $$update events set deleted_at = null where id = '00000000-0000-4000-8000-0000000000fa'$$, 'permission denied');
+select restore_event('00000000-0000-4000-8000-0000000000fa');
+select tests.check('calendar: restore_event brings it back', (select deleted_at is null from events where id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.check('calendar: history create, update, delete, restore',
+  (select string_agg(action, ',' order by id) from event_history where event_id = '00000000-0000-4000-8000-0000000000fa') = 'create,update,delete,restore');
+select tests.check('calendar: trashing is not an edit', (select updated_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
+insert into calendar_shares (calendar_id, group_id, level) values ('00000000-0000-4000-8000-0000000000e5', '00000000-0000-4000-8000-000000000001', 'busy');
+select tests.check('calendar: daniel shares Hospital as busy', (select shared_by = my_person_id() from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e5'));
+
+select tests.as_user('marta@ejemplo.com');
+select tests.check('calendar: marta sees her own, Colegio, not the busy ones (7 events)', (select count(*) from events) = 7);
+select tests.check('calendar: busy slots of Daniel''s folders', (select count(*) from busy_events('00000000-0000-4000-8000-000000000001')) = 3);
+select tests.check('calendar: busy slots carry the times', exists (select 1 from busy_events('00000000-0000-4000-8000-000000000001') where start_time = '19:00' and repeat_weekdays = '{2,4}'));
+select tests.check('calendar: marta cannot read the busy events', (select count(*) from events where calendar_id = '00000000-0000-4000-8000-0000000000e3') = 0);
+select tests.check('calendar: busy folder name stays hidden', not exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e3'));
+select tests.check('calendar: but its share is visible', exists (select 1 from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e3' and level = 'busy'));
+select tests.check('calendar: admin cannot edit a busy share', not can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
+select tests.check('calendar: admin cannot edit Daniel''s private folder', not can_edit_calendar('00000000-0000-4000-8000-0000000000e5'));
+select tests.check('calendar: marta edits Pablo''s Colegio (manages his profile)', can_edit_calendar('00000000-0000-4000-8000-0000000000e4'));
+insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e6', '00000000-0000-4000-8000-0000000000d2', 'Pediatra');
+insert into events (id, calendar_id, title, start_date, all_day) values ('00000000-0000-4000-8000-0000000000fb', '00000000-0000-4000-8000-0000000000e6', 'Vacuna', current_date, true);
+select tests.check('calendar: marta creates a private folder for Pablo', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000fb'));
+insert into event_exceptions (event_id, occurrence_date, status, overrides)
+values ('00000000-0000-4000-8000-0000000000f1', date_trunc('week', current_date)::date + 7, 'modified', '{"title": "Oficina (teletrabajo)", "start_time": "09:00"}');
+select tests.check('calendar: marta changes one Monday of Oficina', exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f1' and after ? 'exception'));
+insert into event_participants (event_id, person_id) values ('00000000-0000-4000-8000-0000000000f3', (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'));
+select tests.check('calendar: marta adds daniel to the dentist', exists (select 1 from event_participants where event_id = '00000000-0000-4000-8000-0000000000f3'));
+
+select tests.check('calendar: delete_calendar', delete_calendar('00000000-0000-4000-8000-0000000000e2') is not null);
+select tests.check('calendar: the folder and its events go in one batch',
+  (select count(*) = 3 and count(distinct deletion_batch) = 1
+     from (select deletion_batch from calendars where id = '00000000-0000-4000-8000-0000000000e2' union all select deletion_batch from events where calendar_id = '00000000-0000-4000-8000-0000000000e2') x));
+select tests.check('calendar: deleted folder still in marta''s trash', exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e2' and deleted_at is not null));
+select tests.expect_error('calendar: an event of a deleted folder comes back with the folder', $$select restore_event('00000000-0000-4000-8000-0000000000f3')$$, 'calendar is deleted');
+select tests.expect_error('calendar: no new events in a deleted folder',
+  $$insert into events (calendar_id, title, start_date, all_day) values ('00000000-0000-4000-8000-0000000000e2', 'x', current_date, true)$$, 'row-level security');
+select restore_calendar('00000000-0000-4000-8000-0000000000e2');
+select tests.check('calendar: restore_calendar brings its events back', (select count(*) from events where calendar_id = '00000000-0000-4000-8000-0000000000e2' and deleted_at is null) = 2);
+select tests.check('calendar: and its extra groups', exists (select 1 from event_shares where event_id = '00000000-0000-4000-8000-0000000000f4'));
+
+select tests.check('calendar: marta deletes Análisis', delete_event('00000000-0000-4000-8000-0000000000f4') is not null);
+select purge_event('00000000-0000-4000-8000-0000000000f4');
+select tests.check('calendar: purge leaves one history line',
+  (select count(*) = 1 and min(action) = 'purge' and min(before ->> 'title') = 'Análisis de sangre' from event_history where event_id = '00000000-0000-4000-8000-0000000000f4'));
+select tests.expect_error('calendar: purge only from the trash', $$select purge_event('00000000-0000-4000-8000-0000000000f1')$$, 'event not found');
+
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('calendar: daniel sees the dentist as participant', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f3'));
+select tests.check('calendar: daniel sees the changed Monday', exists (select 1 from event_exceptions where event_id = '00000000-0000-4000-8000-0000000000f1'));
+select tests.check('calendar: event_owners hides events daniel cannot see',
+  not exists (select 1 from event_owners(array['00000000-0000-4000-8000-0000000000fb']::uuid[])));
+select tests.check('calendar: daniel does not see Pablo''s private folder', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000fb'));
+select tests.check('calendar: daniel cannot read the purged event''s line', not exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f4'));
+select tests.expect_error('calendar: daniel cannot purge Marta''s events', $$select delete_event('00000000-0000-4000-8000-0000000000f1')$$, 'event not found');
+delete from event_participants where event_id = '00000000-0000-4000-8000-0000000000f3' and person_id = my_person_id();
+select tests.check('calendar: daniel takes himself off the dentist', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f3'));
+insert into event_participants (event_id, person_id) values ('00000000-0000-4000-8000-0000000000fa', (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+update calendar_shares set level = 'full' where calendar_id = '00000000-0000-4000-8000-0000000000e3';
+
+select tests.as_user('marta@ejemplo.com');
+select tests.check('calendar: event_owners gives the owner of an event seen as participant',
+  (select owner_id from event_owners(array['00000000-0000-4000-8000-0000000000fa']::uuid[])) = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'));
+select tests.check('calendar: editable calendars of marta', (select count(*) from editable_calendar_ids()) = 5);
+select tests.check('calendar: admin edits once shared in full', can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
+update events set title = 'Crossfit (cambiado)' where id = '00000000-0000-4000-8000-0000000000f5';
+select tests.check('calendar: marta renames Crossfit', (select title from events where id = '00000000-0000-4000-8000-0000000000f5') = 'Crossfit (cambiado)');
+select tests.check('calendar: marta sees Turno as participant', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.expect_error('calendar: empty_trash is internal', $$select empty_trash()$$, 'permission denied');
+
+reset role;
+update events set deleted_at = now() - interval '31 days', deleted_by = null, deletion_batch = gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000f9';
+update events set deleted_at = now() - interval '2 days', deleted_by = null, deletion_batch = gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000f2';
+select tests.check('calendar: empty_trash removes what is older than 30 days', empty_trash() = 1);
+select tests.check('calendar: newer trash stays', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f2'));
+update events set deleted_at = null, deleted_by = null, deletion_batch = null where id = '00000000-0000-4000-8000-0000000000f2';
+set role authenticated;
+
 -- ── Pending request sees nothing of the group ──
 select tests.as_user('lucia@ejemplo.com');
 select tests.check('lucia pending: no items', (select count(*) from items) = 0);
@@ -109,6 +246,10 @@ select tests.check('marta left: sees no items', (select count(*) from items) = 0
 select tests.as_user('daniel@ejemplo.com');
 select tests.check('daniel still admin after marta left', is_group_admin('00000000-0000-4000-8000-000000000001'));
 select tests.check('history keeps marta''s name', (select display_name from people where user_id = '00000000-0000-4000-8000-0000000000c1') = 'Marta');
+select tests.check('marta left: her folders are no longer shared with the group', not exists (select 1 from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e1'));
+select tests.check('marta left: daniel no longer sees Oficina', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f1'));
+select tests.check('marta left: she is off daniel''s night shift', not exists (select 1 from event_participants where event_id = '00000000-0000-4000-8000-0000000000fa'));
+select tests.check('marta left: Pablo''s Colegio still shared', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f7'));
 reset role;
 select invite_code as invite from groups where id = '00000000-0000-4000-8000-000000000001' \gset
 set role authenticated;
@@ -161,6 +302,8 @@ grant execute on function tests.expect_error(text, text, text), tests.check(text
 grant insert on tests.results to anon; grant usage on sequence tests.results_n_seq to anon;
 set role anon;
 select tests.expect_error('anon: no people', $$select * from people$$, 'permission denied');
+select tests.expect_error('anon: no events', $$select * from events$$, 'permission denied');
+select tests.expect_error('anon: no busy slots', $$select * from busy_events('00000000-0000-4000-8000-000000000001')$$, 'permission denied');
 select tests.expect_error('anon: no rpc', $$select group_by_invite('HUERTA7Q4K')$$, 'permission denied');
 reset role;
 

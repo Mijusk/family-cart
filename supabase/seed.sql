@@ -7,6 +7,8 @@
 -- Profiles without an account: Abuela Carmen, and Pablo (claim code PABLO7Q4KM: sign up with a
 -- new email and enter it under "Tengo un código de perfil").
 -- Invite link for "Casa Martín": /unirse/HUERTA7Q4K
+-- Calendar: Marta's "Trabajo" and Pablo's "Colegio" are shared with the group in full, Daniel's
+-- "Gimnasio" only as busy, and Marta's "Médico" is private except for one event.
 
 -- ── Accounts (the on_auth_user_created trigger creates their people) ─────────
 
@@ -110,3 +112,62 @@ from (values
 ) as v (name, quantity, note, status, added_by, added_ago, trip)
 left join public.trips t on t.id = ('00000000-0000-4000-8000-0000000000' || v.trip)::uuid
 order by v.added_ago desc;
+
+-- ── Calendar ─────────────────────────────────────────────────────────────────
+-- Dates are relative to the current week (Monday = date_trunc('week', …)).
+
+insert into public.calendars (id, owner_id, name, color, position, created_by)
+select ('00000000-0000-4000-8000-0000000000' || v.id)::uuid, coalesce(
+         (select id from public.people where user_id = v.owner::uuid), v.owner::uuid),
+       v.name, v.color, v.position,
+       (select id from public.people where user_id = v.author::uuid)
+from (values
+  ('e1', '00000000-0000-4000-8000-0000000000c1', 'Trabajo',  '#3b6fb6', 0, '00000000-0000-4000-8000-0000000000c1'),
+  ('e2', '00000000-0000-4000-8000-0000000000c1', 'Médico',   '#b5476f', 1, '00000000-0000-4000-8000-0000000000c1'),
+  ('e3', '00000000-0000-4000-8000-0000000000c2', 'Gimnasio', '#5f7a2e', 0, '00000000-0000-4000-8000-0000000000c2'),
+  ('e4', '00000000-0000-4000-8000-0000000000d2', 'Colegio',  '#277a7a', 0, '00000000-0000-4000-8000-0000000000c1')
+) as v (id, owner, name, color, position, author);
+
+insert into public.calendar_shares (calendar_id, group_id, level, shared_by)
+select ('00000000-0000-4000-8000-0000000000' || v.calendar)::uuid, '00000000-0000-4000-8000-000000000001', v.level,
+       (select owner_id from public.calendars where id = ('00000000-0000-4000-8000-0000000000' || v.calendar)::uuid)
+from (values ('e1', 'full'), ('e3', 'busy'), ('e4', 'full')) as v (calendar, level);
+
+insert into public.events (id, calendar_id, title, notes, location, all_day, start_date, start_time, end_time,
+                           repeat, repeat_weekdays, repeat_until, created_by)
+select ('00000000-0000-4000-8000-0000000000' || v.id)::uuid, ('00000000-0000-4000-8000-0000000000' || v.calendar)::uuid,
+       v.title, v.notes, v.location, v.all_day, date_trunc('week', current_date)::date + v.day_offset,
+       v.start_time::time, v.end_time::time, v.repeat, v.weekdays::smallint[], v.until::date,
+       (select created_by from public.calendars where id = ('00000000-0000-4000-8000-0000000000' || v.calendar)::uuid)
+from (values
+  ('f1', 'e1', 'Oficina',              null,                     null,              false, 0,  '08:00', '15:00', 'weekly',   '{1,2,3,4,5}', null),
+  ('f2', 'e1', 'Viaje a Valencia',     'Tren de las 7:10',       'Valencia',        true,  10, null,    null,    'none',     null,          null),
+  ('f3', 'e2', 'Dentista',             'Revisión anual',         'Clínica Sonrisas', false, 3, '17:30', '18:15', 'none',     null,          null),
+  ('f4', 'e2', 'Análisis de sangre',   'En ayunas',              'Centro de salud', false, 8,  '08:30', '09:00', 'none',     null,          null),
+  ('f5', 'e3', 'Crossfit',             null,                     'Box Norte',       false, 1,  '19:00', '20:30', 'weekly',   '{2,4}',       null),
+  ('f6', 'e3', 'Partido de pádel',     'Con Javi',               null,              false, 5,  '23:00', '00:30', 'none',     null,          null),
+  ('f7', 'e4', 'Clase',                null,                     'CEIP Las Huertas', false, 0, '09:00', '14:00', 'weekly',   '{1,2,3,4,5}', null),
+  ('f8', 'e4', 'Natación',             'Llevar gorro',           'Polideportivo',   false, 2,  '17:30', '18:30', 'biweekly', '{3}',         null),
+  ('f9', 'e4', 'Reunión de padres',    null,                     'CEIP Las Huertas', false, 3, '18:00', '19:00', 'monthly',  null,          null)
+) as v (id, calendar, title, notes, location, all_day, day_offset, start_time, end_time, repeat, weekdays, until);
+
+-- Marta adds the group to her blood test, so whoever drives her can see it.
+insert into public.event_shares (event_id, group_id, shared_by)
+values ('00000000-0000-4000-8000-0000000000f4', '00000000-0000-4000-8000-000000000001',
+        (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+
+-- Daniel takes Pablo to swimming.
+insert into public.event_participants (event_id, person_id)
+values ('00000000-0000-4000-8000-0000000000f8', (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c2'));
+
+-- No school on Friday next week.
+insert into public.event_exceptions (event_id, occurrence_date, status, created_by)
+values ('00000000-0000-4000-8000-0000000000f7', date_trunc('week', current_date)::date + 11, 'cancelled',
+        (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+
+update public.people p set last_calendar_id = v.calendar::uuid
+from (values
+  ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000e1'),
+  ('00000000-0000-4000-8000-0000000000c2', '00000000-0000-4000-8000-0000000000e3')
+) as v (user_id, calendar)
+where p.user_id = v.user_id::uuid;

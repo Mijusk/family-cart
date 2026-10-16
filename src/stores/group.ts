@@ -4,6 +4,7 @@ import { isAuthRetryableFetchError, type RealtimeChannel, type RealtimeSystemPay
 import { supabase } from '@/lib/supabase'
 import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
 import type { Group, Member, MemberRole, Membership, Person } from '@/types'
+import { useCalendarStore } from './calendar'
 import { useListStore } from './list'
 
 /**
@@ -268,6 +269,7 @@ export const useGroupStore = defineStore('group', () => {
     members.value = []
     myMemberId.value = ''
     useListStore().unload()
+    useCalendarStore().unload()
   }
 
   /** Every screen follows: lists, history and group all read the active group. */
