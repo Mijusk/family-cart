@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { goBack } from '@/router/back'
@@ -110,7 +110,29 @@ function fill() {
   }
   filling = false
   ready.value = true
+  // After the watchers that react to the filled form, so they don't count as changes.
+  void nextTick(() => (pristine = JSON.stringify(form)))
 }
+
+// ── Leaving with unsaved changes ─────────────────────────────
+
+/** The form as filled in on opening; leaving asks first if it no longer matches. */
+let pristine: string | null = null
+let saved = false
+const dirty = () => !saved && pristine !== null && JSON.stringify(form) !== pristine
+
+onBeforeRouteLeave(() => {
+  if (!dirty()) return true
+  const question = editingId.value ? '¿Seguro que quieres descartar los cambios?' : '¿Seguro que quieres descartar el evento?'
+  return window.confirm(question)
+})
+
+// Closing or reloading the tab: the browser shows its own question.
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  if (dirty()) e.preventDefault()
+}
+window.addEventListener('beforeunload', onBeforeUnload)
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
 
 function minutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
@@ -236,6 +258,7 @@ async function save() {
   try {
     if (onlyDay.value) {
       await calendar.saveOccurrence(calendar.eventById(editingId.value!)!, queryDay.value!, shown)
+      saved = true
       goBack(eventPage.value!)
       toast.show('Cambiado solo este día')
       return
@@ -255,6 +278,7 @@ async function save() {
     }
     const groupIds = form.groupIds.filter((id) => !calendar.sharedGroupIds(calendarId).includes(id))
     const id = await calendar.saveEvent(draft, groupIds, editingId.value ?? undefined)
+    saved = true
     // Back to where the form was opened from: the event, or the calendar view.
     if (editingId.value) {
       goBack({ name: 'event', params: { id }, query: { dia: queryDay.value ?? draft.startDate } })

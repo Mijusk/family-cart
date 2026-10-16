@@ -34,14 +34,16 @@ watch(
   { immediate: true },
 )
 
-/** Every active member of the group, me first, with what they have that day. */
+/** The active members of the group with something that day, me first, with what they have. */
 const rows = computed(() => {
   const occurrences = calendar.occurrencesOn(day.value)
   const members = [...groupStore.activeMembers].sort((a, b) => Number(groupStore.isMe(b.id)) - Number(groupStore.isMe(a.id)))
-  return members.map((member) => ({
-    member,
-    items: occurrences.filter((o) => calendar.peopleOf(o).includes(member.personId)),
-  }))
+  return members
+    .map((member) => ({
+      member,
+      items: occurrences.filter((o) => calendar.peopleOf(o).includes(member.personId)),
+    }))
+    .filter((row) => row.items.length)
 })
 </script>
 
@@ -76,6 +78,8 @@ const rows = computed(() => {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
+    <p v-else-if="!rows.length" class="state muted">Nadie tiene nada este día.</p>
+
     <template v-else>
       <section v-for="row in rows" :key="row.member.id" :aria-label="row.member.name">
         <h2 class="person">
@@ -83,7 +87,6 @@ const rows = computed(() => {
           <span>{{ groupStore.isMe(row.member.id) ? 'Tú' : row.member.name }}</span>
         </h2>
         <ul class="rows">
-          <li v-if="!row.items.length" class="nothing muted">Nada este día</li>
           <li v-for="o in row.items" :key="o.key">
             <span v-if="o.busy" class="occurrence busy">
               <span class="bar" :style="{ background: o.color }" />
@@ -165,11 +168,6 @@ const rows = computed(() => {
   padding: 22px var(--gutter) 8px;
   font-size: 1rem;
   font-weight: 700;
-}
-
-.nothing {
-  padding: 14px var(--gutter);
-  font-size: 0.9375rem;
 }
 
 .occurrence {
