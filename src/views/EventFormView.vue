@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { namesList, useEditors } from '@/lib/editors'
 import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -20,13 +21,20 @@ const toast = useToastStore()
 const route = useRoute()
 const router = useRouter()
 
-const NEW_FOLDER = '__new'
 
 const editingId = computed(() => (route.name === 'event-edit' ? String(route.params.id) : null))
 const copyOf = computed(() => (typeof route.query.copia === 'string' ? route.query.copia : null))
 const queryDay = computed(() => (isIsoDate(route.query.dia) ? route.query.dia : null))
 /** Changing only one day of a repeating event: no folder, repetition or groups here. */
 const onlyDay = computed(() => !!editingId.value && route.query.solo === 'dia')
+
+const NEW_FOLDER = '__new'
+
+/** Others with this event open in the form; last save wins, so they get a warning. */
+const editors = useEditors(editingId, () => {
+  const me = groupStore.me
+  return me && { personId: me.id, name: me.displayName }
+})
 
 const pageTitle = computed(() => {
   if (onlyDay.value) return 'Cambiar este día'
@@ -255,6 +263,11 @@ const cancelTo = computed(() =>
         {{ longDay(queryDay) }}. El resto de la serie no cambia.
       </p>
     </header>
+
+    <p v-if="editors.length" class="editing-notice" role="status">
+      {{ namesList(editors) }} también {{ editors.length === 1 ? 'está' : 'están' }} editando este evento. Si guardáis
+      a la vez, se queda el último cambio.
+    </p>
 
     <p v-if="!ready" class="state muted">Cargando…</p>
     <div v-else-if="notFound" class="state">

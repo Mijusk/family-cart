@@ -201,4 +201,4 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 3. **PR 3 — Evento y Hoy** ✅.
 4. **PR 4 — Semana y Mes** ✅: componentes propios (sin librería); Semana con filtros por persona y carpeta; Mes solo con eventos puntuales y excepciones.
 5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera** ✅: sin migración (el esquema y las RPCs ya estaban en el PR 2; los perfiles sin cuenta se crean desde Grupo desde el PR 1).
-6. **PR 6 — Tiempo real y aviso de "está editando".**
+6. **PR 6 — Tiempo real y aviso de "está editando"** ✅: Postgres changes para lo que cada uno ve; para las franjas "Ocupado" un trigger manda un aviso vacío al canal `calendar:<grupo>` (`realtime.send`) y la app recarga. "Está editando" con Presence en el canal `event-edit:<evento>`.

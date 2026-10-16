@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import {
   fromEvent,
@@ -28,6 +29,8 @@ import type {
   TrashItem,
 } from '@/types'
 import { useGroupStore } from './group'
+
+const REALTIME_TABLES = ['calendars', 'calendar_shares', 'events', 'event_exceptions', 'event_shares', 'event_participants']
 
 /** What the event form saves; the rest of an event is set by the database. */
 export type EventDraft = Pick<
@@ -90,6 +93,7 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   async function load(groupId: string) {
     loadedGroupId = groupId
+    subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
     try {
       const [cals, shareRows, eventRows, exceptionRows, eventShareRows, participantRows, editable, busy] = await Promise.all([
@@ -425,7 +429,45 @@ export const useCalendarStore = defineStore('calendar', () => {
     return entries
   }
 
+  // ── Realtime ───────────────────────────────────────────────
+
+  let channel: RealtimeChannel | null = null
+  let channelGroupId: string | null = null
+  let reloadTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** Changes come in bursts (an event, its groups, its exceptions): one reload for them all. */
+  function reloadSoon() {
+    clearTimeout(reloadTimer)
+    reloadTimer = setTimeout(() => reload().catch(console.error), 300)
+  }
+
+  /**
+   * Postgres changes bring what RLS lets me see; busy slots come as an empty broadcast on the
+   * group's topic (see the calendar_realtime migration). Either way, everything is reloaded.
+   */
+  function subscribe(groupId: string) {
+    if (channelGroupId === groupId) return
+    if (channel) void supabase.removeChannel(channel)
+    channelGroupId = groupId
+    let ch = supabase.channel(`calendar:${groupId}`)
+    for (const table of REALTIME_TABLES) ch = ch.on('postgres_changes', { event: '*', schema: 'public', table }, reloadSoon)
+    channel = ch
+      .on('broadcast', { event: 'changed' }, reloadSoon)
+      // Catch up on anything missed before the listeners were live: SUBSCRIBED also fires after a
+      // reconnect (phone back from background), and the system event when Postgres changes actually start.
+      .on('system', {}, (p: RealtimeSystemPayload) => {
+        if (p.extension === 'postgres_changes' && p.status === 'ok') reloadSoon()
+      })
+      .subscribe((state) => {
+        if (state === 'SUBSCRIBED') reloadSoon()
+      })
+  }
+
   function unload() {
+    if (channel) void supabase.removeChannel(channel)
+    channel = null
+    channelGroupId = null
+    clearTimeout(reloadTimer)
     loadedGroupId = null
     status.value = 'idle'
     calendars.value = []
