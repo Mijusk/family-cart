@@ -13,7 +13,7 @@ declare module 'vue-router' {
     /** Reachable signed in or out (the password reset link). */
     anyone?: boolean
     /** Belongs to a section that a group can switch off. */
-    section?: 'shopping' | 'calendar'
+    section?: 'shopping' | 'tasks' | 'calendar'
   }
 }
 
@@ -32,6 +32,30 @@ export const router = createRouter({
       name: 'history',
       component: () => import('@/views/HistoryView.vue'),
       meta: { section: 'shopping' },
+    },
+    {
+      path: '/tareas',
+      name: 'tasks',
+      component: () => import('@/views/TasksView.vue'),
+      meta: { section: 'tasks' },
+    },
+    {
+      path: '/tareas/listas',
+      name: 'task-lists',
+      component: () => import('@/views/TaskListsView.vue'),
+      meta: { section: 'tasks' },
+    },
+    {
+      path: '/tareas/papelera',
+      name: 'task-trash',
+      component: () => import('@/views/TaskTrashView.vue'),
+      meta: { section: 'tasks' },
+    },
+    {
+      path: '/tareas/:id',
+      name: 'task',
+      component: () => import('@/views/TaskView.vue'),
+      meta: { section: 'tasks' },
     },
     {
       path: '/calendario',
@@ -122,10 +146,12 @@ export const router = createRouter({
 export function sectionRedirect(to: { meta: RouteMeta }) {
   const groupStore = useGroupStore()
   if (groupStore.status !== 'ready') return null
-  const { shoppingEnabled, calendarEnabled } = groupStore.group
-  if (to.meta.section === 'shopping' && !shoppingEnabled) return { name: 'calendar' }
-  if (to.meta.section === 'calendar' && !calendarEnabled) return { name: 'list' }
-  return null
+  const { shoppingEnabled, tasksEnabled, calendarEnabled } = groupStore.group
+  const enabled = { shopping: shoppingEnabled, tasks: tasksEnabled, calendar: calendarEnabled }
+  if (!to.meta.section || enabled[to.meta.section]) return null
+  // The first section the group does use, in the order of the tab bar.
+  if (shoppingEnabled) return { name: 'list' }
+  return { name: tasksEnabled ? 'tasks' : 'calendar' }
 }
 
 router.beforeEach(async (to) => {

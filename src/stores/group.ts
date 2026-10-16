@@ -6,6 +6,7 @@ import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
 import type { Group, Member, MemberRole, Membership, Person } from '@/types'
 import { useCalendarStore } from './calendar'
 import { useListStore } from './list'
+import { useTasksStore } from './tasks'
 
 /**
  * loading → signed-out | no-group | ready; error if Supabase can't be reached.
@@ -23,6 +24,7 @@ export interface GroupSettings {
   name?: string
   shoppingEnabled?: boolean
   calendarEnabled?: boolean
+  tasksEnabled?: boolean
 }
 
 /** Last group opened on this device, so the app reopens it next time. */
@@ -270,6 +272,7 @@ export const useGroupStore = defineStore('group', () => {
     myMemberId.value = ''
     useListStore().unload()
     useCalendarStore().unload()
+    useTasksStore().unload()
   }
 
   /** Every screen follows: lists, history and group all read the active group. */
@@ -375,11 +378,12 @@ export const useGroupStore = defineStore('group', () => {
 
   // ── Create / join ──────────────────────────────────────────
 
-  async function createGroup(groupName: string, sections: { shopping: boolean; calendar: boolean }) {
+  async function createGroup(groupName: string, sections: { shopping: boolean; calendar: boolean; tasks: boolean }) {
     const { data, error } = await supabase.rpc('create_group', {
       group_name: groupName,
       with_shopping: sections.shopping,
       with_calendar: sections.calendar,
+      with_tasks: sections.tasks,
     })
     if (error) throw error
     await loadGroup(data)
@@ -492,6 +496,7 @@ export const useGroupStore = defineStore('group', () => {
         name: settings.name,
         shopping_enabled: settings.shoppingEnabled,
         calendar_enabled: settings.calendarEnabled,
+        tasks_enabled: settings.tasksEnabled,
       })
       .eq('id', current.value!.id)
       .select()

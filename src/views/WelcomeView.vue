@@ -34,10 +34,11 @@ function back() {
 const groupName = ref('')
 const withCalendar = ref(true)
 const withShopping = ref(true)
+const withTasks = ref(true)
 const creating = ref(false)
 const createError = ref<string | null>(null)
 const canCreate = computed(
-  () => groupName.value.trim() && (withCalendar.value || withShopping.value) && !creating.value,
+  () => groupName.value.trim() && (withCalendar.value || withShopping.value || withTasks.value) && !creating.value,
 )
 
 async function create() {
@@ -45,7 +46,7 @@ async function create() {
   creating.value = true
   createError.value = null
   try {
-    await groupStore.createGroup(groupName.value.trim(), { shopping: withShopping.value, calendar: withCalendar.value })
+    await groupStore.createGroup(groupName.value.trim(), { shopping: withShopping.value, calendar: withCalendar.value, tasks: withTasks.value })
     await router.replace({ name: 'group' })
   } catch (e) {
     createError.value = friendlyError(e)
@@ -149,8 +150,8 @@ async function cancelRequest(groupId: string, name: string) {
       <template v-else>
         <h1 class="display-title">Hola, {{ groupStore.me?.displayName }}</h1>
         <p v-if="mode === 'choose'" class="muted intro">
-          Crea un grupo para tu familia o únete al que ya tengan. Cada grupo puede tener calendario, lista de la compra
-          o las dos cosas.
+          Crea un grupo para tu familia o únete al que ya tengan. Cada grupo elige qué usar: lista de la compra, tareas
+          y calendario.
         </p>
       </template>
     </header>
@@ -232,9 +233,16 @@ async function cancelRequest(groupId: string, name: string) {
             <span class="muted small">Lo que falta en casa</span>
           </span>
         </label>
+        <label class="check">
+          <input v-model="withTasks" type="checkbox" />
+          <span>
+            <strong>Tareas</strong>
+            <span class="muted small">Cosas por hacer, de una sola vez</span>
+          </span>
+        </label>
         <p class="muted small">Podrás cambiarlo después en los ajustes del grupo.</p>
       </fieldset>
-      <p v-if="!withCalendar && !withShopping" class="form-error">Elige al menos una de las dos.</p>
+      <p v-if="!withCalendar && !withShopping && !withTasks" class="form-error">Elige al menos una.</p>
       <p v-if="createError" class="form-error" role="alert">{{ createError }}</p>
       <button type="submit" class="btn btn-primary btn-block" :disabled="!canCreate">
         {{ creating ? 'Creando…' : 'Crear el grupo' }}

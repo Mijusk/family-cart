@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AddItemForm from '@/components/AddItemForm.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
@@ -43,7 +43,10 @@ function goShopping() {
 <template>
   <div class="page">
     <header class="page-header">
-      <p class="eyebrow">Compra Familiar</p>
+      <div class="header-row">
+        <p class="eyebrow">Compra Familiar</p>
+        <RouterLink :to="{ name: 'history' }" class="header-link"><AppIcon name="history" :size="16" /> Historial</RouterLink>
+      </div>
       <GroupSwitcher />
       <p class="muted">{{ countLabel }}</p>
     </header>

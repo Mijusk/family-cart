@@ -17,6 +17,9 @@ import type {
   Product,
   RepeatKind,
   ShareLevel,
+  Task,
+  TaskList,
+  TaskListShare,
   Trip,
   TripClosedReason,
 } from '@/types'
@@ -46,6 +49,7 @@ export const toGroup = (r: GroupRow): Group => ({
   timezone: r.timezone,
   shoppingEnabled: r.shopping_enabled,
   calendarEnabled: r.calendar_enabled,
+  tasksEnabled: r.tasks_enabled,
   createdAt: r.created_at,
 })
 
@@ -239,4 +243,35 @@ export const toHistoryEntry = (r: EventHistoryRow): HistoryEntry => ({
   changedAt: r.changed_at,
   before: r.before as Record<string, unknown> | null,
   after: r.after as Record<string, unknown> | null,
+})
+
+export type TaskListRow = Tables['task_lists']['Row']
+export type TaskRow = Tables['tasks']['Row']
+
+export const toTaskList = (r: TaskListRow): TaskList => ({
+  id: r.id,
+  ownerId: r.owner_id,
+  name: r.name,
+  createdAt: r.created_at,
+})
+
+export const toTaskListShare = (r: Pick<Tables['task_list_shares']['Row'], 'list_id' | 'group_id'>): TaskListShare => ({
+  listId: r.list_id,
+  groupId: r.group_id,
+})
+
+export const toTask = (r: TaskRow): Task => ({
+  id: r.id,
+  listId: r.list_id,
+  title: r.title,
+  notes: r.notes,
+  assignedTo: r.assigned_to,
+  dueDate: r.due_date,
+  position: Number(r.position),
+  doneAt: r.done_at,
+  doneBy: r.done_by,
+  createdAt: r.created_at,
+  createdBy: r.created_by,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by,
 })

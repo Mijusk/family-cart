@@ -118,12 +118,13 @@ function regenerate() {
 
 // ── Settings (admins) ─────────────────────────────────────────
 
-function toggleSection(section: 'shopping' | 'calendar') {
+function toggleSection(section: 'shopping' | 'calendar' | 'tasks') {
   const g = groupStore.group
-  const next = { shoppingEnabled: g.shoppingEnabled, calendarEnabled: g.calendarEnabled }
+  const next = { shoppingEnabled: g.shoppingEnabled, calendarEnabled: g.calendarEnabled, tasksEnabled: g.tasksEnabled }
   if (section === 'shopping') next.shoppingEnabled = !next.shoppingEnabled
-  else next.calendarEnabled = !next.calendarEnabled
-  if (!next.shoppingEnabled && !next.calendarEnabled) {
+  else if (section === 'calendar') next.calendarEnabled = !next.calendarEnabled
+  else next.tasksEnabled = !next.tasksEnabled
+  if (!next.shoppingEnabled && !next.calendarEnabled && !next.tasksEnabled) {
     toast.show('El grupo necesita al menos una sección activa')
     return
   }
@@ -315,6 +316,21 @@ async function leave() {
             </span>
             <button type="button" class="btn btn-ghost small-btn" @click="startRename">Cambiar</button>
           </template>
+        </li>
+        <li class="setting">
+          <label class="switch-row">
+            <span class="text">
+              <span class="name">Tareas</span>
+              <span class="muted since">Cosas por hacer, de una sola vez</span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              :checked="groupStore.group.tasksEnabled"
+              :disabled="!!busy"
+              @change="toggleSection('tasks')"
+            />
+          </label>
         </li>
         <li class="setting">
           <label class="switch-row">
