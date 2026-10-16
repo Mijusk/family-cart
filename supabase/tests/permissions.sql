@@ -73,7 +73,8 @@ select tests.expect_error('calendar: daniel cannot share Marta''s calendar',
 select tests.expect_error('calendar: daniel cannot create a calendar for Marta',
   $$insert into calendars (owner_id, name) values ((select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), 'x')$$, 'row-level security');
 
-insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e5', my_person_id(), 'Hospital');
+with c as (insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e5', my_person_id(), 'Hospital') returning id)
+select tests.check('calendar: a new folder comes back from the insert (the app reads it at once)', (select count(*) from c) = 1);
 insert into events (id, calendar_id, title, start_date, start_time, end_time) values ('00000000-0000-4000-8000-0000000000fa', '00000000-0000-4000-8000-0000000000e5', 'Turno', current_date, '22:00', '06:00');
 select tests.check('calendar: night shift crosses midnight', (select end_time < start_time from events where id = '00000000-0000-4000-8000-0000000000fa'));
 select tests.check('calendar: created_by is daniel', (select created_by = my_person_id() from events where id = '00000000-0000-4000-8000-0000000000fa'));
@@ -151,6 +152,8 @@ select tests.expect_error('calendar: purge only from the trash', $$select purge_
 select tests.as_user('daniel@ejemplo.com');
 select tests.check('calendar: daniel sees the dentist as participant', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f3'));
 select tests.check('calendar: daniel sees the changed Monday', exists (select 1 from event_exceptions where event_id = '00000000-0000-4000-8000-0000000000f1'));
+select tests.check('calendar: event_owners hides events daniel cannot see',
+  not exists (select 1 from event_owners(array['00000000-0000-4000-8000-0000000000fb']::uuid[])));
 select tests.check('calendar: daniel does not see Pablo''s private folder', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000fb'));
 select tests.check('calendar: daniel cannot read the purged event''s line', not exists (select 1 from event_history where event_id = '00000000-0000-4000-8000-0000000000f4'));
 select tests.expect_error('calendar: daniel cannot purge Marta''s events', $$select delete_event('00000000-0000-4000-8000-0000000000f1')$$, 'event not found');
@@ -160,6 +163,9 @@ insert into event_participants (event_id, person_id) values ('00000000-0000-4000
 update calendar_shares set level = 'full' where calendar_id = '00000000-0000-4000-8000-0000000000e3';
 
 select tests.as_user('marta@ejemplo.com');
+select tests.check('calendar: event_owners gives the owner of an event seen as participant',
+  (select owner_id from event_owners(array['00000000-0000-4000-8000-0000000000fa']::uuid[])) = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'));
+select tests.check('calendar: editable calendars of marta', (select count(*) from editable_calendar_ids()) = 5);
 select tests.check('calendar: admin edits once shared in full', can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
 update events set title = 'Crossfit (cambiado)' where id = '00000000-0000-4000-8000-0000000000f5';
 select tests.check('calendar: marta renames Crossfit', (select title from events where id = '00000000-0000-4000-8000-0000000000f5') = 'Crossfit (cambiado)');

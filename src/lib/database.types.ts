@@ -12,6 +12,393 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_shares: {
+        Row: {
+          calendar_id: string,
+          group_id: string,
+          level: string,
+          shared_at: string,
+          shared_by: string | null
+        }
+        Insert: {
+          calendar_id: string,
+          group_id: string,
+          level?: string,
+          shared_at?: string,
+          shared_by?: string | null
+        }
+        Update: {
+          calendar_id?: string,
+          group_id?: string,
+          level?: string,
+          shared_at?: string,
+          shared_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_shares_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_shares_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendar_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendars: {
+        Row: {
+          color: string,
+          created_at: string,
+          created_by: string | null,
+          deleted_at: string | null,
+          deleted_by: string | null,
+          deletion_batch: string | null,
+          id: string,
+          name: string,
+          owner_id: string,
+          position: number,
+          updated_at: string,
+          updated_by: string | null
+        }
+        Insert: {
+          color?: string,
+          created_at?: string,
+          created_by?: string | null,
+          deleted_at?: string | null,
+          deleted_by?: string | null,
+          deletion_batch?: string | null,
+          id?: string,
+          name: string,
+          owner_id: string,
+          position?: number,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Update: {
+          color?: string,
+          created_at?: string,
+          created_by?: string | null,
+          deleted_at?: string | null,
+          deleted_by?: string | null,
+          deletion_batch?: string | null,
+          id?: string,
+          name?: string,
+          owner_id?: string,
+          position?: number,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendars_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendars_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendars_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calendars_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_exceptions: {
+        Row: {
+          created_at: string,
+          created_by: string | null,
+          event_id: string,
+          occurrence_date: string,
+          overrides: Json,
+          status: string,
+          updated_at: string,
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string,
+          created_by?: string | null,
+          event_id: string,
+          occurrence_date: string,
+          overrides?: Json,
+          status: string,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string,
+          created_by?: string | null,
+          event_id?: string,
+          occurrence_date?: string,
+          overrides?: Json,
+          status?: string,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_exceptions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_exceptions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_exceptions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_history: {
+        Row: {
+          action: string,
+          after: Json | null,
+          before: Json | null,
+          calendar_id: string,
+          changed_at: string,
+          changed_by: string | null,
+          event_id: string,
+          id: number
+        }
+        Insert: {
+          action: string,
+          after?: Json | null,
+          before?: Json | null,
+          calendar_id: string,
+          changed_at?: string,
+          changed_by?: string | null,
+          event_id: string,
+          id?: never
+        }
+        Update: {
+          action?: string,
+          after?: Json | null,
+          before?: Json | null,
+          calendar_id?: string,
+          changed_at?: string,
+          changed_by?: string | null,
+          event_id?: string,
+          id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_participants: {
+        Row: {
+          event_id: string,
+          person_id: string
+        }
+        Insert: {
+          event_id: string,
+          person_id: string
+        }
+        Update: {
+          event_id?: string,
+          person_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_participants_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_participants_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_shares: {
+        Row: {
+          event_id: string,
+          group_id: string,
+          shared_at: string,
+          shared_by: string | null
+        }
+        Insert: {
+          event_id: string,
+          group_id: string,
+          shared_at?: string,
+          shared_by?: string | null
+        }
+        Update: {
+          event_id?: string,
+          group_id?: string,
+          shared_at?: string,
+          shared_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_shares_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_shares_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_shares_shared_by_fkey"
+            columns: ["shared_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          all_day: boolean,
+          calendar_id: string,
+          created_at: string,
+          created_by: string | null,
+          deleted_at: string | null,
+          deleted_by: string | null,
+          deletion_batch: string | null,
+          end_time: string | null,
+          id: string,
+          location: string | null,
+          notes: string | null,
+          repeat: string,
+          repeat_until: string | null,
+          repeat_weekdays: number[] | null,
+          start_date: string,
+          start_time: string | null,
+          timezone: string,
+          title: string,
+          updated_at: string,
+          updated_by: string | null
+        }
+        Insert: {
+          all_day?: boolean,
+          calendar_id: string,
+          created_at?: string,
+          created_by?: string | null,
+          deleted_at?: string | null,
+          deleted_by?: string | null,
+          deletion_batch?: string | null,
+          end_time?: string | null,
+          id?: string,
+          location?: string | null,
+          notes?: string | null,
+          repeat?: string,
+          repeat_until?: string | null,
+          repeat_weekdays?: number[] | null,
+          start_date: string,
+          start_time?: string | null,
+          timezone?: string,
+          title: string,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Update: {
+          all_day?: boolean,
+          calendar_id?: string,
+          created_at?: string,
+          created_by?: string | null,
+          deleted_at?: string | null,
+          deleted_by?: string | null,
+          deletion_batch?: string | null,
+          end_time?: string | null,
+          id?: string,
+          location?: string | null,
+          notes?: string | null,
+          repeat?: string,
+          repeat_until?: string | null,
+          repeat_weekdays?: number[] | null,
+          start_date?: string,
+          start_time?: string | null,
+          timezone?: string,
+          title?: string,
+          updated_at?: string,
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_deleted_by_fkey"
+            columns: ["deleted_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       groups: {
         Row: {
           calendar_enabled: boolean,
@@ -206,6 +593,7 @@ export type Database = {
           created_by: string | null,
           display_name: string,
           id: string,
+          last_calendar_id: string | null,
           updated_at: string,
           updated_by: string | null,
           user_id: string | null
@@ -217,6 +605,7 @@ export type Database = {
           created_by?: string | null,
           display_name: string,
           id?: string,
+          last_calendar_id?: string | null,
           updated_at?: string,
           updated_by?: string | null,
           user_id?: string | null
@@ -228,6 +617,7 @@ export type Database = {
           created_by?: string | null,
           display_name?: string,
           id?: string,
+          last_calendar_id?: string | null,
           updated_at?: string,
           updated_by?: string | null,
           user_id?: string | null
@@ -238,6 +628,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "people_last_calendar_id_fkey"
+            columns: ["last_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "calendars"
             referencedColumns: ["id"]
           },
           {
@@ -336,6 +733,30 @@ export type Database = {
         Args: { member_id: string }
         Returns: undefined
       }
+      busy_events: {
+        Args: { gid: string }
+        Returns: {
+          id: string,
+          owner_id: string,
+          all_day: boolean,
+          start_date: string,
+          start_time: string,
+          end_time: string,
+          timezone: string,
+          repeat: string,
+          repeat_weekdays: number[],
+          repeat_until: string,
+          exceptions: Json
+        }[]
+      }
+      can_edit_calendar: {
+        Args: { cid: string }
+        Returns: boolean
+      }
+      can_edit_event: {
+        Args: { eid: string }
+        Returns: boolean
+      }
       can_manage_person: {
         Args: { pid: string }
         Returns: boolean
@@ -344,8 +765,24 @@ export type Database = {
         Args: { pid: string }
         Returns: boolean
       }
+      can_share_calendar: {
+        Args: { cid: string; gid: string }
+        Returns: boolean
+      }
+      can_share_event: {
+        Args: { eid: string; gid: string }
+        Returns: boolean
+      }
       can_use_group_folder: {
         Args: { object_name: string }
+        Returns: boolean
+      }
+      can_view_calendar: {
+        Args: { cid: string }
+        Returns: boolean
+      }
+      can_view_event: {
+        Args: { eid: string }
         Returns: boolean
       }
       cancel_trip: {
@@ -376,6 +813,34 @@ export type Database = {
         Args: { gid: string; display_name: string }
         Returns: string
       }
+      delete_calendar: {
+        Args: { calendar_id: string }
+        Returns: string
+      }
+      delete_event: {
+        Args: { event_id: string }
+        Returns: string
+      }
+      editable_calendar_ids: {
+        Args: never
+        Returns: string[]
+      }
+      empty_trash: {
+        Args: { max_age?: string }
+        Returns: number
+      }
+      event_owners: {
+        Args: { event_ids: string[] }
+        Returns: {
+          event_id: string,
+          owner_id: string,
+          color: string
+        }[]
+      }
+      event_snapshot: {
+        Args: { e: Database["public"]["Tables"]["events"]["Row"] }
+        Returns: Json
+      }
       finish_trip: {
         Args: { trip_id: string }
         Returns: number
@@ -398,6 +863,14 @@ export type Database = {
       }
       is_group_member: {
         Args: { gid: string }
+        Returns: boolean
+      }
+      is_live_calendar: {
+        Args: { cid: string }
+        Returns: boolean
+      }
+      is_live_event: {
+        Args: { eid: string }
         Returns: boolean
       }
       leave_group: {
@@ -441,6 +914,14 @@ export type Database = {
           display_name: string
         }[]
       }
+      purge_calendar: {
+        Args: { calendar_id: string }
+        Returns: undefined
+      }
+      purge_event: {
+        Args: { event_id: string }
+        Returns: undefined
+      }
       random_person_color: {
         Args: never
         Returns: string
@@ -468,6 +949,14 @@ export type Database = {
       require_person: {
         Args: never
         Returns: string
+      }
+      restore_calendar: {
+        Args: { calendar_id: string }
+        Returns: undefined
+      }
+      restore_event: {
+        Args: { event_id: string }
+        Returns: undefined
       }
       retire_member: {
         Args: { target_member_id: string }
