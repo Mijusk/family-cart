@@ -233,6 +233,14 @@ export const useCalendarStore = defineStore('calendar', () => {
     return calendar
   }
 
+  /** Admins: a folder for someone else in the group, shared with it in full. */
+  async function createCalendarFor(ownerId: string, name: string, color: string, groupId: string): Promise<string> {
+    const { data, error } = await supabase.rpc('create_calendar_for', { owner_id: ownerId, name, color, group_id: groupId })
+    if (error) throw error
+    await reload()
+    return data
+  }
+
   async function updateCalendar(id: string, change: Pick<Calendar, 'name' | 'color'>) {
     const { error } = await supabase.from('calendars').update(change).eq('id', id)
     if (error) throw error
@@ -501,6 +509,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     occurrencesOn,
     peopleOf,
     createCalendar,
+    createCalendarFor,
     updateCalendar,
     sharedGroupIds,
     shareLevel,

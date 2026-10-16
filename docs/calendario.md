@@ -26,7 +26,7 @@ La compra sigue existiendo como otra sección de la misma app.
 9. **El calendario es de cada persona**, organizado en carpetas ("Ejercicio", "Trabajo", "Universidad"…). Compartir una carpeta comparte todos sus eventos.
 10. **Se comparte solo con grupos.** Para compartir con una persona concreta se crea un grupo pequeño ("Pareja", "Padres").
 11. **Un evento puede sumar grupos**, nunca restarlos. Lo privado va en una carpeta sin grupos.
-12. **Modo "ocupado":** una carpeta se puede compartir con un grupo mostrando solo "ocupado" (sin título ni detalles). Desactivado por defecto. Los administradores de ese grupo **no** pueden editar una carpeta compartida en modo ocupado; solo las compartidas en completo.
+12. **Modo "ocupado":** una carpeta se puede compartir con un grupo mostrando solo "ocupado" (sin título ni detalles). Desactivado por defecto. Oculta los detalles al resto del grupo, no a sus administradores: tras el lanzamiento, Luis decidió que los administradores vean y editen toda carpeta compartida con su grupo, también en modo ocupado (y que puedan crear una carpeta a otro miembro, que nace compartida en completo con el grupo). Las privadas siguen siendo solo de su dueño.
 13. **Repeticiones:** puntual, diaria, semanal (uno o varios días), cada dos semanas y mensual (mismo día del mes), con fecha de fin opcional. **Cruzar medianoche:** si la hora de fin es menor que la de inicio (23:00–01:00), el evento acaba al día siguiente (sin fecha de fin; como máximo 24 h).
 14. **Por defecto,** el evento nuevo va a la última carpeta usada, con sus grupos.
 15. **Ediciones simultáneas:** gana el último cambio, se ve un aviso de "X está editando este evento" y todo queda en el historial.
@@ -117,10 +117,10 @@ Con `level = busy` solo ve la franja horaria, con el texto "Ocupado". Esto se re
 
 **Puede editar un evento o carpeta** quien:
 - es el dueño, o
-- es administrador de un grupo en el que esa carpeta está compartida, o
+- es administrador de un grupo en el que esa carpeta está compartida (completo u ocupado), o
 - (persona sin cuenta) es administrador de un grupo del que esa persona es miembro.
 
-(La segunda regla solo con `level = full`.)
+Un administrador puede crear una carpeta a otro miembro activo de su grupo con la RPC `create_calendar_for`; nace compartida en completo con ese grupo.
 
 **Puede compartir una carpeta con un grupo** quien puede editarla y es miembro activo de ese grupo, siempre que el dueño también sea miembro activo. Lo mismo para añadir un grupo a un evento.
 
@@ -166,7 +166,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
   - Si no hay carpeta, "Nueva carpeta…" en el propio formulario crea una privada (nombre y color); compartirla llega con "Mis carpetas".
 
 **Menú secundario**
-- **Mis carpetas:** crear, renombrar, cambiar de color y borrar carpetas, y elegir con qué grupos se comparten (completo u ocupado). Los administradores eligen arriba de quién son las carpetas (tú o un perfil sin cuenta del grupo). Se llega desde el enlace «Mis carpetas» bajo Hoy / Semana / Mes.
+- **Mis carpetas:** crear, renombrar, cambiar de color y borrar carpetas, y elegir con qué grupos se comparten (completo u ocupado). Los administradores eligen arriba de quién son las carpetas (tú u otro miembro del grupo; de quien tiene cuenta solo ven las compartidas con el grupo). Se llega desde el enlace «Mis carpetas» bajo Hoy / Semana / Mes.
 - **Grupo:** miembros, solicitudes pendientes, administradores, secciones activas y código de invitación.
 - **Perfiles sin cuenta:** crear el perfil de un hijo y generar su código para reclamarlo.
 - **Papelera:** desde Mis carpetas. Carpetas borradas (con sus eventos) y eventos borrados sueltos; recuperar o eliminar definitivamente.

@@ -12,7 +12,8 @@ import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
 
 // "Mis carpetas": create, rename, recolor, share and delete folders. Admins also manage the
-// folders of the group's profiles without an account.
+// folders of the group's profiles without an account, and those the other members share with the
+// group (never their private ones, which they don't see).
 
 const groupStore = useGroupStore()
 const calendar = useCalendarStore()
@@ -28,10 +29,10 @@ watch(
 
 const owners = computed(() => {
   const me = groupStore.me!
-  const profiles = groupStore.isAdmin ? groupStore.activeMembers.filter((m) => !m.hasAccount) : []
+  const others = groupStore.isAdmin ? groupStore.activeMembers.filter((m) => m.personId !== me.id) : []
   return [
-    { personId: me.id, name: 'Tú', color: me.color, isMe: true },
-    ...profiles.map((m) => ({ personId: m.personId, name: m.name, color: m.color, isMe: false })),
+    { personId: me.id, name: 'Tú', color: me.color, isMe: true, hasAccount: true },
+    ...others.map((m) => ({ personId: m.personId, name: m.name, color: m.color, isMe: false, hasAccount: m.hasAccount })),
   ]
 })
 const ownerId = ref(groupStore.me!.id)
@@ -41,8 +42,9 @@ watch(owners, (list) => {
   if (!list.some((o) => o.personId === ownerId.value)) ownerId.value = list[0]!.personId
 })
 
+/** Someone else's: only those I can edit (shared with a group I administer, or a profile I manage). */
 const folders = computed(() =>
-  calendar.calendars
+  (owner.value.isMe ? calendar.calendars : calendar.editableCalendars)
     .filter((c) => c.ownerId === owner.value.personId)
     .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
 )
@@ -129,10 +131,13 @@ function add() {
   const name = cleanDisplayName(draft.name)
   if (!name) return
   void act('add', async () => {
-    const created = await calendar.createCalendar(name, draft.color, owner.value.personId)
+    // A profile's folder is mine to manage; someone with an account gets it shared with this group.
+    const id = owner.value.hasAccount && !owner.value.isMe
+      ? await calendar.createCalendarFor(owner.value.personId, name, draft.color, groupStore.group.id)
+      : (await calendar.createCalendar(name, draft.color, owner.value.personId)).id
+    Object.assign(editing, { id, name, color: draft.color })
     draft.name = ''
     adding.value = false
-    Object.assign(editing, { id: created.id, name: created.name, color: created.color })
   })
 }
 </script>
@@ -160,7 +165,8 @@ function add() {
 
     <p class="intro muted">
       Compartir una carpeta comparte todos sus eventos. En modo <strong>ocupado</strong> el grupo solo ve las horas, sin
-      título ni detalles, y sus administradores no pueden editarla.
+      título ni detalles. Los administradores del grupo ven y editan todo lo compartido con él, también en modo ocupado;
+      lo privado solo lo ves tú.
     </p>
 
     <p v-if="calendar.status === 'loading'" class="state muted">Cargando…</p>
@@ -170,7 +176,9 @@ function add() {
     </div>
 
     <template v-else>
-      <p v-if="!folders.length" class="state muted">{{ owner.isMe ? 'Aún no tienes carpetas.' : `${owner.name} aún no tiene carpetas.` }}</p>
+      <p v-if="!folders.length" class="state muted">
+        {{ owner.isMe ? 'Aún no tienes carpetas.' : owner.hasAccount ? `${owner.name} no comparte carpetas con este grupo.` : `${owner.name} aún no tiene carpetas.` }}
+      </p>
 
       <ul class="folders">
         <li v-for="c in folders" :key="c.id" class="folder">
@@ -256,7 +264,10 @@ function add() {
             <AppIcon v-if="draft.color === color" name="check" :size="16" />
           </button>
         </div>
-        <p class="muted hint">Nace privada. Luego eliges con qué grupos compartirla.</p>
+        <p v-if="owner.hasAccount && !owner.isMe" class="muted hint">
+          Nace compartida en completo con {{ groupStore.group.name }}. {{ owner.name }} podrá cambiarlo.
+        </p>
+        <p v-else class="muted hint">Nace privada. Luego eliges con qué grupos compartirla.</p>
         <div class="row">
           <button type="submit" class="btn btn-primary" :disabled="!draft.name.trim() || !!busy">Crear</button>
           <button type="button" class="btn btn-ghost" @click="adding = false">Cancelar</button>
