@@ -199,6 +199,6 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 1. **PR 1 — Cuentas y grupos** ✅: login con email, `people`, roles, aprobación de entrada, secciones por grupo. La compra sigue funcionando.
 2. **PR 2 — Esquema del calendario** ✅: tablas, permisos, historial y papelera, con pruebas de RLS.
 3. **PR 3 — Evento y Hoy** ✅.
-4. **PR 4 — Semana y Mes.**
+4. **PR 4 — Semana y Mes** ✅: componentes propios (sin librería); Semana con filtros por persona y carpeta; Mes solo con eventos puntuales y excepciones.
 5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera.**
 6. **PR 6 — Tiempo real y aviso de "está editando".**

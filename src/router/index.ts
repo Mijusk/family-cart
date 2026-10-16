@@ -40,6 +40,18 @@ export const router = createRouter({
       meta: { section: 'calendar' },
     },
     {
+      path: '/calendario/semana',
+      name: 'calendar-week',
+      component: () => import('@/views/WeekView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
+      path: '/calendario/mes',
+      name: 'calendar-month',
+      component: () => import('@/views/MonthView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
       path: '/calendario/nuevo',
       name: 'event-new',
       component: () => import('@/views/EventFormView.vue'),

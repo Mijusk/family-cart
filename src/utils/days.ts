@@ -41,6 +41,17 @@ export function dayOfMonth(day: IsoDate): number {
   return Number(day.slice(8, 10))
 }
 
+/** First day of the month `day` is in. */
+export function startOfMonth(day: IsoDate): IsoDate {
+  return `${day.slice(0, 8)}01`
+}
+
+/** First day of the month `n` months after (or before) the one `day` is in. */
+export function addMonths(day: IsoDate, n: number): IsoDate {
+  const [y, m] = day.split('-').map(Number)
+  return fromUtc(Date.UTC(y!, m! - 1 + n, 1))
+}
+
 export const WEEKDAY_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const
 export const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'] as const
 
@@ -48,6 +59,13 @@ const longFormat = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeri
 const shortFormat = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+const monthFormat = new Intl.DateTimeFormat('es', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+/** "Octubre de 2026". */
+export function monthLabel(day: IsoDate): string {
+  return capitalize(monthFormat.format(new Date(toUtc(day)))).replace(' de ', ' ')
+}
 
 /** "Jueves, 16 de octubre". */
 export function longDay(day: IsoDate): string {
