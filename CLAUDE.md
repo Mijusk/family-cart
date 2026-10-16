@@ -82,5 +82,7 @@ Pablo compartidos en completo, "Gimnasio" de Daniel en modo ocupado, "Médico" d
 - Lógica del calendario fuera de los componentes: fechas en `src/utils/days.ts`, repeticiones
   en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts`, datos en
   `src/stores/calendar.ts`.
+- Volver atrás siempre con `goBack()` de `src/router/back.ts` (como el botón atrás del móvil), no con
+  un enlace fijo; el estado de las vistas (día, semana, filtros, día elegido del mes) va en la URL.
 - Al desplegar en Supabase Cloud: proveedor Email activado, inicio de sesión anónimo
   desactivado, Site URL y Redirect URLs (`https://<app>.vercel.app/**`) configurados.

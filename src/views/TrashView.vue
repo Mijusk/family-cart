@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -82,7 +82,7 @@ function deletedLine(item: TrashItem): string {
 <template>
   <div class="page">
     <header class="page-header">
-      <RouterLink :to="{ name: 'folders' }" class="back-link"><AppIcon name="back" :size="18" /> Mis carpetas</RouterLink>
+      <button type="button" class="back-link" @click="goBack({ name: 'folders' })"><AppIcon name="back" :size="18" /> Mis carpetas</button>
       <h1 class="display-title">Papelera</h1>
     </header>
 

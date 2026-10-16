@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
@@ -11,6 +11,7 @@ import { addDays, isIsoDate, longDay, shortDay, startOfWeek, today } from '@/uti
 
 // "Semana": the chosen group's week, Monday to Sunday. ?semana=YYYY-MM-DD is any day of the week.
 // Filters by person and by folder narrow it down; none selected means everyone and every folder.
+// They live in the URL (?personas=…&carpetas=…), so coming back from an event keeps them.
 
 const groupStore = useGroupStore()
 const calendar = useCalendarStore()
@@ -24,19 +25,35 @@ const isThisWeek = computed(() => weekStart.value === startOfWeek(today()))
 const weekLabel = computed(() => `${shortDay(weekStart.value)} – ${shortDay(addDays(weekStart.value, 6))}`)
 
 function moveWeek(n: number) {
-  void router.replace({ query: { semana: addDays(weekStart.value, n * 7) } })
+  void router.replace({ query: { ...route.query, semana: addDays(weekStart.value, n * 7) } })
+}
+
+function thisWeek() {
+  const { semana: _, ...rest } = route.query
+  void router.replace({ query: rest })
 }
 
 // ── Filters ───────────────────────────────────────────────────
 
-const people = ref(new Set<string>())
-const folders = ref(new Set<string>())
+/** A set of ids kept in a query parameter as a comma-separated list. */
+function queryIds(key: 'personas' | 'carpetas') {
+  return computed({
+    get: () => new Set(typeof route.query[key] === 'string' && route.query[key] ? route.query[key].split(',') : []),
+    set: (ids: Set<string>) => {
+      const { [key]: _, ...rest } = route.query
+      void router.replace({ query: ids.size ? { ...rest, [key]: [...ids].join(',') } : rest })
+    },
+  })
+}
+
+const people = queryIds('personas')
+const folders = queryIds('carpetas')
 
 watch(
   () => groupStore.group.id,
-  (id) => {
-    people.value = new Set()
-    folders.value = new Set()
+  (id, before) => {
+    // Another group: its people and folders are others.
+    if (before && id !== before) void router.replace({ query: {} })
     calendar.load(id).catch(() => {})
   },
   { immediate: true },
@@ -80,8 +97,8 @@ const week = computed(() =>
 const filtered = computed(() => people.value.size > 0 || activeFolders.value.size > 0)
 
 function clearFilters() {
-  people.value = new Set()
-  folders.value = new Set()
+  const { personas: _p, carpetas: _c, ...rest } = route.query
+  void router.replace({ query: rest })
 }
 
 function ownerName(id: string): string {
@@ -108,7 +125,7 @@ function ownerName(id: string): string {
       <button type="button" class="icon-btn" aria-label="Semana siguiente" @click="moveWeek(1)"><AppIcon name="next" /></button>
     </nav>
     <p v-if="!isThisWeek" class="center">
-      <button type="button" class="link" @click="router.replace({ query: {} })">Volver a esta semana</button>
+      <button type="button" class="link" @click="thisWeek">Volver a esta semana</button>
     </p>
 
     <div class="filters" role="group" aria-label="Filtros">
