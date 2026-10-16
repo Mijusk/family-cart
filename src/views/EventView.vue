@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { historyText, repeatLabel, timeLabel } from '@/lib/eventText'
+import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -53,8 +54,6 @@ const groups = computed(() => {
 })
 
 const participantNames = computed(() => (calendar.participants[eventId.value] ?? []).map((id) => calendar.personName(id, null)))
-
-const backTo = computed(() => ({ name: 'calendar', query: { dia: shownDay.value } }))
 
 // ── Info and history ──────────────────────────────────────────
 
@@ -115,7 +114,7 @@ async function remove(scope: 'day' | 'series') {
   try {
     const undo =
       scope === 'day' ? await calendar.cancelOccurrence(eventId.value, seriesDate.value) : await calendar.deleteEvent(eventId.value)
-    await router.replace(backTo.value)
+    goBack()
     toast.show(scope === 'day' ? `«${title}» quitado de este día` : `«${title}» enviado a la papelera`, () => {
       undo().catch((e) => toast.show(friendlyError(e)))
     })
@@ -130,10 +129,14 @@ async function remove(scope: 'day' | 'series') {
 <template>
   <div class="page">
     <header class="page-header">
-      <RouterLink :to="backTo" class="back-link"><AppIcon name="back" :size="18" /> Calendario</RouterLink>
+      <button type="button" class="back-link" @click="goBack()"><AppIcon name="back" :size="18" /> Volver</button>
     </header>
 
-    <p v-if="calendar.status !== 'ready'" class="state muted">Cargando…</p>
+    <div v-if="calendar.status === 'error'" class="state">
+      <p class="muted">No se pudo cargar el evento.</p>
+      <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
+    </div>
+    <p v-else-if="calendar.status !== 'ready'" class="state muted">Cargando…</p>
     <div v-else-if="!event || !shown" class="state">
       <p class="muted">Este evento ya no existe o no lo puedes ver.</p>
       <RouterLink :to="{ name: 'calendar' }" class="btn btn-ghost">Ir al calendario</RouterLink>

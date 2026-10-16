@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
@@ -40,10 +40,13 @@ const weeks = computed(() => {
   return Array.from({ length: count }, (_, w) => Array.from({ length: 7 }, (_, d) => addDays(first, w * 7 + d)))
 })
 
-const selected = ref<string | null>(null)
+/** The day tapped (?dia=), kept in the URL so it is still open when coming back from an event. */
+const selected = computed({
+  get: () => (isIsoDate(route.query.dia) && route.query.dia.startsWith(month.value.slice(0, 7)) ? route.query.dia : null),
+  set: (day: string | null) => void router.replace({ query: { ...(isThisMonth.value ? {} : { mes: month.value }), ...(day ? { dia: day } : {}) } }),
+})
 
 function moveMonth(n: number) {
-  selected.value = null
   void router.replace({ query: { mes: addMonths(month.value, n) } })
 }
 
@@ -97,7 +100,7 @@ function label(day: string): string {
       <button type="button" class="icon-btn" aria-label="Mes siguiente" @click="moveMonth(1)"><AppIcon name="next" /></button>
     </nav>
     <p v-if="!isThisMonth" class="center">
-      <button type="button" class="link" @click="((selected = null), router.replace({ query: {} }))">Volver a este mes</button>
+      <button type="button" class="link" @click="router.replace({ query: {} })">Volver a este mes</button>
     </p>
 
     <p v-if="calendar.status === 'loading'" class="state muted">Cargando…</p>

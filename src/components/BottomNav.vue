@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
+import { lastCalendarView } from '@/router/back'
 import { useListStore } from '@/stores/list'
 import AppIcon, { type IconName } from './AppIcon.vue'
 
@@ -17,10 +18,11 @@ const groupStore = useGroupStore()
 /** Only the sections this group uses, plus the group itself. */
 const tabs = computed(() => {
   const { shoppingEnabled, calendarEnabled } = groupStore.group
-  const all: { to: string; label: string; icon: IconName; show: boolean }[] = [
+  const all: { to: string; label: string; icon: IconName; show: boolean; link?: string }[] = [
     { to: '/', label: 'Lista', icon: 'list', show: shoppingEnabled },
     { to: '/historial', label: 'Historial', icon: 'history', show: shoppingEnabled },
-    { to: '/calendario', label: 'Calendario', icon: 'calendar', show: calendarEnabled },
+    // Back to the view last used (Semana, say), not always Hoy.
+    { to: '/calendario', label: 'Calendario', icon: 'calendar', show: calendarEnabled, link: lastCalendarView.value },
     { to: '/grupo', label: 'Grupo', icon: 'group', show: true },
   ]
   return all.filter((tab) => tab.show)
@@ -29,7 +31,7 @@ const tabs = computed(() => {
 
 <template>
   <nav class="nav" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
-    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.to" class="tab" :class="{ active: isActive(tab.to) }">
+    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.link ?? tab.to" class="tab" :class="{ active: isActive(tab.to) }">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
         <span v-if="tab.to === '/' && list.pendingItems.length" class="badge">{{ list.pendingItems.length }}</span>

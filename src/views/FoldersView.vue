@@ -2,6 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -139,7 +140,7 @@ function add() {
 <template>
   <div class="page">
     <header class="page-header">
-      <RouterLink :to="{ name: 'calendar' }" class="back-link"><AppIcon name="back" :size="18" /> Calendario</RouterLink>
+      <button type="button" class="back-link" @click="goBack()"><AppIcon name="back" :size="18" /> Calendario</button>
       <h1 class="display-title">{{ owner.isMe ? 'Mis carpetas' : `Carpetas de ${owner.name}` }}</h1>
     </header>
 

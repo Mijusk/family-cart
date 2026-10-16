@@ -114,7 +114,8 @@ export const router = createRouter({
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
-  scrollBehavior: () => ({ top: 0 }),
+  // Back and forward return to where the page was; new screens start at the top.
+  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
 })
 
 /** Where a screen of a switched-off section goes instead; null if it can be shown. */

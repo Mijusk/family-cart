@@ -13,7 +13,7 @@ const tabs = [
 
 <template>
   <nav class="tabs" aria-label="Vista del calendario">
-    <RouterLink v-for="tab in tabs" :key="tab.name" :to="{ name: tab.name }" class="tab" active-class="active" exact-active-class="active">
+    <RouterLink v-for="tab in tabs" :key="tab.name" :to="{ name: tab.name }" replace class="tab" active-class="active" exact-active-class="active">
       {{ tab.label }}
     </RouterLink>
   </nav>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
+import { goBack } from '@/router/back'
 import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -19,7 +20,6 @@ const groupStore = useGroupStore()
 const calendar = useCalendarStore()
 const toast = useToastStore()
 const route = useRoute()
-const router = useRouter()
 
 
 const editingId = computed(() => (route.name === 'event-edit' ? String(route.params.id) : null))
@@ -74,7 +74,10 @@ function defaultStart(day: string): string {
   return next > 23 ? '23:00' : `${String(next).padStart(2, '0')}:00`
 }
 
+let filling = false
+
 function fill() {
+  filling = true
   const source = calendar.eventById(editingId.value ?? copyOf.value ?? '')
   if (source) {
     const day = queryDay.value
@@ -105,8 +108,27 @@ function fill() {
     form.endTime = addHour(form.startTime)
     form.calendarId = defaultCalendar()
   }
+  filling = false
   ready.value = true
 }
+
+function minutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h! * 60 + m!
+}
+
+// Moving the start moves the end with it, keeping the length: otherwise 09:00–10:00 moved to
+// 11:00 would become 11:00–10:00, an event of 23 hours that ends the next day.
+watch(
+  () => form.startTime,
+  (start, before) => {
+    if (filling || !start || !before || !form.endTime) return
+    const length = (minutes(form.endTime) - minutes(before) + 1440) % 1440
+    const end = (minutes(start) + length) % 1440
+    form.endTime = `${String(Math.floor(end / 60)).padStart(2, '0')}:${String(end % 60).padStart(2, '0')}`
+  },
+  { flush: 'sync' },
+)
 
 /** The folder of the last event I created; else my first folder; else a new one. */
 function defaultCalendar(): string {
@@ -214,7 +236,7 @@ async function save() {
   try {
     if (onlyDay.value) {
       await calendar.saveOccurrence(calendar.eventById(editingId.value!)!, queryDay.value!, shown)
-      await router.replace({ name: 'event', params: { id: editingId.value! }, query: { dia: queryDay.value! } })
+      goBack(eventPage.value!)
       toast.show('Cambiado solo este día')
       return
     }
@@ -233,11 +255,12 @@ async function save() {
     }
     const groupIds = form.groupIds.filter((id) => !calendar.sharedGroupIds(calendarId).includes(id))
     const id = await calendar.saveEvent(draft, groupIds, editingId.value ?? undefined)
+    // Back to where the form was opened from: the event, or the calendar view.
     if (editingId.value) {
-      await router.replace({ name: 'event', params: { id }, query: { dia: queryDay.value ?? draft.startDate } })
+      goBack({ name: 'event', params: { id }, query: { dia: queryDay.value ?? draft.startDate } })
       toast.show('Evento guardado')
     } else {
-      await router.replace({ name: 'calendar', query: { dia: draft.startDate } })
+      goBack()
       toast.show(`«${draft.title}» añadido el ${longDay(draft.startDate).toLowerCase()}`)
     }
   } catch (e) {
@@ -247,17 +270,19 @@ async function save() {
   }
 }
 
-const cancelTo = computed(() =>
-  editingId.value
-    ? { name: 'event', params: { id: editingId.value }, query: queryDay.value ? { dia: queryDay.value } : {} }
-    : { name: 'calendar', query: queryDay.value ? { dia: queryDay.value } : {} },
+const eventPage = computed(() =>
+  editingId.value ? { name: 'event', params: { id: editingId.value }, query: queryDay.value ? { dia: queryDay.value } : {} } : null,
 )
+
+function cancel() {
+  goBack(eventPage.value ?? undefined)
+}
 </script>
 
 <template>
   <div class="page">
     <header class="page-header">
-      <RouterLink :to="cancelTo" class="back-link"><AppIcon name="close" :size="18" /> Cancelar</RouterLink>
+      <button type="button" class="back-link" @click="cancel"><AppIcon name="close" :size="18" /> Cancelar</button>
       <h1 class="display-title">{{ pageTitle }}</h1>
       <p v-if="onlyDay && queryDay" class="muted">
         {{ longDay(queryDay) }}. El resto de la serie no cambia.
@@ -269,7 +294,11 @@ const cancelTo = computed(() =>
       a la vez, se queda el último cambio.
     </p>
 
-    <p v-if="!ready" class="state muted">Cargando…</p>
+    <div v-if="!ready && calendar.status === 'error'" class="state">
+      <p class="muted">No se pudo cargar el calendario.</p>
+      <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
+    </div>
+    <p v-else-if="!ready" class="state muted">Cargando…</p>
     <div v-else-if="notFound" class="state">
       <p class="muted">Este evento ya no existe o no lo puedes ver.</p>
       <RouterLink :to="{ name: 'calendar' }" class="btn btn-ghost">Ir al calendario</RouterLink>
