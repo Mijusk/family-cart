@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import CalendarTabs from '@/components/CalendarTabs.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { timeLabel } from '@/lib/eventText'
@@ -50,6 +51,8 @@ const rows = computed(() => {
       <p class="eyebrow">Calendario</p>
       <GroupSwitcher />
     </header>
+
+    <CalendarTabs />
 
     <nav class="day-nav" aria-label="Cambiar de día">
       <button type="button" class="icon-btn" aria-label="Día anterior" @click="moveDay(-1)">
