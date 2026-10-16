@@ -24,6 +24,8 @@ export function friendlyError(error: unknown): string {
   // Calendar
   if (/calendar is deleted/i.test(message)) return 'Esa carpeta está en la papelera. Restáurala primero.'
   if (/event not found|calendar not found/i.test(message)) return 'Ese evento o carpeta ya no existe o no tienes permiso para cambiarlo.'
+  if (/row-level security.*calendar_shares/i.test(message))
+    return 'No se puede compartir con ese grupo: la persona dueña de la carpeta tiene que estar en él.'
   if (/events_times/i.test(message)) return 'Revisa las horas: un evento con hora necesita inicio y fin distintos.'
   if (/events_weekdays/i.test(message)) return 'Elige al menos un día de la semana para la repetición.'
   if (/events_until/i.test(message)) return 'La repetición no puede terminar antes de empezar.'

@@ -52,6 +52,18 @@ export const router = createRouter({
       meta: { section: 'calendar' },
     },
     {
+      path: '/calendario/carpetas',
+      name: 'folders',
+      component: () => import('@/views/FoldersView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
+      path: '/calendario/papelera',
+      name: 'trash',
+      component: () => import('@/views/TrashView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
       path: '/calendario/nuevo',
       name: 'event-new',
       component: () => import('@/views/EventFormView.vue'),

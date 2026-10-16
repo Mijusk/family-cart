@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import AppIcon from './AppIcon.vue'
 
-// Switches between the calendar's views: Hoy, Semana and Mes.
+// Switches between the calendar's views (Hoy, Semana, Mes), with a way to the folders.
 
 const tabs = [
   { name: 'calendar', label: 'Hoy' },
@@ -16,6 +17,9 @@ const tabs = [
       {{ tab.label }}
     </RouterLink>
   </nav>
+  <p class="more">
+    <RouterLink :to="{ name: 'folders' }"><AppIcon name="folder" :size="16" /> Mis carpetas</RouterLink>
+  </p>
 </template>
 
 <style scoped>
@@ -36,6 +40,22 @@ const tabs = [
   min-height: 40px;
   border-radius: 999px;
   color: var(--text-2);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.more {
+  margin: -4px var(--gutter) 8px;
+  text-align: right;
+}
+
+.more a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  color: var(--text-2);
+  font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
 }
