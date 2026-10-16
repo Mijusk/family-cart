@@ -875,7 +875,13 @@ $$;
 -- shrinks photos to ~1024px JPEG before uploading, so the 2 MB cap is just a safety net.
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('item-photos', 'item-photos', false, 2097152, array['image/jpeg']);
+values ('item-photos', 'item-photos', false, 2097152, array['image/jpeg'])
+-- Projects that ran the earlier migrations already have the bucket and its policies.
+on conflict (id) do update
+  set public = excluded.public, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists "members see their group's photos" on storage.objects;
+drop policy if exists "members upload photos to their group" on storage.objects;
+drop policy if exists "members delete their group's photos" on storage.objects;
 
 -- The first folder of the object name is the group id. Compared as text so a malformed
 -- name is simply denied instead of failing a uuid cast.
