@@ -296,7 +296,7 @@ const cancelTo = computed(() =>
               <AppIcon v-if="form.newFolderColor === c" name="check" :size="16" />
             </button>
           </div>
-          <p class="muted hint">De momento la carpeta es solo tuya; compartirla con el grupo llega más adelante.</p>
+          <p class="muted hint">Nace privada; para compartirla con un grupo, ve a Mis carpetas.</p>
         </div>
       </template>
 

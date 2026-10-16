@@ -166,10 +166,10 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
   - Si no hay carpeta, "Nueva carpeta…" en el propio formulario crea una privada (nombre y color); compartirla llega con "Mis carpetas".
 
 **Menú secundario**
-- **Mis carpetas:** crear carpetas y elegir con qué grupos se comparten (completo u ocupado).
+- **Mis carpetas:** crear, renombrar, cambiar de color y borrar carpetas, y elegir con qué grupos se comparten (completo u ocupado). Los administradores eligen arriba de quién son las carpetas (tú o un perfil sin cuenta del grupo). Se llega desde el enlace «Mis carpetas» bajo Hoy / Semana / Mes.
 - **Grupo:** miembros, solicitudes pendientes, administradores, secciones activas y código de invitación.
 - **Perfiles sin cuenta:** crear el perfil de un hijo y generar su código para reclamarlo.
-- **Papelera.**
+- **Papelera:** desde Mis carpetas. Carpetas borradas (con sus eventos) y eventos borrados sueltos; recuperar o eliminar definitivamente.
 
 Navegación: la barra inferior muestra las secciones activas del grupo actual.
 
@@ -200,5 +200,5 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 2. **PR 2 — Esquema del calendario** ✅: tablas, permisos, historial y papelera, con pruebas de RLS.
 3. **PR 3 — Evento y Hoy** ✅.
 4. **PR 4 — Semana y Mes** ✅: componentes propios (sin librería); Semana con filtros por persona y carpeta; Mes solo con eventos puntuales y excepciones.
-5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera.**
+5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera** ✅: sin migración (el esquema y las RPCs ya estaban en el PR 2; los perfiles sin cuenta se crean desde Grupo desde el PR 1).
 6. **PR 6 — Tiempo real y aviso de "está editando".**

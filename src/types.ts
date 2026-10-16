@@ -204,3 +204,21 @@ export interface HistoryEntry {
   before: Record<string, unknown> | null
   after: Record<string, unknown> | null
 }
+
+/** A deleted folder (with the events deleted along with it) or a single deleted event. */
+export interface TrashItem {
+  kind: 'calendar' | 'event'
+  id: string
+  /** Folder name or event title. */
+  title: string
+  color: string
+  ownerId: string | null
+  /** For an event: the folder it was in. */
+  folderName: string | null
+  startDate: IsoDate | null
+  repeating: boolean
+  /** For a folder: events that come back with it. */
+  eventCount: number
+  deletedAt: string
+  deletedBy: string | null
+}

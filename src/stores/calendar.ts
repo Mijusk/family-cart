@@ -24,6 +24,8 @@ import type {
   IsoDate,
   Occurrence,
   Person,
+  ShareLevel,
+  TrashItem,
 } from '@/types'
 import { useGroupStore } from './group'
 
@@ -213,12 +215,11 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   // ── Folders ────────────────────────────────────────────────
 
-  /** A private folder for myself (sharing it comes with the folders screen). */
-  async function createCalendar(name: string, color: string): Promise<Calendar> {
-    const me = useGroupStore().me!
+  /** A new private folder for me, or for a profile I manage. */
+  async function createCalendar(name: string, color: string, ownerId = useGroupStore().me!.id): Promise<Calendar> {
     const { data, error } = await supabase
       .from('calendars')
-      .insert({ owner_id: me.id, name, color, position: calendars.value.filter((c) => c.ownerId === me.id).length })
+      .insert({ owner_id: ownerId, name, color, position: calendars.value.filter((c) => c.ownerId === ownerId).length })
       .select()
       .single()
     if (error) throw error
@@ -228,8 +229,46 @@ export const useCalendarStore = defineStore('calendar', () => {
     return calendar
   }
 
+  async function updateCalendar(id: string, change: Pick<Calendar, 'name' | 'color'>) {
+    const { error } = await supabase.from('calendars').update(change).eq('id', id)
+    if (error) throw error
+    await reload()
+  }
+
   function sharedGroupIds(calendarId: string): string[] {
     return shares.value.filter((s) => s.calendarId === calendarId).map((s) => s.groupId)
+  }
+
+  function shareLevel(calendarId: string, groupId: string): ShareLevel | null {
+    return shares.value.find((s) => s.calendarId === calendarId && s.groupId === groupId)?.level ?? null
+  }
+
+  /** Shares a folder with a group in full or busy mode, or stops sharing it (null). */
+  async function setShare(calendarId: string, groupId: string, level: ShareLevel | null) {
+    const current = shareLevel(calendarId, groupId)
+    if (current === level) return
+    const { error } =
+      level === null
+        ? await supabase.from('calendar_shares').delete().eq('calendar_id', calendarId).eq('group_id', groupId)
+        : current
+          ? await supabase.from('calendar_shares').update({ level }).eq('calendar_id', calendarId).eq('group_id', groupId)
+          : await supabase.from('calendar_shares').insert({ calendar_id: calendarId, group_id: groupId, level })
+    if (error) throw error
+    await reload()
+  }
+
+  /** Sends the folder and its events to the trash; returns how to undo it. */
+  async function deleteCalendar(calendarId: string): Promise<() => Promise<void>> {
+    const { error } = await supabase.rpc('delete_calendar', { calendar_id: calendarId })
+    if (error) throw error
+    await reload()
+    return () => restoreCalendar(calendarId)
+  }
+
+  async function restoreCalendar(calendarId: string) {
+    const { error } = await supabase.rpc('restore_calendar', { calendar_id: calendarId })
+    if (error) throw error
+    await reload()
   }
 
   // ── Events ─────────────────────────────────────────────────
@@ -297,11 +336,85 @@ export const useCalendarStore = defineStore('calendar', () => {
     const { error } = await supabase.rpc('delete_event', { event_id: eventId })
     if (error) throw error
     await reload()
-    return async () => {
-      const { error } = await supabase.rpc('restore_event', { event_id: eventId })
-      if (error) throw error
-      await reload()
+    return () => restoreEvent(eventId)
+  }
+
+  async function restoreEvent(eventId: string) {
+    const { error } = await supabase.rpc('restore_event', { event_id: eventId })
+    if (error) throw error
+    await reload()
+  }
+
+  // ── Trash ──────────────────────────────────────────────────
+
+  /**
+   * What I can bring back: deleted folders, and events deleted on their own (those deleted with
+   * their folder come back with it). Newest first.
+   */
+  async function loadTrash(): Promise<TrashItem[]> {
+    const [cals, evs] = await Promise.all([
+      supabase.from('calendars').select('id, owner_id, name, color, deleted_at, deleted_by, deletion_batch').not('deleted_at', 'is', null),
+      supabase
+        .from('events')
+        .select('id, calendar_id, title, start_date, repeat, deleted_at, deleted_by, deletion_batch')
+        .not('deleted_at', 'is', null),
+    ])
+    if (cals.error) throw cals.error
+    if (evs.error) throw evs.error
+    const deletedCalendars = new Map(cals.data.map((c) => [c.id, c]))
+    const folderOf = (id: string) => {
+      const live = calendarById(id)
+      const gone = deletedCalendars.get(id)
+      return live ?? (gone && { name: gone.name, color: gone.color, ownerId: gone.owner_id })
     }
+    const items: TrashItem[] = [
+      ...cals.data.map((c) => ({
+        kind: 'calendar' as const,
+        id: c.id,
+        title: c.name,
+        color: c.color,
+        ownerId: c.owner_id,
+        folderName: null,
+        startDate: null,
+        repeating: false,
+        eventCount: evs.data.filter((e) => e.calendar_id === c.id && e.deletion_batch === c.deletion_batch).length,
+        deletedAt: c.deleted_at!,
+        deletedBy: c.deleted_by,
+      })),
+      ...evs.data
+        .filter((e) => deletedCalendars.get(e.calendar_id)?.deletion_batch !== e.deletion_batch)
+        .map((e) => {
+          const folder = folderOf(e.calendar_id)
+          return {
+            kind: 'event' as const,
+            id: e.id,
+            title: e.title,
+            color: folder?.color ?? '#5b6b5f',
+            ownerId: folder?.ownerId ?? null,
+            folderName: folder?.name ?? null,
+            startDate: e.start_date,
+            repeating: e.repeat !== 'none',
+            eventCount: 0,
+            deletedAt: e.deleted_at!,
+            deletedBy: e.deleted_by,
+          }
+        }),
+    ].sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
+    await loadPeople(items.flatMap((i) => [i.ownerId, i.deletedBy]))
+    return items
+  }
+
+  function restore(item: TrashItem) {
+    return item.kind === 'calendar' ? restoreCalendar(item.id) : restoreEvent(item.id)
+  }
+
+  /** Gone for good; only a line in the history stays. */
+  async function purge(item: TrashItem) {
+    const { error } =
+      item.kind === 'calendar'
+        ? await supabase.rpc('purge_calendar', { calendar_id: item.id })
+        : await supabase.rpc('purge_event', { event_id: item.id })
+    if (error) throw error
   }
 
   async function loadHistory(eventId: string): Promise<HistoryEntry[]> {
@@ -346,12 +459,19 @@ export const useCalendarStore = defineStore('calendar', () => {
     occurrencesOn,
     peopleOf,
     createCalendar,
+    updateCalendar,
     sharedGroupIds,
+    shareLevel,
+    setShare,
+    deleteCalendar,
     saveEvent,
     saveOccurrence,
     cancelOccurrence,
     deleteEvent,
     loadHistory,
+    loadTrash,
+    restore,
+    purge,
   }
 })
 
