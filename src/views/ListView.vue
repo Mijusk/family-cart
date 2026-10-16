@@ -44,7 +44,7 @@ function goShopping() {
   <div class="page">
     <header class="page-header">
       <div class="header-row">
-        <p class="eyebrow">Compra Familiar</p>
+        <p class="eyebrow">Compra</p>
         <RouterLink :to="{ name: 'history' }" class="header-link"><AppIcon name="history" :size="16" /> Historial</RouterLink>
       </div>
       <GroupSwitcher />

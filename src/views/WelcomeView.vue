@@ -139,7 +139,7 @@ async function cancelRequest(groupId: string, name: string) {
 <template>
   <div class="onboard">
     <header>
-      <p class="eyebrow">Compra Familiar</p>
+      <p class="eyebrow">Family App</p>
       <!-- Reached from the group switcher when this person already has a group. -->
       <template v-if="groupStore.status === 'ready'">
         <h1 class="display-title">Añadir otro grupo</h1>
