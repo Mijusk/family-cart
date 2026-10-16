@@ -540,6 +540,9 @@ isOneToOne: false
 "normalize_name":
 { Args: { "name": string }; Returns: string
                            },
+"notify_busy_groups":
+{ Args: { "cid": string }; Returns: undefined
+                           },
 "profile_by_claim_code":
 { Args: { "code": string }; Returns: {
               "display_name": string,"id": string
