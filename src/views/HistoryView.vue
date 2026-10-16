@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
+import { goBack } from '@/router/back'
 import { useGroupStore } from '@/stores/group'
 import { useListStore, type TripSummary } from '@/stores/list'
 import type { Item } from '@/types'
@@ -42,6 +43,7 @@ function whoBought(summary: TripSummary) {
 <template>
   <div class="page">
     <header class="page-header">
+      <button type="button" class="back-link" @click="goBack({ name: 'list' })"><AppIcon name="back" :size="18" /> Compra</button>
       <GroupSwitcher variant="eyebrow" />
       <h1 class="display-title">Historial</h1>
       <p class="muted">Toca + para volver a apuntar algo en la lista.</p>

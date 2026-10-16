@@ -2,26 +2,28 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
-import { lastCalendarView } from '@/router/back'
+import { lastCalendarView, lastTasksView } from '@/router/back'
 import { useListStore } from '@/stores/list'
 import AppIcon, { type IconName } from './AppIcon.vue'
 
 const list = useListStore()
 const route = useRoute()
 
-/** "/" only on the list itself; other tabs stay lit on their inner screens (an event of the calendar). */
-function isActive(to: string): boolean {
-  return to === '/' ? route.path === '/' : route.path === to || route.path.startsWith(`${to}/`)
+/** Tabs stay lit on their inner screens (the history of Compra, an event of the calendar). */
+function isActive(tab: { to: string; also?: string[] }): boolean {
+  return [tab.to, ...(tab.also ?? [])].some((to) =>
+    to === '/' ? route.path === '/' : route.path === to || route.path.startsWith(`${to}/`),
+  )
 }
 const groupStore = useGroupStore()
 
 /** Only the sections this group uses, plus the group itself. */
 const tabs = computed(() => {
-  const { shoppingEnabled, calendarEnabled } = groupStore.group
-  const all: { to: string; label: string; icon: IconName; show: boolean; link?: string }[] = [
-    { to: '/', label: 'Lista', icon: 'list', show: shoppingEnabled },
-    { to: '/historial', label: 'Historial', icon: 'history', show: shoppingEnabled },
-    // Back to the view last used (Semana, say), not always Hoy.
+  const { shoppingEnabled, tasksEnabled, calendarEnabled } = groupStore.group
+  const all: { to: string; label: string; icon: IconName; show: boolean; link?: string; also?: string[] }[] = [
+    { to: '/', label: 'Compra', icon: 'cart', show: shoppingEnabled, also: ['/historial'] },
+    // Back to the view last used (a list, Semana…), not always the first one.
+    { to: '/tareas', label: 'Tareas', icon: 'tasks', show: tasksEnabled, link: lastTasksView.value },
     { to: '/calendario', label: 'Calendario', icon: 'calendar', show: calendarEnabled, link: lastCalendarView.value },
     { to: '/grupo', label: 'Grupo', icon: 'group', show: true },
   ]
@@ -31,7 +33,7 @@ const tabs = computed(() => {
 
 <template>
   <nav class="nav" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
-    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.link ?? tab.to" class="tab" :class="{ active: isActive(tab.to) }">
+    <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.link ?? tab.to" class="tab" :class="{ active: isActive(tab) }">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
         <span v-if="tab.to === '/' && list.pendingItems.length" class="badge">{{ list.pendingItems.length }}</span>

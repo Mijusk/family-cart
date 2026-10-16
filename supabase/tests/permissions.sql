@@ -181,6 +181,99 @@ select tests.check('calendar: newer trash stays', exists (select 1 from events w
 update events set deleted_at = null, deleted_by = null, deletion_batch = null where id = '00000000-0000-4000-8000-0000000000f2';
 set role authenticated;
 
+-- ── Tasks (on the demo data) ──
+-- Seed: Marta's Pendientes (11) shared with Casa Martín, tasks 21–25 (21 assigned to Daniel, 23 to
+-- Pablo, 25 done); Daniel's private Amigos con quien quedar (12), tasks 26–27. Someone in another
+-- group (otro@ejemplo.com) checks that nothing leaks across groups.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values ('00000000-0000-4000-8000-0000000000c7', 'otro@ejemplo.com', '{"display_name":"Otro"}');
+insert into members (group_id, person_id, role, status, approved_at)
+select '00000000-0000-4000-8000-000000000002', id, 'admin', 'active', now() from people where user_id = '00000000-0000-4000-8000-0000000000c7';
+set role authenticated;
+
+select tests.as_user('lucia@ejemplo.com');
+select tests.check('tasks: pending sees no lists', (select count(*) from task_lists) = 0);
+select tests.check('tasks: pending sees no tasks', (select count(*) from tasks) = 0);
+select tests.expect_error('tasks: pending cannot add tasks',
+  $$insert into tasks (list_id, title) values ('00000000-0000-4000-8000-000000000011', 'x')$$, 'row-level security');
+
+select tests.as_user('otro@ejemplo.com');
+select tests.check('tasks: another group sees no lists', (select count(*) from task_lists) = 0);
+select tests.check('tasks: another group sees no tasks', (select count(*) from tasks) = 0);
+select tests.expect_error('tasks: another group cannot tick', $$select set_task_done('00000000-0000-4000-8000-000000000021', true)$$, 'task not found');
+
+select tests.as_user('marta@ejemplo.com');
+select tests.check('tasks: marta sees Pendientes, not Daniel''s private list', (select count(*) from task_lists) = 1 and (select count(*) from tasks) = 5);
+select tests.expect_error('tasks: cannot share with a group the owner is not in',
+  $$insert into task_list_shares (list_id, group_id) values ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000002')$$, 'row-level security');
+insert into task_lists (id, owner_id, name) values ('00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-0000000000d2', 'Deberes');
+select tests.check('tasks: marta creates a private list for Pablo', exists (select 1 from task_lists where id = '00000000-0000-4000-8000-000000000013'));
+insert into tasks (id, list_id, title, assigned_to) values ('00000000-0000-4000-8000-000000000028', '00000000-0000-4000-8000-000000000013', 'Lámina de plástica', '00000000-0000-4000-8000-0000000000d2');
+select tests.check('tasks: a private list takes its owner', (select assigned_to from tasks where id = '00000000-0000-4000-8000-000000000028') = '00000000-0000-4000-8000-0000000000d2');
+select tests.expect_error('tasks: a private list takes no one else',
+  $$update tasks set assigned_to = my_person_id() where id = '00000000-0000-4000-8000-000000000028'$$, 'row-level security');
+
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('tasks: daniel sees Pendientes and his own list', (select count(*) from task_lists) = 2 and (select count(*) from tasks) = 7);
+select tests.check('tasks: Pablo''s private list stays private', not exists (select 1 from task_lists where id = '00000000-0000-4000-8000-000000000013'));
+with t as (insert into tasks (id, list_id, title) values ('00000000-0000-4000-8000-000000000029', '00000000-0000-4000-8000-000000000011', 'Podar el seto') returning created_by, position)
+select tests.check('tasks: daniel adds to the shared list, at the end, as himself', (select created_by = my_person_id() and position = 6 from t));
+update tasks set title = 'Comprar manguera de 25 m', assigned_to = '00000000-0000-4000-8000-0000000000d2' where id = '00000000-0000-4000-8000-000000000021';
+select tests.check('tasks: daniel edits and assigns Marta''s task', (select updated_by = my_person_id() and assigned_to = '00000000-0000-4000-8000-0000000000d2' from tasks where id = '00000000-0000-4000-8000-000000000021'));
+update tasks set position = 2.5 where id = '00000000-0000-4000-8000-000000000029';
+select tests.check('tasks: one update moves a task', (select array_agg(id order by position) from tasks where list_id = '00000000-0000-4000-8000-000000000011' and done_at is null)
+  = array['00000000-0000-4000-8000-000000000021', '00000000-0000-4000-8000-000000000022', '00000000-0000-4000-8000-000000000029', '00000000-0000-4000-8000-000000000023', '00000000-0000-4000-8000-000000000024']::uuid[]);
+select set_task_done('00000000-0000-4000-8000-000000000023', true);
+select tests.check('tasks: daniel ticks a task', (select done_by = my_person_id() and done_at is not null from tasks where id = '00000000-0000-4000-8000-000000000023'));
+select tests.check('tasks: ticking is not an edit', (select updated_by is null from tasks where id = '00000000-0000-4000-8000-000000000023'));
+select set_task_done('00000000-0000-4000-8000-000000000025', false);
+select tests.check('tasks: and unticks one', (select done_by is null and done_at is null from tasks where id = '00000000-0000-4000-8000-000000000025'));
+select tests.expect_error('tasks: done_by only through set_task_done', $$update tasks set done_by = '00000000-0000-4000-8000-0000000000d2' where id = '00000000-0000-4000-8000-000000000022'$$, 'permission denied');
+select tests.expect_error('tasks: cannot insert done_at',
+  $$insert into tasks (list_id, title, done_at) values ('00000000-0000-4000-8000-000000000011', 'x', now())$$, 'permission denied');
+select tests.expect_error('tasks: cannot set created_by',
+  $$insert into tasks (list_id, title, created_by) values ('00000000-0000-4000-8000-000000000011', 'x', '00000000-0000-4000-8000-0000000000d2')$$, 'permission denied');
+select tests.expect_error('tasks: cannot assign to someone who does not see the list',
+  $$update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000026'$$, 'row-level security');
+select tests.expect_error('tasks: nor to a pending member',
+  $$update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c3') where id = '00000000-0000-4000-8000-000000000022'$$, 'row-level security');
+select tests.expect_error('tasks: title without spaces around', $$insert into tasks (list_id, title) values ('00000000-0000-4000-8000-000000000012', ' x ')$$, 'tasks_title_check');
+select tests.expect_error('tasks: no real delete of tasks', $$delete from tasks where id = '00000000-0000-4000-8000-000000000022'$$, 'permission denied');
+select tests.expect_error('tasks: no real delete of lists', $$delete from task_lists where id = '00000000-0000-4000-8000-000000000012'$$, 'permission denied');
+update task_lists set name = 'Hackeada' where id = '00000000-0000-4000-8000-000000000011';
+select tests.check('tasks: daniel cannot rename Marta''s list', (select name from task_lists where id = '00000000-0000-4000-8000-000000000011') = 'Pendientes');
+delete from task_list_shares where list_id = '00000000-0000-4000-8000-000000000011';
+select tests.check('tasks: daniel cannot unshare Marta''s list', exists (select 1 from task_list_shares where list_id = '00000000-0000-4000-8000-000000000011'));
+select tests.expect_error('tasks: daniel cannot delete Marta''s list', $$select delete_task_list('00000000-0000-4000-8000-000000000011')$$, 'task list not found');
+select tests.expect_error('tasks: cannot share with a group I am not in',
+  $$insert into task_list_shares (list_id, group_id) values ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000002')$$, 'row-level security');
+
+select tests.check('tasks: delete_task returns its batch', delete_task('00000000-0000-4000-8000-000000000029') is not null);
+update tasks set title = 'x' where id = '00000000-0000-4000-8000-000000000029';
+select tests.check('tasks: a deleted task cannot be edited', (select title from tasks where id = '00000000-0000-4000-8000-000000000029') = 'Podar el seto');
+select restore_task('00000000-0000-4000-8000-000000000029');
+select tests.check('tasks: restore_task brings it back', (select deleted_at is null from tasks where id = '00000000-0000-4000-8000-000000000029'));
+select tests.check('tasks: delete_task_list', delete_task_list('00000000-0000-4000-8000-000000000012') is not null);
+select tests.check('tasks: the list and its tasks go in one batch',
+  (select count(*) = 3 and count(distinct deletion_batch) = 1
+     from (select deletion_batch from task_lists where id = '00000000-0000-4000-8000-000000000012' union all select deletion_batch from tasks where list_id = '00000000-0000-4000-8000-000000000012') x));
+select tests.expect_error('tasks: a task deleted with its list comes back with the list', $$select restore_task('00000000-0000-4000-8000-000000000026')$$, 'task list is deleted');
+select tests.expect_error('tasks: no new tasks in a deleted list', $$insert into tasks (list_id, title) values ('00000000-0000-4000-8000-000000000012', 'x')$$, 'row-level security');
+select restore_task_list('00000000-0000-4000-8000-000000000012');
+select tests.check('tasks: restore_task_list brings its tasks back', (select count(*) from tasks where list_id = '00000000-0000-4000-8000-000000000012' and deleted_at is null) = 2);
+insert into task_list_shares (list_id, group_id) values ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000001');
+select tests.check('tasks: daniel shares his list', (select shared_by = my_person_id() from task_list_shares where list_id = '00000000-0000-4000-8000-000000000012'));
+update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000026';
+select tests.check('tasks: once shared, marta can be assigned', (select assigned_to is not null from tasks where id = '00000000-0000-4000-8000-000000000026'));
+delete from task_list_shares where list_id = '00000000-0000-4000-8000-000000000012';
+select tests.check('tasks: unsharing unassigns who no longer sees it', (select assigned_to is null from tasks where id = '00000000-0000-4000-8000-000000000026'));
+
+reset role;
+update tasks set deleted_at = now() - interval '31 days', deleted_by = null, deletion_batch = gen_random_uuid() where id = '00000000-0000-4000-8000-000000000027';
+select tests.check('tasks: empty_trash clears old tasks too', empty_trash() = 1);
+select tests.check('tasks: the old task is gone', not exists (select 1 from tasks where id = '00000000-0000-4000-8000-000000000027'));
+set role authenticated;
+
 -- ── Pending request sees nothing of the group ──
 select tests.as_user('lucia@ejemplo.com');
 select tests.check('lucia pending: no items', (select count(*) from items) = 0);
@@ -218,8 +311,10 @@ update people set display_name = 'Dani' where user_id = '00000000-0000-4000-8000
 select tests.check('marta: cannot rename Daniel (has account)', (select display_name from people where user_id = '00000000-0000-4000-8000-0000000000c2') = 'Daniel M.');
 update groups set name = 'Casa Martín García', shopping_enabled = false;
 select tests.check('marta: renames group and toggles shopping', (select name = 'Casa Martín García' and not shopping_enabled from groups));
-select tests.expect_error('marta: cannot disable both sections', $$update groups set calendar_enabled = false$$, 'groups_some_section');
-update groups set shopping_enabled = true;
+update groups set tasks_enabled = false;
+select tests.check('marta: toggles tasks', (select not tasks_enabled from groups));
+select tests.expect_error('marta: cannot disable all three sections', $$update groups set calendar_enabled = false$$, 'groups_some_section');
+update groups set shopping_enabled = true, tasks_enabled = true;
 select tests.check('marta: regenerate code', length(regenerate_invite_code('00000000-0000-4000-8000-000000000001')) = 10);
 select tests.expect_error('marta: profile cannot be admin', $$select set_member_role('00000000-0000-4000-8000-0000000000a4', 'admin')$$, 'profile without account');
 select tests.expect_error('marta: last admin cannot step down', $$select set_member_role('00000000-0000-4000-8000-0000000000a1', 'member')$$, 'last admin');
@@ -244,6 +339,7 @@ select tests.expect_error('lucia: cannot start a trip as daniel',
 select tests.as_user('marta@ejemplo.com');
 select leave_group('00000000-0000-4000-8000-000000000001');
 select tests.check('marta left: sees no items', (select count(*) from items) = 0);
+select tests.check('marta left: Pablo is off her tasks', (select assigned_to is null from tasks where id = '00000000-0000-4000-8000-000000000021'));
 select tests.as_user('daniel@ejemplo.com');
 select tests.check('daniel still admin after marta left', is_group_admin('00000000-0000-4000-8000-000000000001'));
 select tests.check('history keeps marta''s name', (select display_name from people where user_id = '00000000-0000-4000-8000-0000000000c1') = 'Marta');
@@ -251,6 +347,8 @@ select tests.check('marta left: her folders are no longer shared with the group'
 select tests.check('marta left: daniel no longer sees Oficina', not exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f1'));
 select tests.check('marta left: she is off daniel''s night shift', not exists (select 1 from event_participants where event_id = '00000000-0000-4000-8000-0000000000fa'));
 select tests.check('marta left: Pablo''s Colegio still shared', exists (select 1 from events where id = '00000000-0000-4000-8000-0000000000f7'));
+select tests.check('marta left: Pendientes is no longer shared with the group', not exists (select 1 from task_list_shares where list_id = '00000000-0000-4000-8000-000000000011'));
+select tests.check('marta left: daniel no longer sees its tasks', not exists (select 1 from tasks where list_id = '00000000-0000-4000-8000-000000000011'));
 reset role;
 select invite_code as invite from groups where id = '00000000-0000-4000-8000-000000000001' \gset
 set role authenticated;
@@ -295,7 +393,10 @@ select tests.check('only one person for this account', (select count(*) from peo
 select tests.as_user('sinnombre@ejemplo.com');
 select create_group('Pareja', false, true);
 select tests.check('create_group: creator is active admin', (select role = 'admin' and status = 'active' from members where person_id = my_person_id()));
-select tests.check('create_group: sections', (select not shopping_enabled and calendar_enabled from groups where name = 'Pareja'));
+select tests.check('create_group: sections', (select not shopping_enabled and calendar_enabled and tasks_enabled from groups where name = 'Pareja'));
+select tests.check('create_group: a Pendientes list shared with the group',
+  exists (select 1 from task_lists l join task_list_shares s on s.list_id = l.id join groups g on g.id = s.group_id
+           where l.owner_id = my_person_id() and l.name = 'Pendientes' and g.name = 'Pareja'));
 select tests.check('other group invisible to Pablo? (as sinnombre sees 1 group)', (select count(*) from groups) = 1);
 
 reset role;
@@ -304,6 +405,9 @@ grant insert on tests.results to anon; grant usage on sequence tests.results_n_s
 set role anon;
 select tests.expect_error('anon: no people', $$select * from people$$, 'permission denied');
 select tests.expect_error('anon: no events', $$select * from events$$, 'permission denied');
+select tests.expect_error('anon: no tasks', $$select * from tasks$$, 'permission denied');
+select tests.expect_error('anon: no task lists', $$select * from task_lists$$, 'permission denied');
+select tests.expect_error('anon: cannot tick', $$select set_task_done('00000000-0000-4000-8000-000000000022', true)$$, 'permission denied');
 select tests.expect_error('anon: no busy slots', $$select * from busy_events('00000000-0000-4000-8000-000000000001')$$, 'permission denied');
 select tests.expect_error('anon: no rpc', $$select group_by_invite('HUERTA7Q4K')$$, 'permission denied');
 reset role;

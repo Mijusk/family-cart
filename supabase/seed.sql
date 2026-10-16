@@ -9,6 +9,8 @@
 -- Invite link for "Casa Martín": /unirse/HUERTA7Q4K
 -- Calendar: Marta's "Trabajo" and Pablo's "Colegio" are shared with the group in full, Daniel's
 -- "Gimnasio" only as busy, and Marta's "Médico" is private except for one event.
+-- Tasks: Marta's "Pendientes" shared with the group (one overdue, one for Pablo, one done) and
+-- Daniel's private "Amigos con quien quedar".
 
 -- ── Accounts (the on_auth_user_created trigger creates their people) ─────────
 
@@ -171,3 +173,45 @@ from (values
   ('00000000-0000-4000-8000-0000000000c2', '00000000-0000-4000-8000-0000000000e3')
 ) as v (user_id, calendar)
 where p.user_id = v.user_id::uuid;
+
+-- ── Tasks ────────────────────────────────────────────────────────────────────
+-- Dates are relative to today.
+
+insert into public.task_lists (id, owner_id, name, created_by)
+select ('00000000-0000-4000-8000-0000000000' || v.id)::uuid, p.id, v.name, p.id
+from (values
+  ('11', '00000000-0000-4000-8000-0000000000c1', 'Pendientes'),
+  ('12', '00000000-0000-4000-8000-0000000000c2', 'Amigos con quien quedar')
+) as v (id, owner, name)
+join public.people p on p.user_id = v.owner::uuid;
+
+insert into public.task_list_shares (list_id, group_id, shared_by)
+values ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000001',
+        (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+
+insert into public.tasks (id, list_id, title, notes, assigned_to, due_date, position, done_at, done_by, created_by)
+select ('00000000-0000-4000-8000-0000000000' || v.id)::uuid, ('00000000-0000-4000-8000-0000000000' || v.list)::uuid,
+       v.title, v.notes,
+       coalesce((select id from public.people where user_id = v.assigned::uuid), v.assigned::uuid),
+       current_date + v.due, v.position,
+       now() - v.done_ago, (select id from public.people where user_id = v.done_by::uuid),
+       (select id from public.people where user_id = v.author::uuid)
+from (values
+  ('21', '11', 'Comprar manguera',                       'Para el patio, de 25 m',  '00000000-0000-4000-8000-0000000000c2', -2,   1, null::interval, null, '00000000-0000-4000-8000-0000000000c1'),
+  ('22', '11', 'Llamar al fontanero',                    'Gotea el grifo del baño', '00000000-0000-4000-8000-0000000000c1', 0,    2, null,           null, '00000000-0000-4000-8000-0000000000c1'),
+  ('23', '11', 'Firmar la autorización de la excursión', null,                      '00000000-0000-4000-8000-0000000000d2', 3,    3, null,           null, '00000000-0000-4000-8000-0000000000c1'),
+  ('24', '11', 'Renovar el DNI de la abuela',            'Pedir cita por internet', null,                                   null, 4, null,           null, '00000000-0000-4000-8000-0000000000c2'),
+  ('25', '11', 'Devolver los libros a la biblioteca',    null,                      null,                                   -1,   5, interval '1 day', '00000000-0000-4000-8000-0000000000c2', '00000000-0000-4000-8000-0000000000c1'),
+  ('26', '12', 'Quedar con Javi',                        'Para el pádel',           null,                                   5,    1, null,           null, '00000000-0000-4000-8000-0000000000c2'),
+  ('27', '12', 'Llamar a Sara',                          null,                      null,                                   null, 2, null,           null, '00000000-0000-4000-8000-0000000000c2')
+) as v (id, list, title, notes, assigned, due, position, done_ago, done_by, author);
+
+-- The insert stamps every row with now(); spread them out as if written over the last weeks.
+update public.task_lists set created_at = now() - interval '62 days', updated_at = now() - interval '62 days'
+ where id = '00000000-0000-4000-8000-000000000011';
+update public.task_lists set created_at = now() - interval '20 days', updated_at = now() - interval '20 days'
+ where id = '00000000-0000-4000-8000-000000000012';
+update public.tasks t set created_at = now() - v.ago, updated_at = now() - v.ago
+from (values ('21', interval '6 days'), ('22', interval '3 days'), ('23', interval '2 days'), ('24', interval '1 day'),
+             ('25', interval '8 days'), ('26', interval '4 days'), ('27', interval '2 days')) as v (id, ago)
+where t.id = ('00000000-0000-4000-8000-0000000000' || v.id)::uuid;

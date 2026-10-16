@@ -177,7 +177,7 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 
 - Importar calendarios externos (`.ics`, colegio, trabajo).
 - Exportar horarios (CSV/JSON) para generar tablas de tareas con IA.
-- Tareas familiares y repartos.
+- Repartos de tareas familiares (las tareas puntuales llegan en el PR 8, ver `docs/tareas.md`).
 - Notificaciones y recordatorios.
 - Entrar con Google.
 - PWA instalable y app con Capacitor.
@@ -202,3 +202,5 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual.
 4. **PR 4 — Semana y Mes** ✅: componentes propios (sin librería); Semana con filtros por persona y carpeta; Mes solo con eventos puntuales y excepciones.
 5. **PR 5 — Carpetas, compartir, perfiles sin cuenta y papelera** ✅: sin migración (el esquema y las RPCs ya estaban en el PR 2; los perfiles sin cuenta se crean desde Grupo desde el PR 1).
 6. **PR 6 — Tiempo real y aviso de "está editando"** ✅: Postgres changes para lo que cada uno ve; para las franjas "Ocupado" un trigger manda un aviso vacío al canal `calendar:<grupo>` (`realtime.send`) y la app recarga. "Está editando" con Presence en el canal `event-edit:<evento>`.
+7. **PR 7 — Navegación y flujos** ✅: volver atrás a la vista de donde se venía (`goBack()`), estado de las vistas en la URL, la hora de fin sigue a la de inicio, mensajes de error y reintentar.
+8. **PR 8 — Tareas**: listas de tareas puntuales con el mismo modelo de propiedad y compartición que las carpetas. Diseño en `docs/tareas.md`. La barra queda en Compra · Tareas · Calendario · Grupo, con Historial dentro de Compra. Las tareas con fecha en Hoy llegarán después.

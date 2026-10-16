@@ -20,6 +20,16 @@ export function today(now = new Date()): IsoDate {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
+/** The day a moment falls on in a time zone (a group's): today by default. */
+export function dayIn(timeZone: string, at: Date | string = new Date()): IsoDate {
+  try {
+    // en-CA writes dates as YYYY-MM-DD.
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at))
+  } catch {
+    return today(new Date(at))
+  }
+}
+
 export function addDays(day: IsoDate, n: number): IsoDate {
   return fromUtc(toUtc(day) + n * DAY_MS)
 }
@@ -57,6 +67,7 @@ export const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'vierne
 
 const longFormat = new Intl.DateTimeFormat('es', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
 const shortFormat = new Intl.DateTimeFormat('es', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+const weekdayShortFormat = new Intl.DateTimeFormat('es', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -75,6 +86,11 @@ export function longDay(day: IsoDate): string {
 /** "16 oct". */
 export function shortDay(day: IsoDate): string {
   return shortFormat.format(new Date(toUtc(day)))
+}
+
+/** "jue 23 oct". */
+export function weekdayShortDay(day: IsoDate): string {
+  return weekdayShortFormat.format(new Date(toUtc(day))).replace(',', '')
 }
 
 /** "Hoy", "Mañana", "Ayer" or "Jueves, 16 de octubre". */

@@ -1,11 +1,11 @@
 # Family App (repo `family-cart`)
 
-App web familiar: lista de la compra compartida (ya funciona) + calendario por persona
-(rutina diaria, horario semanal, eventos puntuales) compartible con grupos. El nombre
+App web familiar: lista de la compra compartida, tareas puntuales en listas compartibles y
+calendario por persona (rutina diaria, horario semanal, eventos puntuales) compartible con grupos. El nombre
 definitivo de la app está por decidir; en la interfaz aún pone "Compra Familiar".
 
 **Antes de tocar nada del calendario, lee `docs/calendario.md`**: diseño completo,
-decisiones tomadas con Luis y plan de PRs (§12).
+decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`.
 
 ## Stack
 
@@ -19,13 +19,16 @@ decisiones tomadas con Luis y plan de PRs (§12).
 - `auth.users` → `people` (una por humano; `user_id` null = perfil sin cuenta, p. ej. un
   niño; se reclama con `claim_code`) → `members` (persona en grupo: `role` admin/member,
   `status` pending/active, `left_at`; nunca se borran) → `groups` (`timezone`,
-  `shopping_enabled`, `calendar_enabled`).
+  `shopping_enabled`, `tasks_enabled`, `calendar_enabled`; al menos una activa).
 - Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial.
 - Calendario: `calendars` (carpetas de una persona) → `events` (repetición en columnas
   simples) + `event_exceptions`, `event_participants`. Se comparte con grupos vía
   `calendar_shares` (`full`/`busy`) y `event_shares`. El modo ocupado se lee solo con la RPC
   `busy_events(gid)`. Borrado suave con `deletion_batch` y RPCs de papelera; `event_history`
   lo escriben triggers.
+- Tareas: `task_lists` (de una persona, como las carpetas) → `tasks` (orden en `position`
+  numérica; `done_at`/`done_by` solo por la RPC `set_task_done`). Se comparten enteras con
+  grupos vía `task_list_shares`; sin grupos es privada. Borrado suave como en el calendario.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 
@@ -55,6 +58,7 @@ Datos de prueba (`seed.sql`), contraseña `demo1234`: `marta@ejemplo.com` (admin
 `daniel@ejemplo.com` (miembro), `lucia@ejemplo.com` (pendiente); perfiles sin cuenta
 Abuela Carmen y Pablo (código `PABLO7Q4KM`); grupo "Casa Martín" (invitación `HUERTA7Q4K`). Calendario: "Trabajo" de Marta y "Colegio" de
 Pablo compartidos en completo, "Gimnasio" de Daniel en modo ocupado, "Médico" de Marta privado.
+Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar" de Daniel privada.
 
 ## Convenciones
 

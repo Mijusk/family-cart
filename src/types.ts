@@ -12,6 +12,7 @@ export interface Group {
   timezone: string
   shoppingEnabled: boolean
   calendarEnabled: boolean
+  tasksEnabled: boolean
   createdAt: string
 }
 
@@ -219,6 +220,52 @@ export interface TrashItem {
   repeating: boolean
   /** For a folder: events that come back with it. */
   eventCount: number
+  deletedAt: string
+  deletedBy: string | null
+}
+
+// ── Tasks ────────────────────────────────────────────────────
+
+/** A person's list of one-off tasks; shared whole with groups, private without them. */
+export interface TaskList {
+  id: string
+  ownerId: string
+  name: string
+  createdAt: string
+}
+
+export interface TaskListShare {
+  listId: string
+  groupId: string
+}
+
+export interface Task {
+  id: string
+  listId: string
+  title: string
+  notes: string | null
+  assignedTo: string | null
+  dueDate: IsoDate | null
+  /** Manual order inside the list. */
+  position: number
+  doneAt: string | null
+  doneBy: string | null
+  createdAt: string
+  createdBy: string | null
+  updatedAt: string
+  updatedBy: string | null
+}
+
+/** Something in the tasks' trash: a whole list (with the tasks deleted along with it) or a task. */
+export interface TaskTrashItem {
+  kind: 'list' | 'task'
+  id: string
+  /** List name or task title. */
+  title: string
+  /** For a task: the list it was in. */
+  listName: string | null
+  /** For a list: tasks that come back with it. */
+  taskCount: number
   deletedAt: string
   deletedBy: string | null
 }

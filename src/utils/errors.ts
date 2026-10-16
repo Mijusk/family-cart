@@ -26,6 +26,15 @@ export function friendlyError(error: unknown): string {
   if (/event not found|calendar not found/i.test(message)) return 'Ese evento o carpeta ya no existe o no tienes permiso para cambiarlo.'
   if (/row-level security.*calendar_shares/i.test(message))
     return 'No se puede compartir con ese grupo: la persona dueña de la carpeta tiene que estar en él.'
+  // Tasks
+  if (/task list is deleted/i.test(message)) return 'Esa lista está en la papelera. Restáurala primero.'
+  if (/task not found|task list not found/i.test(message)) return 'Esa tarea o lista ya no existe o no tienes permiso para cambiarla.'
+  if (/row-level security.*task_list_shares/i.test(message))
+    return 'No se puede compartir con ese grupo: la persona dueña de la lista tiene que estar en él.'
+  if (/row-level security.*"tasks"/i.test(message))
+    return 'No se pudo guardar: esa persona no ve esta lista, o la lista ya no está compartida contigo.'
+  if (/tasks_title_check/i.test(message)) return 'La tarea necesita un título de hasta 120 caracteres.'
+
   // An update that matched nothing: someone else deleted it, or took away my access, meanwhile.
   if (/JSON object requested|single JSON object/i.test(message)) return 'Esto ya no existe o ya no puedes cambiarlo. Vuelve atrás para ver cómo está ahora.'
   if (/events_times/i.test(message)) return 'Revisa las horas: un evento con hora necesita inicio y fin distintos.'

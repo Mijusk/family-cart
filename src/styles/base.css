@@ -12,6 +12,9 @@
   --qty-ink: #7a5710;
   --warn: #6b4e71;
   --warn-soft: #efe7f0;
+  /* Overdue tasks: a soft red, not an alarm. */
+  --late: #9c3d2b;
+  --late-soft: #f7e4df;
 
   --font-display: 'Fraunces', Georgia, serif;
   --font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -312,6 +315,29 @@ a {
   color: var(--warn);
   font-weight: 600;
   font-size: 0.9375rem;
+}
+
+/* Eyebrow on the left, a way to a section's inner screen on the right (Historial, Mis listas). */
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  color: var(--text-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.header-link:hover {
+  color: var(--primary);
 }
 
 .back-link {
