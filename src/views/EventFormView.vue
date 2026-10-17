@@ -98,7 +98,7 @@ function fill() {
       repeatUntil: copyOf.value ? '' : (source.repeatUntil ?? ''),
       location: shown.location ?? '',
       notes: shown.notes ?? '',
-      groupIds: editingId.value ? [...(calendar.eventGroups[source.id] ?? [])] : [],
+      groupIds: editingId.value ? [...(calendar.eventGroups[source.id] ?? [])] : [groupStore.group.id],
     })
     if (onlyDay.value && day) form.startDate = exception?.overrides.startDate ?? day
   } else {
@@ -107,6 +107,8 @@ function fill() {
     form.startTime = defaultStart(day)
     form.endTime = addHour(form.startTime)
     form.calendarId = defaultCalendar()
+    // Created from a group, it is for that group: untick it to keep the event private.
+    form.groupIds = [groupStore.group.id]
   }
   filling = false
   ready.value = true
@@ -215,7 +217,7 @@ const groupOptions = computed(() => {
     (m) =>
       ownerIsMe ||
       (m.groupId === groupStore.group.id && groupStore.activeMembers.some((a) => a.personId === folderOwnerId.value)) ||
-      form.groupIds.includes(m.groupId),
+      (!!editingId.value && form.groupIds.includes(m.groupId)),
   )
   return candidates.map((m) => ({ id: m.groupId, name: m.groupName, viaFolder: shared.includes(m.groupId) }))
 })
@@ -276,7 +278,8 @@ async function save() {
       repeatWeekdays: weekly ? form.weekdays : null,
       repeatUntil: form.repeat !== 'none' && form.repeatUntil ? form.repeatUntil : null,
     }
-    const groupIds = form.groupIds.filter((id) => !calendar.sharedGroupIds(calendarId).includes(id))
+    const offered = groupOptions.value.map((g) => g.id)
+    const groupIds = form.groupIds.filter((id) => offered.includes(id) && !calendar.sharedGroupIds(calendarId).includes(id))
     const id = await calendar.saveEvent(draft, groupIds, editingId.value ?? undefined)
     saved = true
     // Back to where the form was opened from: the event, or the calendar view.
