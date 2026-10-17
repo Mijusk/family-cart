@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type RouteMeta } from 'vue-router'
+import { createRouter, createWebHistory, START_LOCATION, type RouteMeta } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import ListView from '@/views/ListView.vue'
 
@@ -138,8 +138,16 @@ export const router = createRouter({
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
-  // Back and forward return to where the page was; new screens start at the top.
-  scrollBehavior: (_to, _from, saved) => saved ?? { top: 0 },
+  scrollBehavior: (to, from, saved) => {
+    // Opening or reloading the app starts at the top: the browser keeps the last scroll in the
+    // history entry, and restoring it once the loading screen goes would land mid-page.
+    if (from === START_LOCATION) return { top: 0 }
+    // Back and forward return to where the page was.
+    if (saved) return saved
+    // Same screen with another day, week or filter in the URL: stay where you are.
+    if (to.path === from.path) return false
+    return { top: 0 }
+  },
 })
 
 /** Where a screen of a switched-off section goes instead; null if it can be shown. */
