@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, START_LOCATION, type RouteLocationNormalized, type RouteMeta } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import { isIsoDate, startOfWeek, today } from '@/utils/days'
-import ListView from '@/views/ListView.vue'
+import CalendarView from '@/views/CalendarView.vue'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -21,7 +21,14 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: '/', name: 'list', component: ListView, meta: { section: 'shopping' } },
+    // The app opens on today's calendar; a group without it goes to its first section (see sectionRedirect).
+    { path: '/', redirect: { name: 'calendar' } },
+    {
+      path: '/lista',
+      name: 'list',
+      component: () => import('@/views/ListView.vue'),
+      meta: { section: 'shopping' },
+    },
     {
       path: '/compra',
       name: 'shopping',
@@ -61,7 +68,7 @@ export const router = createRouter({
     {
       path: '/calendario',
       name: 'calendar',
-      component: () => import('@/views/CalendarView.vue'),
+      component: CalendarView,
       meta: { section: 'calendar' },
     },
     {
@@ -194,8 +201,8 @@ export function sectionRedirect(to: { meta: RouteMeta }) {
   const enabled = { shopping: shoppingEnabled, tasks: tasksEnabled, calendar: calendarEnabled }
   if (!to.meta.section || enabled[to.meta.section]) return null
   // The first section the group does use, in the order of the tab bar.
-  if (shoppingEnabled) return { name: 'list' }
-  return { name: tasksEnabled ? 'tasks' : 'calendar' }
+  if (calendarEnabled) return { name: 'calendar' }
+  return { name: tasksEnabled ? 'tasks' : 'list' }
 }
 
 router.beforeEach(async (to) => {
