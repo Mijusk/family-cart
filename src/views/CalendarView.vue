@@ -33,7 +33,7 @@ function backToToday() {
 
 watch(
   () => groupStore.group.id,
-  (id) => calendar.load(id).catch(() => {}),
+  (id) => calendar.ensureLoaded(id).catch(() => {}),
   { immediate: true },
 )
 

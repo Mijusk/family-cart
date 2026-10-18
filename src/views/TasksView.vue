@@ -26,7 +26,7 @@ watch(
   (id, before) => {
     // Another group has other lists.
     if (before && id !== before) void router.replace({ query: {} })
-    store.load(id).catch(() => {})
+    store.ensureLoaded(id).catch(() => {})
   },
   { immediate: true },
 )
