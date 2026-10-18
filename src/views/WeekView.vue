@@ -163,7 +163,7 @@ function ownerName(id: string): string {
     </div>
 
     <template v-else>
-      <section v-for="d in week" :key="d.day" class="day" :aria-label="longDay(d.day)">
+      <section v-for="d in week" :key="d.day" class="day" :data-day="d.day" :aria-label="longDay(d.day)">
         <h2 class="day-head" :class="{ today: d.day === today() }">
           <RouterLink :to="{ name: 'calendar', query: { dia: d.day } }">{{ longDay(d.day) }}</RouterLink>
         </h2>
@@ -284,7 +284,12 @@ function ownerName(id: string): string {
 }
 
 .day-head {
+  /* Stays at the top while its day scrolls by, so a long day still says which one it is. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
   padding: 20px var(--gutter) 6px;
+  background: var(--bg);
   font-size: 1rem;
   font-weight: 700;
 }

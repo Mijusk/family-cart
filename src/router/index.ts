@@ -1,5 +1,6 @@
-import { createRouter, createWebHistory, START_LOCATION, type RouteMeta } from 'vue-router'
+import { createRouter, createWebHistory, START_LOCATION, type RouteLocationNormalized, type RouteMeta } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
+import { isIsoDate, startOfWeek, today } from '@/utils/days'
 import ListView from '@/views/ListView.vue'
 
 declare module 'vue-router' {
@@ -139,16 +140,51 @@ export const router = createRouter({
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: (to, from, saved) => {
+    const opening = from === START_LOCATION
+    // Semana opens at today, so the end of the week is at hand without scrolling.
+    if (to.name === 'calendar-week' && (opening || (!saved && to.path !== from.path))) return weekScroll(to, true)
     // Opening or reloading the app starts at the top: the browser keeps the last scroll in the
     // history entry, and restoring it once the loading screen goes would land mid-page.
-    if (from === START_LOCATION) return { top: 0 }
+    if (opening) return { top: 0 }
     // Back and forward return to where the page was.
     if (saved) return saved
+    // Another week: back to its Monday if the old week was scrolled past it.
+    if (to.name === 'calendar-week' && from.name === 'calendar-week' && to.query.semana !== from.query.semana) {
+      return weekScroll(to, false)
+    }
     // Same screen with another day, week or filter in the URL: stay where you are.
     if (to.path === from.path) return false
     return { top: 0 }
   },
 })
+
+/**
+ * Where Semana scrolls to. Opening it: today, when this week is on screen and today's day isn't
+ * already in sight. Changing week: its Monday, only if the list was scrolled past it, so the week
+ * arrows stay under the finger. The days render once the calendar has loaded, hence the wait.
+ */
+async function weekScroll(to: RouteLocationNormalized, opening: boolean) {
+  const week = startOfWeek(isIsoDate(to.query.semana) ? to.query.semana : today())
+  const day = opening ? (week === startOfWeek(today()) ? today() : null) : week
+  const el = day ? await rendered(`[data-day="${day}"]`) : null
+  if (!el) return opening ? { top: 0 } : false
+  const top = el.getBoundingClientRect().top
+  if (opening) return top > window.innerHeight / 2 ? { el, top: 0 } : { top: 0 }
+  return top < 0 ? { el, top: 0 } : false
+}
+
+/** The element once it is on the page, giving up after a few seconds (slow or failed load). */
+function rendered(selector: string, timeout = 8000): Promise<Element | null> {
+  const start = performance.now()
+  return new Promise((resolve) => {
+    const check = () => {
+      const el = document.querySelector(selector)
+      if (el || performance.now() - start > timeout) resolve(el)
+      else requestAnimationFrame(check)
+    }
+    check()
+  })
+}
 
 /** Where a screen of a switched-off section goes instead; null if it can be shown. */
 export function sectionRedirect(to: { meta: RouteMeta }) {
