@@ -8,8 +8,11 @@ const LOCK_DISTANCE = 10
 /** Swipes from the screen edges belong to the phone (back and forward gestures). */
 const EDGE = 24
 
-const OUT_MS = 140
-const IN_MS = 220
+const OUT_MS = 120
+const IN_MS = 280
+/** How far the new content travels as it fades in: a nudge, not a whole screen. */
+const IN_OFFSET = 32
+const SOFT = 'cubic-bezier(0.22, 1, 0.36, 1)'
 
 /**
  * Swiping sideways anywhere on the screen moves to the next day, week or month (finger to the
@@ -75,7 +78,7 @@ export function useSwipe(area: Ref<HTMLElement | null>, move: (direction: 1 | -1
     const el = area.value
     if (!el) return
     el.style.transform = ''
-    el.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: IN_MS, easing: 'ease-out' })
+    el.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: IN_MS, easing: SOFT })
   }
 
   async function go(direction: 1 | -1, from = 0) {
@@ -86,12 +89,12 @@ export function useSwipe(area: Ref<HTMLElement | null>, move: (direction: 1 | -1
     }
     busy = true
     try {
-      const width = el.offsetWidth
       el.style.transform = ''
+      // The old content fades out a little further along; the new one eases in from the other side.
       await el.animate(
         [
           { transform: `translateX(${from}px)`, opacity: 1 },
-          { transform: `translateX(${-direction * width}px)`, opacity: 0 },
+          { transform: `translateX(${from - direction * IN_OFFSET}px)`, opacity: 0 },
         ],
         { duration: OUT_MS, easing: 'ease-in', fill: 'forwards' },
       ).finished
@@ -100,10 +103,10 @@ export function useSwipe(area: Ref<HTMLElement | null>, move: (direction: 1 | -1
       el.getAnimations().forEach((a) => a.cancel())
       el.animate(
         [
-          { transform: `translateX(${direction * width * 0.4}px)`, opacity: 0 },
+          { transform: `translateX(${direction * IN_OFFSET}px)`, opacity: 0 },
           { transform: 'none', opacity: 1 },
         ],
-        { duration: IN_MS, easing: 'ease-out' },
+        { duration: IN_MS, easing: SOFT },
       )
     } finally {
       busy = false

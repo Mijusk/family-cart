@@ -82,7 +82,7 @@ const rows = computed(() => {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <div v-else ref="swipeArea">
+    <div v-else ref="swipeArea" class="appear">
       <p v-if="!rows.length" class="state muted">Nadie tiene nada este día.</p>
       <section v-for="row in rows" :key="row.member.id" :aria-label="row.member.name">
         <h2 class="person">

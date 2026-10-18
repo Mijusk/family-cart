@@ -113,7 +113,7 @@ function label(day: string): string {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <div v-else ref="swipeArea">
+    <div v-else ref="swipeArea" class="appear">
       <div class="grid" role="grid" :aria-label="monthLabel(month)">
         <div class="head" role="row">
           <span v-for="(w, i) in WEEKDAY_INITIALS" :key="i" role="columnheader">{{ w }}</span>

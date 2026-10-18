@@ -101,6 +101,24 @@ a {
   overflow-x: clip;
 }
 
+/* Content that shows up once loaded fades in instead of popping. */
+.appear {
+  animation: appear 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appear {
+    animation: none;
+  }
+}
+
 .page-header {
   padding: 28px var(--gutter) 18px;
 }

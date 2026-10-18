@@ -166,7 +166,7 @@ function ownerName(id: string): string {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <div v-else ref="swipeArea">
+    <div v-else ref="swipeArea" class="appear">
       <section v-for="d in week" :key="d.day" class="day" :class="{ past: d.day < today() }" :data-day="d.day" :aria-label="longDay(d.day)">
         <h2 class="day-head" :class="{ today: d.day === today() }">
           <RouterLink :to="{ name: 'calendar', query: { dia: d.day } }">{{ longDay(d.day) }}</RouterLink>
