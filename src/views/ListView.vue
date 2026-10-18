@@ -34,8 +34,8 @@ const countLabel = computed(() => {
   return n === 1 ? '1 cosa por comprar' : `${n} cosas por comprar`
 })
 
+// The trip itself starts with the first item put in the cart.
 function goShopping() {
-  list.startTrip()
   router.push({ name: 'shopping' })
 }
 </script>
