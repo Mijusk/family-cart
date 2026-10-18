@@ -2,6 +2,7 @@
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
 import { useListStore, type Suggestion } from '@/stores/list'
+import type { Product } from '@/types'
 import AppIcon from './AppIcon.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import QuantityChip from './QuantityChip.vue'
@@ -16,12 +17,15 @@ const note = ref('')
 const photo = ref<Blob | string | null>(null)
 const showNote = ref(false)
 const suggestionsOpen = ref(false)
+const focused = ref(false)
 const highlighted = ref(-1)
 const nameInput = useTemplateRef('nameInput')
 
 const suggestions = computed<Suggestion[]>(() => (suggestionsOpen.value ? list.suggest(name.value) : []))
 const duplicate = computed(() => list.findPendingDuplicate(name.value))
 const canSubmit = computed(() => name.value.trim().length > 0)
+/** With the field empty and focused: the usual products, one tap each. */
+const usual = computed<Product[]>(() => (focused.value && !name.value.trim() ? list.usualProducts() : []))
 
 watch(name, () => {
   highlighted.value = -1
@@ -37,14 +41,28 @@ function reset() {
   nameInput.value?.focus()
 }
 
-function pick(suggestion: Suggestion) {
-  name.value = suggestion.product.displayName
-  quantity.value = suggestion.product.lastQuantity
-  suggestionsOpen.value = false
-}
-
 /** The picker only ever holds a new photo here, never a stored path. */
 const newPhoto = () => (photo.value instanceof Blob ? photo.value : null)
+
+/** Adds a suggested product straight away, unless it's already on the list. */
+function pick(suggestion: Suggestion) {
+  const { product } = suggestion
+  if (suggestion.pending) {
+    // Into the field, so the panel below asks whether to add to the line already there.
+    name.value = product.displayName
+    quantity.value = product.lastQuantity
+    suggestionsOpen.value = false
+    return
+  }
+  // The quantity last bought, unless it was already changed here.
+  const amount = quantity.value > 1 ? quantity.value : product.lastQuantity
+  list.addItem({ name: product.displayName, quantity: amount, note: note.value, photo: newPhoto() })
+  reset()
+}
+
+function addUsual(product: Product) {
+  list.addItem({ name: product.displayName, quantity: product.lastQuantity })
+}
 
 function addSeparately() {
   if (!canSubmit.value) return
@@ -97,8 +115,8 @@ function onKeydown(event: KeyboardEvent) {
           aria-controls="new-item-suggestions"
           :aria-expanded="suggestions.length > 0"
           @input="suggestionsOpen = true"
-          @focus="suggestionsOpen = true"
-          @blur="suggestionsOpen = false"
+          @focus="suggestionsOpen = focused = true"
+          @blur="suggestionsOpen = focused = false"
           @keydown="onKeydown"
         />
         <ul v-if="suggestions.length" id="new-item-suggestions" class="suggestions" role="listbox">
@@ -118,6 +136,21 @@ function onKeydown(event: KeyboardEvent) {
           </li>
         </ul>
       </div>
+    </div>
+
+    <div v-if="usual.length" class="usual" aria-label="Lo de siempre">
+      <!-- mousedown.prevent keeps focus in the input, so the chips stay for the next tap -->
+      <button
+        v-for="product in usual"
+        :key="product.id"
+        type="button"
+        class="chip"
+        @mousedown.prevent
+        @click="addUsual(product)"
+      >
+        <AppIcon name="plus" :size="14" />
+        {{ product.displayName }}<span v-if="product.lastQuantity > 1" class="chip-qty">×{{ product.lastQuantity }}</span>
+      </button>
     </div>
 
     <input
@@ -239,6 +272,40 @@ function onKeydown(event: KeyboardEvent) {
   background: var(--warn-soft);
   padding: 2px 8px;
   border-radius: 999px;
+}
+
+.usual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 12px 0 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.chip:active {
+  background: var(--primary-soft);
+}
+
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--primary-soft);
+  }
+}
+
+.chip-qty {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .controls {
