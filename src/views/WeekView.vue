@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
@@ -26,10 +26,11 @@ const isThisWeek = computed(() => weekStart.value === startOfWeek(today()))
 const weekLabel = computed(() => `${shortDay(weekStart.value)} – ${shortDay(addDays(weekStart.value, 6))}`)
 
 function moveWeek(n: number) {
-  void router.replace({ query: { ...route.query, semana: addDays(weekStart.value, n * 7) } })
+  return router.replace({ query: { ...route.query, semana: addDays(weekStart.value, n * 7) } })
 }
 
-useSwipe(moveWeek)
+const swipeArea = ref<HTMLElement | null>(null)
+const slide = useSwipe(swipeArea, moveWeek)
 
 function thisWeek() {
   const { semana: _, ...rest } = route.query
@@ -57,7 +58,7 @@ watch(
   (id, before) => {
     // Another group: its people and folders are others.
     if (before && id !== before) void router.replace({ query: {} })
-    calendar.load(id).catch(() => {})
+    calendar.ensureLoaded(id).catch(() => {})
   },
   { immediate: true },
 )
@@ -111,7 +112,7 @@ function ownerName(id: string): string {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page swipe-page">
     <header class="page-header">
       <p class="eyebrow">Calendario</p>
       <GroupSwitcher />
@@ -120,12 +121,12 @@ function ownerName(id: string): string {
     <CalendarTabs />
 
     <nav class="week-nav" aria-label="Cambiar de semana">
-      <button type="button" class="icon-btn" aria-label="Semana anterior" @click="moveWeek(-1)"><AppIcon name="prev" /></button>
+      <button type="button" class="icon-btn" aria-label="Semana anterior" @click="slide(-1)"><AppIcon name="prev" /></button>
       <span class="week-label">
         <strong>{{ isThisWeek ? 'Esta semana' : weekLabel }}</strong>
         <span v-if="isThisWeek" class="muted">{{ weekLabel }}</span>
       </span>
-      <button type="button" class="icon-btn" aria-label="Semana siguiente" @click="moveWeek(1)"><AppIcon name="next" /></button>
+      <button type="button" class="icon-btn" aria-label="Semana siguiente" @click="slide(1)"><AppIcon name="next" /></button>
     </nav>
     <p v-if="!isThisWeek" class="center">
       <button type="button" class="link" @click="thisWeek">Volver a esta semana</button>
@@ -165,7 +166,7 @@ function ownerName(id: string): string {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <template v-else>
+    <div v-else ref="swipeArea" class="appear">
       <section v-for="d in week" :key="d.day" class="day" :class="{ past: d.day < today() }" :data-day="d.day" :aria-label="longDay(d.day)">
         <h2 class="day-head" :class="{ today: d.day === today() }">
           <RouterLink :to="{ name: 'calendar', query: { dia: d.day } }">{{ longDay(d.day) }}</RouterLink>
@@ -193,7 +194,7 @@ function ownerName(id: string): string {
           </li>
         </ul>
       </section>
-    </template>
+    </div>
 
     <div class="dock">
       <RouterLink :to="{ name: 'event-new', query: { dia: today() >= weekStart && today() <= addDays(weekStart, 6) ? today() : weekStart } }" class="btn btn-primary btn-block">

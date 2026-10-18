@@ -11,9 +11,7 @@ const route = useRoute()
 
 /** Tabs stay lit on their inner screens (the history of Compra, an event of the calendar). */
 function isActive(tab: { to: string; also?: string[] }): boolean {
-  return [tab.to, ...(tab.also ?? [])].some((to) =>
-    to === '/' ? route.path === '/' : route.path === to || route.path.startsWith(`${to}/`),
-  )
+  return [tab.to, ...(tab.also ?? [])].some((to) => route.path === to || route.path.startsWith(`${to}/`))
 }
 const groupStore = useGroupStore()
 
@@ -21,14 +19,20 @@ const groupStore = useGroupStore()
 const tabs = computed(() => {
   const { shoppingEnabled, tasksEnabled, calendarEnabled } = groupStore.group
   const all: { to: string; label: string; icon: IconName; show: boolean; link?: string; also?: string[] }[] = [
-    { to: '/', label: 'Compra', icon: 'cart', show: shoppingEnabled, also: ['/historial'] },
-    // Back to the view last used (a list, Semana…), not always the first one.
-    { to: '/tareas', label: 'Tareas', icon: 'tasks', show: tasksEnabled, link: lastTasksView.value },
+    // Back to the view last used (Semana, a list…), not always the first one.
     { to: '/calendario', label: 'Calendario', icon: 'calendar', show: calendarEnabled, link: lastCalendarView.value },
+    { to: '/tareas', label: 'Tareas', icon: 'tasks', show: tasksEnabled, link: lastTasksView.value },
+    { to: '/lista', label: 'Compra', icon: 'cart', show: shoppingEnabled, also: ['/historial'] },
     { to: '/grupo', label: 'Grupo', icon: 'group', show: true },
   ]
   return all.filter((tab) => tab.show)
 })
+
+/** What's waiting in each tab: things to buy, and for admins, people asking to join. */
+const badges = computed<Record<string, number>>(() => ({
+  '/lista': list.pendingItems.length,
+  '/grupo': groupStore.isAdmin ? groupStore.pendingMembers.length : 0,
+}))
 </script>
 
 <template>
@@ -36,7 +40,7 @@ const tabs = computed(() => {
     <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.link ?? tab.to" class="tab" :class="{ active: isActive(tab) }">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
-        <span v-if="tab.to === '/' && list.pendingItems.length" class="badge">{{ list.pendingItems.length }}</span>
+        <span v-if="badges[tab.to]" class="badge">{{ badges[tab.to] }}</span>
       </span>
       {{ tab.label }}
     </RouterLink>

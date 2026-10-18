@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
@@ -22,10 +22,11 @@ const day = computed(() => (isIsoDate(route.query.dia) ? route.query.dia : today
 const isToday = computed(() => day.value === today())
 
 function moveDay(n: number) {
-  void router.replace({ query: { dia: addDays(day.value, n) } })
+  return router.replace({ query: { dia: addDays(day.value, n) } })
 }
 
-useSwipe(moveDay)
+const swipeArea = ref<HTMLElement | null>(null)
+const slide = useSwipe(swipeArea, moveDay)
 
 function backToToday() {
   void router.replace({ query: {} })
@@ -33,7 +34,7 @@ function backToToday() {
 
 watch(
   () => groupStore.group.id,
-  (id) => calendar.load(id).catch(() => {}),
+  (id) => calendar.ensureLoaded(id).catch(() => {}),
   { immediate: true },
 )
 
@@ -51,7 +52,7 @@ const rows = computed(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page swipe-page">
     <header class="page-header">
       <p class="eyebrow">Calendario</p>
       <GroupSwitcher />
@@ -60,14 +61,14 @@ const rows = computed(() => {
     <CalendarTabs />
 
     <nav class="day-nav" aria-label="Cambiar de día">
-      <button type="button" class="icon-btn" aria-label="Día anterior" @click="moveDay(-1)">
+      <button type="button" class="icon-btn" aria-label="Día anterior" @click="slide(-1)">
         <AppIcon name="prev" />
       </button>
       <span class="day-label">
         <strong>{{ relativeDay(day) }}</strong>
         <span v-if="relativeDay(day) !== longDay(day)" class="muted">{{ longDay(day) }}</span>
       </span>
-      <button type="button" class="icon-btn" aria-label="Día siguiente" @click="moveDay(1)">
+      <button type="button" class="icon-btn" aria-label="Día siguiente" @click="slide(1)">
         <AppIcon name="next" />
       </button>
     </nav>
@@ -81,9 +82,8 @@ const rows = computed(() => {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <p v-else-if="!rows.length" class="state muted">Nadie tiene nada este día.</p>
-
-    <template v-else>
+    <div v-else ref="swipeArea" class="appear">
+      <p v-if="!rows.length" class="state muted">Nadie tiene nada este día.</p>
       <section v-for="row in rows" :key="row.member.id" :aria-label="row.member.name">
         <h2 class="person">
           <PersonAvatar :name="row.member.name" :color="row.member.color" :size="28" />
@@ -108,7 +108,7 @@ const rows = computed(() => {
           </li>
         </ul>
       </section>
-    </template>
+    </div>
 
     <div class="dock">
       <RouterLink :to="{ name: 'event-new', query: { dia: day } }" class="btn btn-primary btn-block">

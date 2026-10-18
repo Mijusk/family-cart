@@ -60,6 +60,8 @@ export const useCalendarStore = defineStore('calendar', () => {
   const people = ref<Record<string, Person>>({})
   /** Group whose busy slots are loaded; answers for another group are discarded. */
   let loadedGroupId: string | null = null
+  /** Every load gets a number; only the latest one is applied. */
+  let loadSeq = 0
 
   const editableCalendars = computed(() =>
     calendars.value.filter((c) => editableIds.value.has(c.id)).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
@@ -93,6 +95,7 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   async function load(groupId: string) {
     loadedGroupId = groupId
+    const seq = ++loadSeq
     subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
     try {
@@ -114,7 +117,7 @@ export const useCalendarStore = defineStore('calendar', () => {
         ? await supabase.rpc('event_owners', { event_ids: loadedEvents.map((e) => e.id) })
         : { data: [], error: null }
       if (ownerRows.error) throw ownerRows.error
-      if (groupId !== loadedGroupId) return
+      if (groupId !== loadedGroupId || seq !== loadSeq) return
 
       calendars.value = cals.data!.map(toCalendar)
       shares.value = shareRows.data!.map(toCalendarShare)
@@ -129,13 +132,22 @@ export const useCalendarStore = defineStore('calendar', () => {
       status.value = 'ready'
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId) status.value = 'error'
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
       throw e
     }
   }
 
   function reload() {
     return loadedGroupId ? load(loadedGroupId) : Promise.resolve()
+  }
+
+  /**
+   * For the views: loads only if this group isn't loaded or loading yet, or the last load failed.
+   * Realtime keeps it fresh after that, so moving between Hoy, Semana and Mes costs nothing.
+   */
+  function ensureLoaded(groupId: string): Promise<void> {
+    if (groupId === loadedGroupId && (status.value === 'ready' || status.value === 'loading')) return Promise.resolve()
+    return load(groupId)
   }
 
   /** Names for everyone the calendar mentions who isn't loaded yet. */
@@ -285,16 +297,33 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   // ── Events ─────────────────────────────────────────────────
 
-  /** Creates or updates a whole event (the series, if it repeats) and its extra groups. */
+  /**
+   * Creates or updates a whole event (the series, if it repeats) and its extra groups. The saved
+   * row goes into the store at once, so the screens show it; a reload in the background (and
+   * Realtime) brings the rest (exceptions, history…). That reload failing doesn't undo the save.
+   */
   async function saveEvent(draft: EventDraft, groupIds: string[], id?: string): Promise<string> {
     const row = fromEvent(draft)
     const { data, error } = id
-      ? await supabase.from('events').update(row).eq('id', id).select('id').single()
-      : await supabase.from('events').insert(row).select('id').single()
+      ? await supabase.from('events').update(row).eq('id', id).select().single()
+      : await supabase.from('events').insert(row).select().single()
     if (error) throw error
     await setEventGroups(data.id, groupIds)
-    await reload()
+    putEvent(toEvent(data), groupIds)
+    void reload().catch(() => {})
     return data.id
+  }
+
+  /** A saved event, shown before the reload brings it. */
+  function putEvent(event: CalendarEvent, groupIds: string[]) {
+    const i = events.value.findIndex((e) => e.id === event.id)
+    if (i === -1) events.value.push(event)
+    else events.value[i] = event
+    // Its folder is one I can edit, so it is loaded; the owner and color are the folder's.
+    const folder = calendarById(event.calendarId)
+    if (folder) owners.value[event.id] = { ownerId: folder.ownerId, color: folder.color }
+    // setEventGroups left exactly these.
+    eventGroups.value[event.id] = groupIds
   }
 
   async function setEventGroups(eventId: string, groupIds: string[]) {
@@ -504,7 +533,9 @@ export const useCalendarStore = defineStore('calendar', () => {
     exceptionsOf,
     personName,
     load,
+    ensureLoaded,
     reload,
+    reloadSoon,
     unload,
     occurrencesOn,
     peopleOf,

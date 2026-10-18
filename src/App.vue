@@ -3,6 +3,7 @@ import { computed, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import BottomNav from '@/components/BottomNav.vue'
 import UndoToast from '@/components/UndoToast.vue'
+import { useOnResume } from '@/composables/resume'
 import { sectionRedirect } from '@/router'
 import { useGroupStore } from '@/stores/group'
 
@@ -42,6 +43,12 @@ watch(
     }
   },
 )
+
+// Back from the background or online again: the data on screen updates in place.
+useOnResume(() => {
+  if (groupStore.status === 'error' && groupStore.offline) void retry()
+  else void groupStore.catchUp()
+})
 
 async function retry() {
   await groupStore.init()

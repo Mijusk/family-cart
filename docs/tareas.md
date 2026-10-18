@@ -25,7 +25,7 @@ calendario puede usar después las mismas piezas.
    sus dos vecinas. Las nuevas entran abajo (la base de datos pone `max + 1`). "Ordenar por fecha"
    solo cambia la vista.
 8. **Hechas:** `done_at` y `done_by` solo por la RPC `set_task_done`, para que no se puedan falsear.
-   En la vista van plegadas abajo, las de los últimos 30 días.
+   En la vista van plegadas abajo, las de los últimos 30 días; solo esas se cargan.
 9. **Borrado suave** con `deletion_batch`, como en el calendario: al borrar una lista, sus tareas
    comparten lote y vuelven juntas. Aviso "Deshacer" al borrar. Papelera y vaciado a los 30 días con
    el mismo `empty_trash()`.
@@ -78,7 +78,9 @@ Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
 ## 4. Pantallas
 
 - **Tareas** (`/tareas`): pestañas "Todas" y una por lista visible en el grupo elegido (las
-  compartidas con él y mis privadas). Filtro Todas / Mías. Se añade escribiendo el título. Arrastrar
+  compartidas con él y mis privadas). Filtro Todas / Mías. Se añade escribiendo el título: sale al
+  momento y el cursor sigue en la caja para escribir la siguiente (si falla al guardar, desaparece
+  con un aviso). Arrastrar
   para ordenar (también en el móvil, pulsando y arrastrando). Fecha como etiqueta ("Hoy", "Mañana",
   "jue 23 oct"; atrasada en rojo suave). "Ordenar por fecha". Hechas plegadas abajo.
 - **Tarea** (`/tareas/:id`): título, nota, persona, fecha, ⓘ con creada y editada por quién y
@@ -88,7 +90,7 @@ Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
   administradores eligen arriba de quién son las listas (yo o un perfil sin cuenta), como en Mis
   carpetas. Desde aquí, la **Papelera** de tareas.
 
-Navegación: la barra queda en **Compra · Tareas · Calendario · Grupo**. Historial pasa dentro de
+Navegación: la barra queda en **Calendario · Tareas · Compra · Grupo** (la app abre en Hoy). Historial pasa dentro de
 Compra (enlace en su cabecera, misma ruta `/historial`).
 
 Fechas en español, semana de lunes, "hoy" en la zona horaria del grupo.
@@ -96,5 +98,6 @@ Fechas en español, semana de lunes, "hoy" en la zona horaria del grupo.
 ## 5. Preparado para el calendario (sin construir)
 
 Las tareas con fecha saldrán en Hoy y en su día; las hechas, en el día en que se marcaron
-(`done_at` en la zona del grupo). El store de tareas expone las tareas por día para que las vistas
+(`done_at` en la zona del grupo; el store solo carga las hechas de los últimos 30 días, así que
+para días más antiguos habría que pedirlas aparte). El store de tareas expone las tareas por día para que las vistas
 del calendario las lean sin otra consulta.

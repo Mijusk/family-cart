@@ -1,29 +1,46 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
+import { goBack } from '@/router/back'
 import { useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
+import type { Item } from '@/types'
 
 const list = useListStore()
 const toast = useToastStore()
 const router = useRouter()
 
-// Opening this screen directly (reload, shared URL) starts a trip, same as the button on the list.
-const tripId = list.startTrip().id
+// Opening this screen doesn't start a trip: the first item put in the cart (or marked as not
+// found) does, so the family only sees "X está haciendo la compra" once I really am.
+const tripId = ref<string | null>(null)
+watch(
+  () => list.myActiveTrip?.id,
+  (id) => {
+    if (id && !tripId.value) tripId.value = id
+  },
+  { immediate: true },
+)
 /** Set when this screen closes the trip itself, so the watcher below doesn't react to it. */
 let leaving = false
 
+// Leaving with an empty cart (back arrow, or the phone's back button) closes the trip.
+onBeforeRouteLeave(() => {
+  if (leaving) return
+  leaving = true
+  list.leaveEmptyTrip()
+})
+
 // The trip can also end while this screen is open: the 4-hour timeout, or this same member
-// finishing or cancelling it from another device. Tapping items would then do nothing.
+// finishing or cancelling it from another device.
 watch(
-  () => list.tripById(tripId)?.finishedAt,
+  () => list.tripById(tripId.value)?.finishedAt,
   (finishedAt) => {
     if (!finishedAt || leaving) return
     leaving = true
-    const reason = list.tripById(tripId)?.closedReason
+    const reason = list.tripById(tripId.value)?.closedReason
     if (reason === 'cancelled') {
       toast.show('La compra se canceló desde otro dispositivo')
       router.push({ name: 'list' })
@@ -38,12 +55,21 @@ watch(
   },
 )
 
-const toPick = computed(() => list.pendingItems.filter((i) => i.status === 'pending'))
-const notFound = computed(() => list.pendingItems.filter((i) => i.status === 'not_found'))
+// Only what wasn't found on this trip is set aside; what someone missed on an earlier one is to pick again.
+const notFoundHere = (i: Item) => i.status === 'not_found' && !!tripId.value && i.tripId === tripId.value
+const toPick = computed(() => list.pendingItems.filter((i) => !notFoundHere(i)))
+const notFound = computed(() => list.pendingItems.filter(notFoundHere))
 const cart = computed(() => list.myCartItems)
 
 const total = computed(() => toPick.value.length + notFound.value.length + cart.value.length)
 const progress = computed(() => (total.value ? cart.value.length / total.value : 0))
+
+const newName = ref('')
+
+function addToCart() {
+  list.addToCart(newName.value)
+  newName.value = ''
+}
 
 function finish() {
   leaving = true
@@ -66,18 +92,38 @@ function cancel() {
 <template>
   <div class="page shopping">
     <header class="bar">
-      <RouterLink :to="{ name: 'list' }" class="icon-btn" aria-label="Volver a la lista (la compra sigue abierta)">
+      <button
+        type="button"
+        class="icon-btn"
+        :aria-label="cart.length ? 'Volver a la lista (la compra sigue abierta)' : 'Volver a la lista'"
+        @click="goBack({ name: 'list' })"
+      >
         <AppIcon name="back" />
-      </RouterLink>
+      </button>
       <div class="bar-title">
         <h1>Modo compra</h1>
         <p class="muted">{{ cart.length }} de {{ total }} en el carrito</p>
       </div>
-      <button type="button" class="cancel" @click="cancel">Cancelar</button>
+      <button v-if="list.myActiveTrip" type="button" class="cancel" @click="cancel">Cancelar</button>
       <div class="progress" role="progressbar" :aria-valuenow="cart.length" aria-valuemin="0" :aria-valuemax="total">
         <span :style="{ transform: `scaleX(${progress})` }" />
       </div>
     </header>
+
+    <form class="quick-add" autocomplete="off" @submit.prevent="addToCart">
+      <input
+        v-model="newName"
+        class="field"
+        placeholder="Otra cosa…"
+        aria-label="Producto para añadir al carrito"
+        maxlength="80"
+        enterkeyhint="done"
+      />
+      <button type="submit" class="btn btn-primary" :disabled="!newName.trim()">
+        <AppIcon name="plus" :size="20" />
+        Al carrito
+      </button>
+    </form>
 
     <h2 class="section-title">
       <span>Por coger</span>
@@ -91,6 +137,7 @@ function cancel() {
           <span class="text">
             <span class="name">{{ item.name }}</span>
             <span v-if="item.note" class="note">{{ item.note }}</span>
+            <span v-if="item.status === 'not_found'" class="missed">No estaba la última vez</span>
           </span>
           <QuantityChip :quantity="item.quantity" />
         </button>
@@ -209,6 +256,21 @@ function cancel() {
   transition: transform 0.25s ease-out;
 }
 
+.quick-add {
+  display: flex;
+  gap: 8px;
+  padding: 12px var(--gutter) 0;
+}
+
+.quick-add .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-add .btn {
+  flex-shrink: 0;
+}
+
 .shop-row {
   display: flex;
   align-items: stretch;
@@ -314,6 +376,11 @@ function cancel() {
 
 .warn-title {
   color: var(--warn);
+}
+
+.missed {
+  font-size: 0.8125rem;
+  color: var(--text-2);
 }
 
 .in-cart .name {

@@ -123,6 +123,15 @@ export const useListStore = defineStore('list', () => {
       .map((product) => ({ product, pending: pendingKeys.has(product.normalizedName) }))
   }
 
+  /** The most used products that aren't on the list or in a cart now, to add with one tap. */
+  function usualProducts(limit = 8): Product[] {
+    const taken = new Set([...pendingItems.value, ...inCartItems.value].map((i) => normalizeName(i.name)))
+    return products.value
+      .filter((p) => !taken.has(p.normalizedName))
+      .sort((a, b) => b.timesUsed - a.timesUsed)
+      .slice(0, limit)
+  }
+
   // ── Loading & realtime ─────────────────────────────────────
 
   async function load(gid: string) {
@@ -465,28 +474,51 @@ export const useListStore = defineStore('list', () => {
     return trip
   }
 
-  /** Tap in shopping mode: list → cart, or cart → back to the list. */
+  /**
+   * Tap in shopping mode: list → cart, or cart → back to the list. The trip starts with the
+   * first item in the cart, so just looking at shopping mode doesn't tell the family I'm shopping.
+   */
   function toggleInCart(id: string) {
     const item = findItem(id)
-    const trip = myActiveTrip.value
-    if (!item || !trip) return
+    if (!item) return
     if (item.status === 'in_cart') {
       item.status = 'pending'
       item.tripId = null
     } else {
       item.status = 'in_cart'
-      item.tripId = trip.id
+      item.tripId = startTrip().id
     }
     updateRemote(id, { status: item.status, trip_id: item.tripId })
   }
 
   function markNotFound(id: string) {
     const item = findItem(id)
-    const trip = myActiveTrip.value
-    if (!item || !trip) return
+    if (!item) return
     item.status = 'not_found'
-    item.tripId = trip.id
+    item.tripId = startTrip().id
     updateRemote(id, { status: item.status, trip_id: item.tripId })
+  }
+
+  /** Shopping mode: something bought that wasn't on the list (or was) goes straight into my cart. */
+  function addToCart(name: string) {
+    const key = normalizeName(name)
+    if (!key) return
+    const inCart = myCartItems.value.find((i) => normalizeName(i.name) === key)
+    if (inCart) {
+      toast.show(`${inCart.name} ya está en el carrito`)
+      return
+    }
+    const onList = findPendingDuplicate(name)
+    if (onList) {
+      toggleInCart(onList.id)
+      toast.show(`Al carrito: ${onList.name}`, () => toggleInCart(onList.id))
+      return
+    }
+    // The trip first: the queued insert of the item reads it as it is by then, already in the cart.
+    startTrip()
+    const product = products.value.find((p) => p.normalizedName === key)
+    const item = addItem({ name, quantity: product?.lastQuantity ?? 1 })
+    toggleInCart(item.id)
   }
 
   /** Cart items become purchased; returns how many were bought. */
@@ -506,17 +538,29 @@ export const useListStore = defineStore('list', () => {
     return bought.length
   }
 
-  /** Abandons the trip, returning anything in the cart to the list. */
+  /** Abandons the trip, returning anything in the cart (or not found on it) to the list. */
   function cancelTrip() {
     const trip = myActiveTrip.value
     if (!trip) return
-    for (const item of myCartItems.value) {
+    for (const item of items.value) {
+      if (item.tripId !== trip.id || (item.status !== 'in_cart' && item.status !== 'not_found')) continue
       item.status = 'pending'
       item.tripId = null
     }
     trip.finishedAt = new Date().toISOString()
     trip.closedReason = 'cancelled'
     persist(() => supabase.rpc('cancel_trip', { trip_id: trip.id }))
+  }
+
+  /**
+   * Leaving shopping mode with nothing in the cart: no trip is left open for the family to see.
+   * Items marked "no lo encontré" keep the mark for next time, so such a trip is finished, not cancelled.
+   */
+  function leaveEmptyTrip() {
+    const trip = myActiveTrip.value
+    if (!trip || myCartItems.value.length) return
+    if (items.value.some((i) => i.tripId === trip.id && i.status === 'not_found')) finishTrip()
+    else cancelTrip()
   }
 
   return {
@@ -532,7 +576,9 @@ export const useListStore = defineStore('list', () => {
     tripById,
     findPendingDuplicate,
     suggest,
+    usualProducts,
     load,
+    refresh,
     unload,
     addItem,
     mergeInto,
@@ -542,7 +588,9 @@ export const useListStore = defineStore('list', () => {
     startTrip,
     toggleInCart,
     markNotFound,
+    addToCart,
     finishTrip,
     cancelTrip,
+    leaveEmptyTrip,
   }
 })

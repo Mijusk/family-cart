@@ -169,7 +169,7 @@ watch(
   },
   { immediate: true },
 )
-if (calendar.status !== 'ready') void calendar.load(groupStore.group.id).catch(() => {})
+void calendar.ensureLoaded(groupStore.group.id).catch(() => {})
 
 const notFound = computed(() => ready.value && (editingId.value || copyOf.value) && !calendar.eventById(editingId.value ?? copyOf.value!))
 

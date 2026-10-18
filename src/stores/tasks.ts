@@ -4,9 +4,10 @@ import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-
 import { supabase } from '@/lib/supabase'
 import { toPerson, toTask, toTaskList, toTaskListShare } from '@/lib/mappers'
 import type { Database } from '@/lib/database.types'
-import { byPosition, positionBetween } from '@/lib/tasks'
+import { byPosition, DONE_VISIBLE_DAYS, positionBetween } from '@/lib/tasks'
 import type { IsoDate, Person, Task, TaskList, TaskListShare, TaskTrashItem } from '@/types'
 import { dayIn } from '@/utils/days'
+import { newId } from '@/utils/id'
 import { useGroupStore } from './group'
 
 const REALTIME_TABLES = ['task_lists', 'task_list_shares', 'tasks']
@@ -36,6 +37,13 @@ export const useTasksStore = defineStore('tasks', () => {
   /** People named by the tasks (owners, assignees, authors) beyond the current group. */
   const people = ref<Record<string, Person>>({})
   let loadedGroupId: string | null = null
+  /** Every load gets a number; only the latest one is applied. */
+  let loadSeq = 0
+  /**
+   * Tasks added here that a load may not bring yet: until the insert is confirmed, and then until
+   * a load that started after it lands (`until` is that load's number).
+   */
+  const localAdds = new Map<string, { task: Task; until: number | null }>()
 
   // ── Reading ────────────────────────────────────────────────
 
@@ -121,7 +129,7 @@ export const useTasksStore = defineStore('tasks', () => {
     return groupStore.activeMembers.find((m) => m.personId === id)?.color ?? people.value[id]?.color ?? '#5b6b5f'
   }
 
-  /** For the calendar later: what is due on a day, and what was ticked on it. */
+  /** For the calendar later: what is due on a day, and what was ticked on it (only recent ticks are loaded). */
   function tasksOn(day: IsoDate): { due: Task[]; done: Task[] } {
     const visible = new Set(groupLists.value.map((l) => l.id))
     const inGroup = tasks.value.filter((t) => visible.has(t.listId))
@@ -135,30 +143,48 @@ export const useTasksStore = defineStore('tasks', () => {
 
   async function load(groupId: string) {
     loadedGroupId = groupId
+    const seq = ++loadSeq
     subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
+    // Done tasks only show for DONE_VISIBLE_DAYS (a day more covers any time zone).
+    const doneSince = new Date(Date.now() - (DONE_VISIBLE_DAYS + 1) * 86_400_000).toISOString()
     try {
       const [listRows, shareRows, taskRows] = await Promise.all([
         supabase.from('task_lists').select().is('deleted_at', null),
         supabase.from('task_list_shares').select('list_id, group_id'),
-        supabase.from('tasks').select().is('deleted_at', null),
+        supabase.from('tasks').select().is('deleted_at', null).or(`done_at.is.null,done_at.gte.${doneSince}`),
       ])
       for (const res of [listRows, shareRows, taskRows]) if (res.error) throw res.error
-      if (groupId !== loadedGroupId) return
+      if (groupId !== loadedGroupId || seq !== loadSeq) return
       lists.value = listRows.data!.map(toTaskList)
       shares.value = shareRows.data!.map(toTaskListShare)
       tasks.value = taskRows.data!.map(toTask)
+      keepLocalAdds(seq)
       await loadPeople()
       status.value = 'ready'
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId) status.value = 'error'
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
       throw e
+    }
+  }
+
+  /** A load that started before an insert landed doesn't have it yet: keep the local row. */
+  function keepLocalAdds(seq: number) {
+    for (const [id, { task, until }] of localAdds) {
+      if (until !== null && seq >= until) localAdds.delete(id)
+      else if (!taskById(id)) tasks.value.push(task)
     }
   }
 
   function reload() {
     return loadedGroupId ? load(loadedGroupId) : Promise.resolve()
+  }
+
+  /** For the views: loads only if this group isn't loaded or loading yet, or the last load failed. */
+  function ensureLoaded(groupId: string): Promise<void> {
+    if (groupId === loadedGroupId && (status.value === 'ready' || status.value === 'loading')) return Promise.resolve()
+    return load(groupId)
   }
 
   /** Names for people outside the current group (a list shared with another group, say). */
@@ -179,24 +205,52 @@ export const useTasksStore = defineStore('tasks', () => {
 
   // ── Tasks ──────────────────────────────────────────────────
 
-  /** A new task at the end of its list. */
+  /**
+   * A new task at the end of its list. It shows at once (with an id made here, so the Realtime
+   * echo is the same row); if the insert fails it goes away again and this rejects.
+   */
   async function addTask(listId: string, title: string, change: TaskChange = {}): Promise<Task> {
     const last = Math.max(0, ...tasks.value.filter((t) => t.listId === listId).map((t) => t.position))
+    const now = new Date().toISOString()
+    const local: Task = {
+      id: newId(),
+      listId,
+      title,
+      notes: change.notes ?? null,
+      assignedTo: change.assignedTo ?? null,
+      dueDate: change.dueDate ?? null,
+      position: last + 1,
+      doneAt: null,
+      doneBy: null,
+      createdAt: now,
+      createdBy: useGroupStore().me?.id ?? null,
+      updatedAt: now,
+      updatedBy: null,
+    }
+    localAdds.set(local.id, { task: local, until: null })
+    tasks.value.push(local)
     const { data, error } = await supabase
       .from('tasks')
       .insert({
+        id: local.id,
         list_id: listId,
         title,
-        position: last + 1,
-        notes: change.notes ?? null,
-        assigned_to: change.assignedTo ?? null,
-        due_date: change.dueDate ?? null,
+        position: local.position,
+        notes: local.notes,
+        assigned_to: local.assignedTo,
+        due_date: local.dueDate,
       })
       .select()
       .single()
-    if (error) throw error
+    if (error) {
+      localAdds.delete(local.id)
+      tasks.value = tasks.value.filter((t) => t.id !== local.id)
+      throw error
+    }
     const task = toTask(data)
-    tasks.value.push(task)
+    localAdds.set(task.id, { task, until: loadSeq + 1 })
+    // Unless it was deleted meanwhile, the server's row (its stamps) replaces the local one.
+    if (taskById(task.id)) replace(task)
     return task
   }
 
@@ -245,6 +299,7 @@ export const useTasksStore = defineStore('tasks', () => {
   async function deleteTask(id: string): Promise<() => Promise<void>> {
     const { error } = await supabase.rpc('delete_task', { task_id: id })
     if (error) throw error
+    localAdds.delete(id)
     tasks.value = tasks.value.filter((t) => t.id !== id)
     return () => restoreTask(id)
   }
@@ -393,6 +448,7 @@ export const useTasksStore = defineStore('tasks', () => {
     channelGroupId = null
     clearTimeout(reloadTimer)
     loadedGroupId = null
+    localAdds.clear()
     status.value = 'idle'
     lists.value = []
     shares.value = []
@@ -416,7 +472,9 @@ export const useTasksStore = defineStore('tasks', () => {
     personColor,
     tasksOn,
     load,
+    ensureLoaded,
     reload,
+    reloadSoon,
     unload,
     addTask,
     updateTask,

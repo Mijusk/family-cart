@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
@@ -48,14 +48,15 @@ const selected = computed({
 })
 
 function moveMonth(n: number) {
-  void router.replace({ query: { mes: addMonths(month.value, n) } })
+  return router.replace({ query: { mes: addMonths(month.value, n) } })
 }
 
-useSwipe(moveMonth)
+const swipeArea = ref<HTMLElement | null>(null)
+const slide = useSwipe(swipeArea, moveMonth)
 
 watch(
   () => groupStore.group.id,
-  (id) => calendar.load(id).catch(() => {}),
+  (id) => calendar.ensureLoaded(id).catch(() => {}),
   { immediate: true },
 )
 
@@ -87,7 +88,7 @@ function label(day: string): string {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page swipe-page">
     <header class="page-header">
       <p class="eyebrow">Calendario</p>
       <GroupSwitcher />
@@ -96,11 +97,11 @@ function label(day: string): string {
     <CalendarTabs />
 
     <nav class="month-nav" aria-label="Cambiar de mes">
-      <button type="button" class="icon-btn" aria-label="Mes anterior" @click="moveMonth(-1)"><AppIcon name="prev" /></button>
+      <button type="button" class="icon-btn" aria-label="Mes anterior" @click="slide(-1)"><AppIcon name="prev" /></button>
       <span class="month-label">
         <strong>{{ monthLabel(month) }}</strong>
       </span>
-      <button type="button" class="icon-btn" aria-label="Mes siguiente" @click="moveMonth(1)"><AppIcon name="next" /></button>
+      <button type="button" class="icon-btn" aria-label="Mes siguiente" @click="slide(1)"><AppIcon name="next" /></button>
     </nav>
     <p v-if="!isThisMonth" class="center">
       <button type="button" class="link" @click="router.replace({ query: {} })">Volver a este mes</button>
@@ -112,7 +113,7 @@ function label(day: string): string {
       <button type="button" class="btn btn-ghost" @click="calendar.load(groupStore.group.id).catch(() => {})">Reintentar</button>
     </div>
 
-    <template v-else>
+    <div v-else ref="swipeArea" class="appear">
       <div class="grid" role="grid" :aria-label="monthLabel(month)">
         <div class="head" role="row">
           <span v-for="(w, i) in WEEKDAY_INITIALS" :key="i" role="columnheader">{{ w }}</span>
@@ -159,7 +160,7 @@ function label(day: string): string {
           </li>
         </ul>
       </section>
-    </template>
+    </div>
 
     <div class="dock">
       <RouterLink :to="{ name: 'event-new', query: { dia: selected ?? (isThisMonth ? today() : month) } }" class="btn btn-primary btn-block">

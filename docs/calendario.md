@@ -160,7 +160,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - **Hoy:** lo de hoy de cada persona del grupo actual (yo primero), agrupado por persona, con flechas para pasar al día anterior o siguiente. Cada persona ve sus eventos, los que comparte el grupo, aquellos en los que participa y las franjas "Ocupado".
 - **Semana:** el grupo elegido, con filtros por persona y por carpeta. Al abrirla en la semana actual baja hasta hoy (salvo que hoy ya se vea); al cambiar de semana vuelve a su lunes si la lista estaba más abajo. El nombre de cada día se queda fijo arriba mientras pasan sus eventos, y los días ya pasados salen atenuados.
 - **Mes:** solo eventos puntuales y excepciones.
-- En Hoy, Semana y Mes, deslizar el dedo hacia un lado pasa al día, la semana o el mes siguiente (hacia la izquierda) o anterior (hacia la derecha), como las flechas.
+- En Hoy, Semana y Mes, deslizar el dedo hacia un lado pasa al día, la semana o el mes siguiente (hacia la izquierda) o anterior (hacia la derecha), como las flechas. El contenido sigue al dedo y entra deslizándose desde el lado (también con las flechas); sin animación si el móvil pide reducir el movimiento.
 - **Persona:** el calendario de una persona.
 - **Evento:** crear y editar rápido, duplicar un día, elegir carpeta y grupos extra, icono ⓘ y aviso de "está editando".
   - En un evento que se repite, editar o borrar pregunta "solo este día" (excepción) o "toda la serie".
@@ -172,7 +172,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - **Perfiles sin cuenta:** crear el perfil de un hijo y generar su código para reclamarlo.
 - **Papelera:** desde Mis carpetas. Carpetas borradas (con sus eventos) y eventos borrados sueltos; recuperar o eliminar definitivamente.
 
-Navegación: la barra inferior muestra las secciones activas del grupo actual.
+Navegación: la barra inferior muestra las secciones activas del grupo actual, en el orden Calendario · Tareas · Compra · Grupo. La app abre siempre en Hoy (o en la primera sección activa si el grupo no usa el calendario). Grupo lleva un aviso con el número de solicitudes pendientes para los administradores.
 
 ## 9. Fuera de la V1 (pero preparado)
 
