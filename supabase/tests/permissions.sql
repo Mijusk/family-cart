@@ -242,18 +242,21 @@ select tests.expect_error('tasks: cannot share with a group the owner is not in'
   $$insert into task_list_shares (list_id, group_id) values ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000002')$$, 'row-level security');
 insert into task_lists (id, owner_id, name) values ('00000000-0000-4000-8000-000000000013', '00000000-0000-4000-8000-0000000000d2', 'Deberes');
 select tests.check('tasks: marta creates a private list for Pablo', exists (select 1 from task_lists where id = '00000000-0000-4000-8000-000000000013'));
-insert into tasks (id, list_id, title, assigned_to) values ('00000000-0000-4000-8000-000000000028', '00000000-0000-4000-8000-000000000013', 'Lámina de plástica', '00000000-0000-4000-8000-0000000000d2');
-select tests.check('tasks: a private list takes its owner', (select assigned_to from tasks where id = '00000000-0000-4000-8000-000000000028') = '00000000-0000-4000-8000-0000000000d2');
+insert into tasks (id, list_id, title, assignees) values ('00000000-0000-4000-8000-000000000028', '00000000-0000-4000-8000-000000000013', 'Lámina de plástica', array['00000000-0000-4000-8000-0000000000d2']::uuid[]);
+select tests.check('tasks: a private list takes its owner', (select assignees from tasks where id = '00000000-0000-4000-8000-000000000028') = array['00000000-0000-4000-8000-0000000000d2']::uuid[]);
 select tests.expect_error('tasks: a private list takes no one else',
-  $$update tasks set assigned_to = my_person_id() where id = '00000000-0000-4000-8000-000000000028'$$, 'row-level security');
+  $$update tasks set assignees = array['00000000-0000-4000-8000-0000000000d2', my_person_id()] where id = '00000000-0000-4000-8000-000000000028'$$, 'row-level security');
 
 select tests.as_user('daniel@ejemplo.com');
 select tests.check('tasks: daniel sees Pendientes and his own list', (select count(*) from task_lists) = 2 and (select count(*) from tasks) = 7);
 select tests.check('tasks: Pablo''s private list stays private', not exists (select 1 from task_lists where id = '00000000-0000-4000-8000-000000000013'));
 with t as (insert into tasks (id, list_id, title) values ('00000000-0000-4000-8000-000000000029', '00000000-0000-4000-8000-000000000011', 'Podar el seto') returning created_by, position)
 select tests.check('tasks: daniel adds to the shared list, at the end, as himself', (select created_by = my_person_id() and position = 6 from t));
-update tasks set title = 'Comprar manguera de 25 m', assigned_to = '00000000-0000-4000-8000-0000000000d2' where id = '00000000-0000-4000-8000-000000000021';
-select tests.check('tasks: daniel edits and assigns Marta''s task', (select updated_by = my_person_id() and assigned_to = '00000000-0000-4000-8000-0000000000d2' from tasks where id = '00000000-0000-4000-8000-000000000021'));
+update tasks set title = 'Comprar manguera de 25 m', assignees = array['00000000-0000-4000-8000-0000000000d2']::uuid[] where id = '00000000-0000-4000-8000-000000000021';
+select tests.check('tasks: daniel edits and assigns Marta''s task', (select updated_by = my_person_id() and assignees = array['00000000-0000-4000-8000-0000000000d2']::uuid[] from tasks where id = '00000000-0000-4000-8000-000000000021'));
+select tests.check('tasks: the seed has a task for two', (select cardinality(assignees) = 2 from tasks where id = '00000000-0000-4000-8000-000000000022'));
+update tasks set assignees = array[my_person_id(), '00000000-0000-4000-8000-0000000000d2', my_person_id()] where id = '00000000-0000-4000-8000-000000000024';
+select tests.check('tasks: several people at once, each once', (select assignees = array[my_person_id(), '00000000-0000-4000-8000-0000000000d2'] from tasks where id = '00000000-0000-4000-8000-000000000024'));
 update tasks set position = 2.5 where id = '00000000-0000-4000-8000-000000000029';
 select tests.check('tasks: one update moves a task', (select array_agg(id order by position) from tasks where list_id = '00000000-0000-4000-8000-000000000011' and done_at is null)
   = array['00000000-0000-4000-8000-000000000021', '00000000-0000-4000-8000-000000000022', '00000000-0000-4000-8000-000000000029', '00000000-0000-4000-8000-000000000023', '00000000-0000-4000-8000-000000000024']::uuid[]);
@@ -268,9 +271,11 @@ select tests.expect_error('tasks: cannot insert done_at',
 select tests.expect_error('tasks: cannot set created_by',
   $$insert into tasks (list_id, title, created_by) values ('00000000-0000-4000-8000-000000000011', 'x', '00000000-0000-4000-8000-0000000000d2')$$, 'permission denied');
 select tests.expect_error('tasks: cannot assign to someone who does not see the list',
-  $$update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000026'$$, 'row-level security');
+  $$update tasks set assignees = array[my_person_id(), (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')] where id = '00000000-0000-4000-8000-000000000026'$$, 'row-level security');
 select tests.expect_error('tasks: nor to a pending member',
-  $$update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c3') where id = '00000000-0000-4000-8000-000000000022'$$, 'row-level security');
+  $$update tasks set assignees = array[(select id from people where user_id = '00000000-0000-4000-8000-0000000000c3')] where id = '00000000-0000-4000-8000-000000000022'$$, 'row-level security');
+select tests.expect_error('tasks: no empty slots in assignees',
+  $$update tasks set assignees = array[null]::uuid[] where id = '00000000-0000-4000-8000-000000000022'$$, 'row-level security|tasks_assignees_valid');
 select tests.expect_error('tasks: title without spaces around', $$insert into tasks (list_id, title) values ('00000000-0000-4000-8000-000000000012', ' x ')$$, 'tasks_title_check');
 select tests.expect_error('tasks: no real delete of tasks', $$delete from tasks where id = '00000000-0000-4000-8000-000000000022'$$, 'permission denied');
 select tests.expect_error('tasks: no real delete of lists', $$delete from task_lists where id = '00000000-0000-4000-8000-000000000012'$$, 'permission denied');
@@ -297,10 +302,10 @@ select restore_task_list('00000000-0000-4000-8000-000000000012');
 select tests.check('tasks: restore_task_list brings its tasks back', (select count(*) from tasks where list_id = '00000000-0000-4000-8000-000000000012' and deleted_at is null) = 2);
 insert into task_list_shares (list_id, group_id) values ('00000000-0000-4000-8000-000000000012', '00000000-0000-4000-8000-000000000001');
 select tests.check('tasks: daniel shares his list', (select shared_by = my_person_id() from task_list_shares where list_id = '00000000-0000-4000-8000-000000000012'));
-update tasks set assigned_to = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000026';
-select tests.check('tasks: once shared, marta can be assigned', (select assigned_to is not null from tasks where id = '00000000-0000-4000-8000-000000000026'));
+update tasks set assignees = array[(select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), my_person_id()] where id = '00000000-0000-4000-8000-000000000026';
+select tests.check('tasks: once shared, marta can be assigned', (select cardinality(assignees) = 2 from tasks where id = '00000000-0000-4000-8000-000000000026'));
 delete from task_list_shares where list_id = '00000000-0000-4000-8000-000000000012';
-select tests.check('tasks: unsharing unassigns who no longer sees it', (select assigned_to is null from tasks where id = '00000000-0000-4000-8000-000000000026'));
+select tests.check('tasks: unsharing unassigns who no longer sees it, not the rest', (select assignees = array[my_person_id()] from tasks where id = '00000000-0000-4000-8000-000000000026'));
 
 reset role;
 update tasks set deleted_at = now() - interval '31 days', deleted_by = null, deletion_batch = gen_random_uuid() where id = '00000000-0000-4000-8000-000000000027';
@@ -398,7 +403,8 @@ select tests.check('finish_trip: a not found item can go in the next cart', (sel
 select tests.as_user('marta@ejemplo.com');
 select leave_group('00000000-0000-4000-8000-000000000001');
 select tests.check('marta left: sees no items', (select count(*) from items) = 0);
-select tests.check('marta left: Pablo is off her tasks', (select assigned_to is null from tasks where id = '00000000-0000-4000-8000-000000000021'));
+select tests.check('marta left: Pablo is off her tasks', (select assignees = '{}' from tasks where id = '00000000-0000-4000-8000-000000000021'));
+select tests.check('marta left: she stays on her own task, Daniel comes off it', (select assignees = array[my_person_id()] from tasks where id = '00000000-0000-4000-8000-000000000022'));
 select tests.as_user('daniel@ejemplo.com');
 select tests.check('daniel still admin after marta left', is_group_admin('00000000-0000-4000-8000-000000000001'));
 select tests.check('history keeps marta''s name', (select display_name from people where user_id = '00000000-0000-4000-8000-0000000000c1') = 'Marta');

@@ -150,7 +150,7 @@ function add() {
         v-for="o in owners"
         :key="o.personId"
         type="button"
-        class="chip"
+        class="choice"
         role="radio"
         :aria-checked="o.personId === owner.personId"
         @click="((ownerId = o.personId), (editing.id = null), (adding = false))"
@@ -246,25 +246,6 @@ function add() {
   gap: 8px;
   padding: 0 var(--gutter) 8px;
   overflow-x: auto;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.chip[aria-checked='true'] {
-  border-color: var(--primary);
-  background: var(--primary-soft);
 }
 
 .dot {

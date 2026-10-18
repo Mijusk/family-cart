@@ -265,7 +265,7 @@ export const toTask = (r: TaskRow): Task => ({
   listId: r.list_id,
   title: r.title,
   notes: r.notes,
-  assignedTo: r.assigned_to,
+  assignees: r.assignees,
   dueDate: r.due_date,
   position: Number(r.position),
   doneAt: r.done_at,

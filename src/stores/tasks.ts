@@ -15,7 +15,7 @@ const REALTIME_TABLES = ['task_lists', 'task_list_shares', 'tasks']
 type TaskUpdate = Database['public']['Tables']['tasks']['Update']
 
 /** What the task screens change; the rest is set by the database. */
-export type TaskChange = Partial<Pick<Task, 'title' | 'notes' | 'assignedTo' | 'dueDate'>>
+export type TaskChange = Partial<Pick<Task, 'title' | 'notes' | 'assignees' | 'dueDate'>>
 
 /** Someone a task can go to. */
 export interface Assignee {
@@ -191,7 +191,7 @@ export const useTasksStore = defineStore('tasks', () => {
   async function loadPeople(extra: (string | null)[] = []) {
     const ids = new Set<string>()
     for (const l of lists.value) ids.add(l.ownerId)
-    for (const t of tasks.value) [t.assignedTo, t.createdBy, t.updatedBy, t.doneBy].forEach((id) => id && ids.add(id))
+    for (const t of tasks.value) [...t.assignees, t.createdBy, t.updatedBy, t.doneBy].forEach((id) => id && ids.add(id))
     extra.forEach((id) => id && ids.add(id))
     const groupStore = useGroupStore()
     const known = new Set([groupStore.me?.id, ...groupStore.activeMembers.map((m) => m.personId)])
@@ -217,7 +217,7 @@ export const useTasksStore = defineStore('tasks', () => {
       listId,
       title,
       notes: change.notes ?? null,
-      assignedTo: change.assignedTo ?? null,
+      assignees: change.assignees ?? [],
       dueDate: change.dueDate ?? null,
       position: last + 1,
       doneAt: null,
@@ -237,7 +237,7 @@ export const useTasksStore = defineStore('tasks', () => {
         title,
         position: local.position,
         notes: local.notes,
-        assigned_to: local.assignedTo,
+        assignees: local.assignees,
         due_date: local.dueDate,
       })
       .select()
@@ -254,15 +254,22 @@ export const useTasksStore = defineStore('tasks', () => {
     return task
   }
 
+  /** Shows at once (so quick taps build on each other); undone if the update fails. */
   async function updateTask(id: string, change: TaskChange) {
-    const row: Pick<TaskUpdate, 'title' | 'notes' | 'assigned_to' | 'due_date'> = {}
+    const row: Pick<TaskUpdate, 'title' | 'notes' | 'assignees' | 'due_date'> = {}
     if ('title' in change) row.title = change.title
     if ('notes' in change) row.notes = change.notes
-    if ('assignedTo' in change) row.assigned_to = change.assignedTo
+    if ('assignees' in change) row.assignees = change.assignees
     if ('dueDate' in change) row.due_date = change.dueDate
+    const task = taskById(id)
+    const previous = task && { title: task.title, notes: task.notes, assignees: task.assignees, dueDate: task.dueDate }
+    if (task) Object.assign(task, change)
     // .single(): if it was deleted (or I lost the list) meanwhile, this fails instead of doing nothing.
     const { data, error } = await supabase.from('tasks').update(row).eq('id', id).select().single()
-    if (error) throw error
+    if (error) {
+      if (task && previous) Object.assign(task, previous)
+      throw error
+    }
     replace(toTask(data))
   }
 

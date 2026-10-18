@@ -189,16 +189,18 @@ insert into public.task_list_shares (list_id, group_id, shared_by)
 values ('00000000-0000-4000-8000-000000000011', '00000000-0000-4000-8000-000000000001',
         (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
 
-insert into public.tasks (id, list_id, title, notes, assigned_to, due_date, position, done_at, done_by, created_by)
+insert into public.tasks (id, list_id, title, notes, assignees, due_date, position, done_at, done_by, created_by)
 select ('00000000-0000-4000-8000-0000000000' || v.id)::uuid, ('00000000-0000-4000-8000-0000000000' || v.list)::uuid,
        v.title, v.notes,
-       coalesce((select id from public.people where user_id = v.assigned::uuid), v.assigned::uuid),
+       -- assigned: comma-separated, user ids for people with an account.
+       array(select coalesce((select id from public.people where user_id = a::uuid), a::uuid)
+               from unnest(string_to_array(v.assigned, ',')) with ordinality as x (a, n) order by n),
        current_date + v.due, v.position,
        now() - v.done_ago, (select id from public.people where user_id = v.done_by::uuid),
        (select id from public.people where user_id = v.author::uuid)
 from (values
   ('21', '11', 'Comprar manguera',                       'Para el patio, de 25 m',  '00000000-0000-4000-8000-0000000000c2', -2,   1, null::interval, null, '00000000-0000-4000-8000-0000000000c1'),
-  ('22', '11', 'Llamar al fontanero',                    'Gotea el grifo del baño', '00000000-0000-4000-8000-0000000000c1', 0,    2, null,           null, '00000000-0000-4000-8000-0000000000c1'),
+  ('22', '11', 'Llamar al fontanero',                    'Gotea el grifo del baño', '00000000-0000-4000-8000-0000000000c1,00000000-0000-4000-8000-0000000000c2', 0,    2, null,           null, '00000000-0000-4000-8000-0000000000c1'),
   ('23', '11', 'Firmar la autorización de la excursión', null,                      '00000000-0000-4000-8000-0000000000d2', 3,    3, null,           null, '00000000-0000-4000-8000-0000000000c1'),
   ('24', '11', 'Renovar el DNI de la abuela',            'Pedir cita por internet', null,                                   null, 4, null,           null, '00000000-0000-4000-8000-0000000000c2'),
   ('25', '11', 'Devolver los libros a la biblioteca',    null,                      null,                                   -1,   5, interval '1 day', '00000000-0000-4000-8000-0000000000c2', '00000000-0000-4000-8000-0000000000c1'),

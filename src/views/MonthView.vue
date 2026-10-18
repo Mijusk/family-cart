@@ -258,6 +258,7 @@ function label(day: string): string {
 
 .cell.selected {
   background: var(--primary-soft);
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 
 .num {
