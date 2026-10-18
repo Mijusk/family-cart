@@ -5,6 +5,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
+import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -23,6 +24,8 @@ const isToday = computed(() => day.value === today())
 function moveDay(n: number) {
   void router.replace({ query: { dia: addDays(day.value, n) } })
 }
+
+useSwipe(moveDay)
 
 function backToToday() {
   void router.replace({ query: {} })

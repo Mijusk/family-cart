@@ -158,8 +158,9 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 
 **Calendario**
 - **Hoy:** lo de hoy de cada persona del grupo actual (yo primero), agrupado por persona, con flechas para pasar al día anterior o siguiente. Cada persona ve sus eventos, los que comparte el grupo, aquellos en los que participa y las franjas "Ocupado".
-- **Semana:** el grupo elegido, con filtros por persona y por carpeta. Al abrirla en la semana actual baja hasta hoy (salvo que hoy ya se vea); al cambiar de semana vuelve a su lunes si la lista estaba más abajo. El nombre de cada día se queda fijo arriba mientras pasan sus eventos.
+- **Semana:** el grupo elegido, con filtros por persona y por carpeta. Al abrirla en la semana actual baja hasta hoy (salvo que hoy ya se vea); al cambiar de semana vuelve a su lunes si la lista estaba más abajo. El nombre de cada día se queda fijo arriba mientras pasan sus eventos, y los días ya pasados salen atenuados.
 - **Mes:** solo eventos puntuales y excepciones.
+- En Hoy, Semana y Mes, deslizar el dedo hacia un lado pasa al día, la semana o el mes siguiente (hacia la izquierda) o anterior (hacia la derecha), como las flechas.
 - **Persona:** el calendario de una persona.
 - **Evento:** crear y editar rápido, duplicar un día, elegir carpeta y grupos extra, icono ⓘ y aviso de "está editando".
   - En un evento que se repite, editar o borrar pregunta "solo este día" (excepción) o "toda la serie".
