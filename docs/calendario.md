@@ -172,7 +172,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - **Perfiles sin cuenta:** crear el perfil de un hijo y generar su código para reclamarlo.
 - **Papelera:** desde Mis carpetas. Carpetas borradas (con sus eventos) y eventos borrados sueltos; recuperar o eliminar definitivamente.
 
-Navegación: la barra inferior muestra las secciones activas del grupo actual.
+Navegación: la barra inferior muestra las secciones activas del grupo actual, en el orden Calendario · Tareas · Compra · Grupo. La app abre siempre en Hoy (o en la primera sección activa si el grupo no usa el calendario). Grupo lleva un aviso con el número de solicitudes pendientes para los administradores.
 
 ## 9. Fuera de la V1 (pero preparado)
 

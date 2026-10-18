@@ -88,7 +88,7 @@ Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
   administradores eligen arriba de quién son las listas (yo o un perfil sin cuenta), como en Mis
   carpetas. Desde aquí, la **Papelera** de tareas.
 
-Navegación: la barra queda en **Compra · Tareas · Calendario · Grupo**. Historial pasa dentro de
+Navegación: la barra queda en **Calendario · Tareas · Compra · Grupo** (la app abre en Hoy). Historial pasa dentro de
 Compra (enlace en su cabecera, misma ruta `/historial`).
 
 Fechas en español, semana de lunes, "hoy" en la zona horaria del grupo.
