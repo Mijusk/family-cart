@@ -19,7 +19,7 @@ const toast = useToastStore()
 
 watch(
   () => groupStore.group.id,
-  (id) => store.load(id).catch(() => {}),
+  (id) => store.ensureLoaded(id).catch(() => {}),
   { immediate: true },
 )
 

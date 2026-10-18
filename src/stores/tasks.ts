@@ -181,6 +181,12 @@ export const useTasksStore = defineStore('tasks', () => {
     return loadedGroupId ? load(loadedGroupId) : Promise.resolve()
   }
 
+  /** For the views: loads only if this group isn't loaded or loading yet, or the last load failed. */
+  function ensureLoaded(groupId: string): Promise<void> {
+    if (groupId === loadedGroupId && (status.value === 'ready' || status.value === 'loading')) return Promise.resolve()
+    return load(groupId)
+  }
+
   /** Names for people outside the current group (a list shared with another group, say). */
   async function loadPeople(extra: (string | null)[] = []) {
     const ids = new Set<string>()
@@ -466,6 +472,7 @@ export const useTasksStore = defineStore('tasks', () => {
     personColor,
     tasksOn,
     load,
+    ensureLoaded,
     reload,
     unload,
     addTask,

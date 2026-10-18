@@ -58,7 +58,7 @@ watch(
   (id, before) => {
     // Another group: its people and folders are others.
     if (before && id !== before) void router.replace({ query: {} })
-    calendar.load(id).catch(() => {})
+    calendar.ensureLoaded(id).catch(() => {})
   },
   { immediate: true },
 )
