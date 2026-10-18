@@ -96,6 +96,11 @@ a {
   padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 96px);
 }
 
+/* Day, week and month slide sideways when swiped; nothing pokes out past the screen meanwhile. */
+.swipe-page {
+  overflow-x: clip;
+}
+
 .page-header {
   padding: 28px var(--gutter) 18px;
 }
