@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
+import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -49,6 +50,8 @@ const selected = computed({
 function moveMonth(n: number) {
   void router.replace({ query: { mes: addMonths(month.value, n) } })
 }
+
+useSwipe(moveMonth)
 
 watch(
   () => groupStore.group.id,
