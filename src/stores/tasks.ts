@@ -164,7 +164,7 @@ export const useTasksStore = defineStore('tasks', () => {
       status.value = 'ready'
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId) status.value = 'error'
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
       throw e
     }
   }
