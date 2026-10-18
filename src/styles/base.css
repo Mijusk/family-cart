@@ -16,8 +16,8 @@
   --late: #9c3d2b;
   --late-soft: #f7e4df;
 
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-ui: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-ui: 'Public Sans Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --column: 560px;
   --gutter: 16px;

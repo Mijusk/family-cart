@@ -28,6 +28,16 @@ export interface GroupSettings {
   tasksEnabled?: boolean
 }
 
+/** A membership row with its group's name, as loadMe and loadMemberships read it. */
+interface MembershipRow {
+  id: string
+  group_id: string
+  role: string
+  status: string
+  created_at: string
+  groups: { name: string } | null
+}
+
 /** Last group opened on this device, so the app reopens it next time. */
 const ACTIVE_GROUP_KEY = 'family-cart:active-group'
 
@@ -160,7 +170,7 @@ export const useGroupStore = defineStore('group', () => {
         return
       }
       subscribeToMine()
-      await loadGroup()
+      await pickGroup()
     } catch (e) {
       fail(e)
     }
@@ -202,48 +212,55 @@ export const useGroupStore = defineStore('group', () => {
     memberships.value = []
   }
 
-  /** Loads the signed-in person; false if this account has none. */
+  /**
+   * Loads the signed-in person with their groups; false if this account has none. One request,
+   * since every round trip adds to the first load on a phone.
+   */
   async function loadMe(): Promise<boolean> {
-    const { data, error } = await supabase.from('people').select().eq('user_id', userId.value!).maybeSingle()
+    const { data, error } = await supabase
+      .from('people')
+      .select('*, members!members_person_id_fkey(id, group_id, role, status, created_at, groups(name))')
+      .eq('user_id', userId.value!)
+      .is('members.left_at', null)
+      .order('created_at', { referencedTable: 'members', ascending: false })
+      .maybeSingle()
     if (error) throw error
     me.value = data ? toPerson(data) : null
+    memberships.value = data ? data.members.map(toMembership) : []
     return !!data
   }
 
   async function loadMemberships() {
     const { data, error } = await supabase
       .from('members')
-      .select('id, group_id, role, status, created_at')
+      .select('id, group_id, role, status, created_at, groups(name)')
       .eq('person_id', me.value!.id)
       .is('left_at', null)
       .order('created_at', { ascending: false })
     if (error) throw error
-    if (!data.length) {
-      memberships.value = []
-      return
-    }
-    const groups = await supabase
-      .from('groups')
-      .select('id, name')
-      .in(
-        'id',
-        data.map((d) => d.group_id),
-      )
-    if (groups.error) throw groups.error
-    const names = new Map(groups.data.map((g) => [g.id, g.name]))
-    memberships.value = data.map((d) => ({
+    memberships.value = data.map(toMembership)
+  }
+
+  function toMembership(d: MembershipRow): Membership {
+    return {
       groupId: d.group_id,
-      groupName: names.get(d.group_id) ?? '',
+      // A pending member can't see the group yet.
+      groupName: d.groups?.name ?? '',
       memberId: d.id,
       role: d.role as MemberRole,
       status: d.status as Membership['status'],
       joinedAt: d.created_at,
-    }))
+    }
   }
 
   /** Opens `groupId` if given, else the last group opened on this device, else the newest one. */
   async function loadGroup(groupId?: string) {
     await loadMemberships()
+    await pickGroup(groupId)
+  }
+
+  /** As loadGroup, with the memberships already loaded. */
+  async function pickGroup(groupId?: string) {
     const wanted = groupId ?? readActiveGroup()
     const active = activeMemberships.value
     const target = active.find((m) => m.groupId === wanted) ?? active[0]
@@ -300,27 +317,20 @@ export const useGroupStore = defineStore('group', () => {
   }
 
   async function refresh(gid: string) {
-    const [groupRes, membersRes] = await Promise.all([
-      supabase.from('groups').select().eq('id', gid).single(),
-      supabase.from('members').select().eq('group_id', gid).order('created_at'),
-    ])
-    if (groupRes.error) throw groupRes.error
-    if (membersRes.error) throw membersRes.error
-    const peopleRes = await supabase
-      .from('people')
-      .select()
-      .in(
-        'id',
-        membersRes.data.map((m) => m.person_id),
-      )
-    if (peopleRes.error) throw peopleRes.error
+    // The group, its members and their people in one request.
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*, members(*, people!members_person_id_fkey(*))')
+      .eq('id', gid)
+      .order('created_at', { referencedTable: 'members' })
+      .single()
+    if (error) throw error
     // Switched group while loading: this answer belongs to the old one.
     if (gid !== activeGroupId) return
-    const people = new Map(peopleRes.data.map((p) => [p.id, toPerson(p)]))
-    current.value = toGroup(groupRes.data)
-    members.value = membersRes.data.map((m) => toMember(m, people.get(m.person_id)))
-    const mine = people.get(me.value?.id ?? '')
-    if (mine) me.value = mine
+    current.value = toGroup(data)
+    members.value = data.members.map((m) => toMember(m, m.people ? toPerson(m.people) : undefined))
+    const mine = data.members.find((m) => m.person_id === me.value?.id)?.people
+    if (mine) me.value = toPerson(mine)
     renameMembership(current.value)
   }
 
@@ -373,7 +383,7 @@ export const useGroupStore = defineStore('group', () => {
       await loadMemberships()
       const stillIn = current.value && isActiveMemberOf(current.value.id)
       if (status.value === 'no-group' || (status.value === 'ready' && !stillIn)) {
-        await loadGroup()
+        await pickGroup()
       }
     } catch (e) {
       console.error(e)
@@ -427,7 +437,7 @@ export const useGroupStore = defineStore('group', () => {
     if (error) throw error
     await loadMe()
     subscribeToMine()
-    await loadGroup()
+    await pickGroup()
   }
 
   /**
