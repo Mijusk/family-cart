@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import type { IsoDate } from '@/types'
 
 // Calendar days as 'YYYY-MM-DD' strings. Arithmetic runs on UTC midnights so daylight saving
@@ -14,20 +15,64 @@ function fromUtc(ms: number): IsoDate {
   return new Date(ms).toISOString().slice(0, 10)
 }
 
-/** Today on this device. */
-export function today(now = new Date()): IsoDate {
+function deviceDay(now: Date): IsoDate {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
 }
 
-/** The day a moment falls on in a time zone (a group's): today by default. */
-export function dayIn(timeZone: string, at: Date | string = new Date()): IsoDate {
+function zoneDay(timeZone: string, at: Date): IsoDate {
   try {
     // en-CA writes dates as YYYY-MM-DD.
-    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(at))
+    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
   } catch {
-    return today(new Date(at))
+    return deviceDay(at)
   }
+}
+
+// "Today" without a given moment is reactive: computeds and templates that ask for it run again
+// when the date changes with the app open (past midnight, or woken up on another day). A cheap
+// check every minute and when the app comes back covers every zone asked for ('' = this device).
+const dayChanges = ref(0)
+const zonesInUse = new Set<string>()
+let lastKey: string | null = null
+
+function dayKey(): string {
+  const now = new Date()
+  return [...zonesInUse].map((zone) => (zone ? zoneDay(zone, now) : deviceDay(now))).join()
+}
+
+function checkDay() {
+  const key = dayKey()
+  if (key === lastKey) return
+  lastKey = key
+  dayChanges.value++
+}
+
+/** Makes the caller depend on the date changing in `zone`. */
+function trackDay(zone: string) {
+  if (!zonesInUse.has(zone)) {
+    if (lastKey === null && typeof window !== 'undefined') {
+      setInterval(checkDay, 60_000)
+      document.addEventListener('visibilitychange', checkDay)
+    }
+    zonesInUse.add(zone)
+    lastKey = dayKey()
+  }
+  void dayChanges.value
+}
+
+/** Today on this device. */
+export function today(now?: Date): IsoDate {
+  if (now) return deviceDay(now)
+  trackDay('')
+  return deviceDay(new Date())
+}
+
+/** The day a moment falls on in a time zone (a group's): today by default. */
+export function dayIn(timeZone: string, at?: Date | string): IsoDate {
+  if (at !== undefined) return zoneDay(timeZone, new Date(at))
+  trackDay(timeZone)
+  return zoneDay(timeZone, new Date())
 }
 
 export function addDays(day: IsoDate, n: number): IsoDate {

@@ -390,6 +390,25 @@ export const useGroupStore = defineStore('group', () => {
     }
   }
 
+  /**
+   * Brings everything up to date in place, without loading screens: for the app coming back
+   * from the background or the connection coming back, before Realtime has caught up by itself.
+   */
+  async function catchUp() {
+    if (status.value !== 'ready' && status.value !== 'no-group') return
+    const gid = current.value?.id
+    // Approved somewhere, or no longer in this group: this also opens the right group.
+    const work: Promise<unknown>[] = [onMyMembershipsChanged()]
+    if (gid) {
+      work.push(refresh(gid), useListStore().refresh())
+      useCalendarStore().reloadSoon()
+      useTasksStore().reloadSoon()
+    }
+    for (const result of await Promise.allSettled(work)) {
+      if (result.status === 'rejected') console.error(result.reason)
+    }
+  }
+
   // ── Create / join ──────────────────────────────────────────
 
   async function createGroup(groupName: string, sections: { shopping: boolean; calendar: boolean; tasks: boolean }) {
@@ -556,6 +575,7 @@ export const useGroupStore = defineStore('group', () => {
     memberColor,
     init,
     reload,
+    catchUp,
     switchGroup,
     isActiveMemberOf,
     isPendingIn,

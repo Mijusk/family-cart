@@ -506,11 +506,12 @@ export const useListStore = defineStore('list', () => {
     return bought.length
   }
 
-  /** Abandons the trip, returning anything in the cart to the list. */
+  /** Abandons the trip, returning anything in the cart (or not found on it) to the list. */
   function cancelTrip() {
     const trip = myActiveTrip.value
     if (!trip) return
-    for (const item of myCartItems.value) {
+    for (const item of items.value) {
+      if (item.tripId !== trip.id || (item.status !== 'in_cart' && item.status !== 'not_found')) continue
       item.status = 'pending'
       item.tripId = null
     }
@@ -533,6 +534,7 @@ export const useListStore = defineStore('list', () => {
     findPendingDuplicate,
     suggest,
     load,
+    refresh,
     unload,
     addItem,
     mergeInto,
