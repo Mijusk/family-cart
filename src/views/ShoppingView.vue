@@ -6,6 +6,7 @@ import PhotoThumb from '@/components/PhotoThumb.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
 import { useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
+import type { Item } from '@/types'
 
 const list = useListStore()
 const toast = useToastStore()
@@ -38,8 +39,10 @@ watch(
   },
 )
 
-const toPick = computed(() => list.pendingItems.filter((i) => i.status === 'pending'))
-const notFound = computed(() => list.pendingItems.filter((i) => i.status === 'not_found'))
+// Only what wasn't found on this trip is set aside; what someone missed on an earlier one is to pick again.
+const notFoundHere = (i: Item) => i.status === 'not_found' && i.tripId === tripId
+const toPick = computed(() => list.pendingItems.filter((i) => !notFoundHere(i)))
+const notFound = computed(() => list.pendingItems.filter(notFoundHere))
 const cart = computed(() => list.myCartItems)
 
 const total = computed(() => toPick.value.length + notFound.value.length + cart.value.length)
@@ -91,6 +94,7 @@ function cancel() {
           <span class="text">
             <span class="name">{{ item.name }}</span>
             <span v-if="item.note" class="note">{{ item.note }}</span>
+            <span v-if="item.status === 'not_found'" class="missed">No estaba la última vez</span>
           </span>
           <QuantityChip :quantity="item.quantity" />
         </button>
@@ -314,6 +318,11 @@ function cancel() {
 
 .warn-title {
   color: var(--warn);
+}
+
+.missed {
+  font-size: 0.8125rem;
+  color: var(--text-2);
 }
 
 .in-cart .name {

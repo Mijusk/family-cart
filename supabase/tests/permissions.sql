@@ -369,6 +369,31 @@ select tests.check('lucia: can start a trip', (select count(*) from t) = 1);
 select tests.expect_error('lucia: cannot start a trip as daniel',
   $$insert into trips (group_id, member_id) values ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000a2')$$, 'row-level security');
 
+-- Cancelling a trip returns its cart and its "not found" items to the list; finishing keeps
+-- the "not found" ones on the list (for next time) and leaves older marks alone.
+create temp table trip_items on commit drop as
+  select id, row_number() over (order by id) as n from items where status = 'pending' order by id limit 4;
+reset role;
+grant select on trip_items to authenticated;
+set role authenticated;
+select id as lucia_trip from trips where member_id = my_member_id('00000000-0000-4000-8000-000000000001') and finished_at is null \gset
+update items set status = 'in_cart', trip_id = :'lucia_trip' where id = (select id from trip_items where n = 1);
+update items set status = 'not_found', trip_id = :'lucia_trip' where id = (select id from trip_items where n = 2);
+select cancel_trip(:'lucia_trip');
+select tests.check('cancel_trip: cart and not found go back to pending',
+  (select bool_and(status = 'pending' and trip_id is null) from items where id in (select id from trip_items where n <= 2)));
+select tests.check('cancel_trip: older not found marks stay', exists (select 1 from items where name = 'Cilantro fresco' and status = 'not_found'));
+with t as (insert into trips (group_id, member_id) values ('00000000-0000-4000-8000-000000000001', my_member_id('00000000-0000-4000-8000-000000000001')) returning id)
+select id as lucia_trip from t \gset
+update items set status = 'in_cart', trip_id = :'lucia_trip' where id = (select id from trip_items where n = 3);
+update items set status = 'not_found', trip_id = :'lucia_trip' where id = (select id from trip_items where n = 4);
+select tests.check('finish_trip: buys the cart', finish_trip(:'lucia_trip') = 1);
+select tests.check('finish_trip: not found stays on the list', (select status = 'not_found' from items where id = (select id from trip_items where n = 4)));
+with t as (insert into trips (group_id, member_id) values ('00000000-0000-4000-8000-000000000001', my_member_id('00000000-0000-4000-8000-000000000001')) returning id)
+select id as lucia_trip from t \gset
+with u as (update items set status = 'in_cart', trip_id = :'lucia_trip' where id = (select id from trip_items where n = 4) returning 1)
+select tests.check('finish_trip: a not found item can go in the next cart', (select count(*) from u) = 1);
+
 -- ── Leaving and coming back ──
 select tests.as_user('marta@ejemplo.com');
 select leave_group('00000000-0000-4000-8000-000000000001');

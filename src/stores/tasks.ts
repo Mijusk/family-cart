@@ -474,6 +474,7 @@ export const useTasksStore = defineStore('tasks', () => {
     load,
     ensureLoaded,
     reload,
+    reloadSoon,
     unload,
     addTask,
     updateTask,

@@ -535,6 +535,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     load,
     ensureLoaded,
     reload,
+    reloadSoon,
     unload,
     occurrencesOn,
     peopleOf,
