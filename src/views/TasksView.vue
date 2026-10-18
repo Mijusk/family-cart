@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
@@ -94,7 +94,7 @@ const newTitle = ref('')
 /** In "Todas", which list a new task goes to. */
 const pickedListId = ref<string | null>(null)
 const addListId = computed(() => currentList.value?.id ?? pickedListId.value ?? store.groupLists[0]?.id ?? null)
-const adding = ref(false)
+const titleInput = useTemplateRef('titleInput')
 
 watch(
   () => store.groupLists,
@@ -103,21 +103,16 @@ watch(
   },
 )
 
-async function add() {
+/** Shows at once and keeps the keyboard open for the next one; if saving fails, the task goes away. */
+function add() {
   const title = newTitle.value.trim()
   const listId = addListId.value
-  if (!title || !listId || adding.value) return
-  adding.value = true
-  try {
-    // With "Mías" on, a new task is mine, or it would vanish from the view.
-    const mine = onlyMine.value && store.assignees(listId).some((a) => a.personId === groupStore.me?.id)
-    await store.addTask(listId, title.slice(0, 120), mine ? { assignedTo: groupStore.me!.id } : {})
-    newTitle.value = ''
-  } catch (e) {
-    toast.show(friendlyError(e))
-  } finally {
-    adding.value = false
-  }
+  if (!title || !listId) return
+  // With "Mías" on, a new task is mine, or it would vanish from the view.
+  const mine = onlyMine.value && store.assignees(listId).some((a) => a.personId === groupStore.me?.id)
+  store.addTask(listId, title.slice(0, 120), mine ? { assignedTo: groupStore.me!.id } : {}).catch((e) => toast.show(friendlyError(e)))
+  newTitle.value = ''
+  titleInput.value?.focus()
 }
 
 // ── Ticking and moving ────────────────────────────────────────
@@ -188,8 +183,9 @@ function move(id: string, beforeId: string | null, afterId: string | null) {
       </div>
 
       <form class="add" @submit.prevent="add">
-        <input v-model="newTitle" class="field" maxlength="120" placeholder="Añadir tarea…" enterkeyhint="done" aria-label="Nueva tarea" />
-        <button type="submit" class="btn btn-primary" :disabled="!newTitle.trim() || adding" aria-label="Añadir">
+        <input ref="titleInput" v-model="newTitle" class="field" maxlength="120" placeholder="Añadir tarea…" enterkeyhint="done" aria-label="Nueva tarea" />
+        <!-- mousedown.prevent keeps focus (and the phone keyboard) in the input -->
+        <button type="submit" class="btn btn-primary" :disabled="!newTitle.trim()" aria-label="Añadir" @mousedown.prevent>
           <AppIcon name="plus" />
         </button>
         <label v-if="!currentList && store.groupLists.length > 1" class="add-to muted">
