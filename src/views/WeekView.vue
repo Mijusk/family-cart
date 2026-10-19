@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
-import { metroRows } from '@/lib/metro'
+import { HOUR_PX, timeline } from '@/lib/timeline'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { addDays, isIsoDate, longDay, shortDay, startOfWeek, today } from '@/utils/days'
@@ -98,11 +98,30 @@ function shows(o: ReturnType<typeof calendar.occurrencesOn>[number]): boolean {
 const week = computed(() =>
   days.value.map((day) => {
     const items = calendar.occurrencesOn(day).filter(shows)
-    return { day, items, metro: metroRows(items, day) }
+    return { day, items, allDay: items.filter((o) => o.allDay), scale: timeline(items, day) }
   }),
 )
-/** The same gutter width every day, so the times line up down the week. */
-const gutterWidth = computed(() => `${Math.max(1, ...week.value.flatMap((d) => d.metro.map((row) => row.cells.length))) * 14}px`)
+
+// The current time, as a line across today's scale.
+const now = ref(new Date())
+const clock = setInterval(() => (now.value = new Date()), 60_000)
+onUnmounted(() => clearInterval(clock))
+const nowMinute = computed(() => now.value.getHours() * 60 + now.value.getMinutes())
+const nowLabel = computed(() => `${String(now.value.getHours()).padStart(2, '0')}:${String(now.value.getMinutes()).padStart(2, '0')}`)
+
+/** How much a block has room to say. */
+function fits(height: number): { time: boolean; who: boolean } {
+  return { time: height >= HOUR_PX * 0.75, who: height >= HOUR_PX * 1.25 }
+}
+
+/** The time in a block: as in the lists, without the spaces, so it fits a narrow column. */
+function blockTime(o: Parameters<typeof timeLabel>[0], day: string): string {
+  return timeLabel(o, day).replace(' – ', '–')
+}
+
+function freeLabel(minutes: number): string {
+  return `${minutes / 60} h libres`
+}
 
 const filtered = computed(() => people.value.size > 0 || activeFolders.value.size > 0)
 
@@ -177,62 +196,55 @@ function ownerName(id: string): string {
         <h2 class="day-head" :class="{ today: d.day === today() }">
           <RouterLink :to="{ name: 'calendar', query: { dia: d.day } }">{{ longDay(d.day) }}</RouterLink>
         </h2>
-        <ul class="rows">
-          <li v-if="!d.items.length" class="nothing muted">Nada</li>
-          <li v-for="r in d.metro" :key="d.items[r.item]!.key + (r.end ? ':end' : '')">
-            <template v-for="o in [d.items[r.item]!]" :key="o.key">
-              <span v-if="r.end" class="occurrence ends" :class="{ busy: o.busy }">
-                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
-                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
-                    <template v-if="c">
-                      <span v-if="c.up" class="line up" />
-                      <span v-if="c.down" class="line down" />
-                      <span v-if="c.dot" class="dot" />
-                      <span v-if="c.stop" class="stop" />
-                    </template>
-                  </span>
-                </span>
-                <span class="when" :style="{ color: o.color }">{{ o.endTime }}</span>
-                <span class="muted ends-what">Termina {{ o.busy ? 'Ocupado' : o.title }}</span>
-              </span>
-              <span v-else-if="o.busy" class="occurrence busy">
-                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
-                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
-                    <template v-if="c">
-                      <span v-if="c.up" class="line up" />
-                      <span v-if="c.down" class="line down" />
-                      <span v-if="c.dot" class="dot" />
-                      <span v-if="c.stop" class="stop" />
-                    </template>
-                  </span>
-                </span>
-                <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
-                <span class="what">
-                  <span class="title">Ocupado</span>
-                  <span class="muted who">{{ ownerName(o.ownerId) }}</span>
-                </span>
-              </span>
-              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
-                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
-                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
-                    <template v-if="c">
-                      <span v-if="c.up" class="line up" />
-                      <span v-if="c.down" class="line down" />
-                      <span v-if="c.dot" class="dot" />
-                      <span v-if="c.stop" class="stop" />
-                    </template>
-                  </span>
-                </span>
-                <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
-                <span class="what">
-                  <span class="title">{{ o.title }}</span>
-                  <span class="muted who">{{ ownerName(o.ownerId) }}</span>
-                </span>
-                <AppIcon v-if="o.repeating" name="repeat" :size="16" class="repeat" />
+        <p v-if="!d.items.length" class="nothing muted">Nada</p>
+        <div v-else class="sheet">
+          <ul v-if="d.allDay.length" class="all-day">
+            <li v-for="o in d.allDay" :key="o.key">
+              <span v-if="o.busy" class="chip busy" :style="{ background: o.color }">Ocupado · {{ ownerName(o.ownerId) }}</span>
+              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="chip" :style="{ background: o.color }">
+                {{ o.title }} · {{ ownerName(o.ownerId) }}
               </RouterLink>
+            </li>
+          </ul>
+          <div v-if="d.scale.height" class="scale" :style="{ height: `${d.scale.height}px` }">
+            <template v-for="h in d.scale.hours" :key="h.top">
+              <span class="hour" :style="{ top: `${h.top}px` }">{{ h.label }}</span>
+              <span class="hour-line" :style="{ top: `${h.top}px` }" />
             </template>
-          </li>
-        </ul>
+            <span v-for="g in d.scale.gaps" :key="g.top" class="gap muted" :style="{ top: `${g.top}px` }">
+              <span aria-hidden="true">· · ·</span>{{ freeLabel(g.minutes) }}
+            </span>
+            <div class="blocks">
+              <template v-for="b in d.scale.blocks" :key="d.items[b.item]!.key">
+                <template v-for="o in [d.items[b.item]!]" :key="o.key">
+                  <span
+                    v-if="o.busy"
+                    class="block busy"
+                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, background: o.color }"
+                  >
+                    <strong>Ocupado</strong>
+                    <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
+                    <span v-if="fits(b.height).who">{{ ownerName(o.ownerId) }}</span>
+                  </span>
+                  <RouterLink
+                    v-else
+                    :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }"
+                    class="block"
+                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, background: o.color }"
+                  >
+                    <strong>{{ o.title }}</strong>
+                    <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
+                    <span v-if="fits(b.height).who">{{ ownerName(o.ownerId) }}</span>
+                  </RouterLink>
+                </template>
+              </template>
+            </div>
+            <template v-if="d.day === today() && d.scale.at(nowMinute) !== null">
+              <span class="now-label" :style="{ top: `${d.scale.at(nowMinute)}px` }">{{ nowLabel }}</span>
+              <span class="now-line" :style="{ top: `${d.scale.at(nowMinute)}px` }" />
+            </template>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -333,7 +345,8 @@ function ownerName(id: string): string {
 
 /* Days already gone stay readable but step back, so what is left of the week stands out. */
 .day.past .day-head a,
-.day.past .rows {
+.day.past .sheet,
+.day.past .nothing {
   opacity: 0.5;
 }
 
@@ -342,140 +355,157 @@ function ownerName(id: string): string {
   font-size: 0.9375rem;
 }
 
-/* No lines between rows: the metro lines run from one row into the next. */
-.rows > li + li {
-  border-top: 0;
+/* ── Time scale (src/lib/timeline.ts) ── */
+
+.sheet {
+  --axis: 44px;
+  background: var(--surface);
+  border-block: 1px solid var(--line);
 }
 
-.occurrence {
-  --row-pad: 5px;
+@media (min-width: 592px) {
+  .sheet {
+    border-inline: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+}
+
+.all-day {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 46px;
-  padding: var(--row-pad) var(--gutter);
-  color: inherit;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 8px var(--gutter) 0 calc(var(--gutter) + var(--axis));
+  list-style: none;
+}
+
+.chip {
+  display: block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
   text-decoration: none;
 }
 
-a.occurrence:hover {
-  background: var(--primary-soft);
-}
-
-/* ── Metro lines (src/lib/metro.ts) ── */
-
-.metro {
-  display: flex;
-  align-self: stretch;
-  flex-shrink: 0;
-  /* Over the row's padding too, so a line meets the next row's. */
-  margin-block: calc(-1 * var(--row-pad));
-}
-
-.lane {
+.scale {
   position: relative;
-  width: 14px;
+  margin: 0 var(--gutter) 0 calc(var(--gutter) - 6px);
 }
 
-.lane.faded {
-  opacity: 0.45;
-}
-
-.line {
+.hour {
   position: absolute;
-  left: 5px;
-  width: 4px;
-  background: currentColor;
-}
-
-.line.up {
-  top: 0;
-  height: 50%;
-}
-
-.line.down {
-  top: 50%;
-  bottom: 0;
-}
-
-.dot {
-  position: absolute;
-  top: 50%;
   left: 0;
-  width: 14px;
-  height: 14px;
-  margin-top: -7px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 2px var(--surface);
-}
-
-/* Where a line ends: a short crossbar, like the end of a metro line. */
-.stop {
-  position: absolute;
-  top: 50%;
-  left: 1px;
-  width: 12px;
-  height: 4px;
-  margin-top: -2px;
-  border-radius: 2px;
-  background: currentColor;
-}
-
-/* A line's stop: a short row with the time it ends. */
-.occurrence.ends {
-  --row-pad: 0px;
-  min-height: 24px;
-  font-size: 0.8125rem;
-}
-
-.ends .when {
-  font-size: 0.8125rem;
-}
-
-.ends-what {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.when {
-  width: 6.75rem;
-  flex-shrink: 0;
-  font-size: 0.875rem;
-  font-weight: 600;
+  width: calc(var(--axis) - 8px);
+  margin-top: -0.45rem;
+  text-align: right;
+  font-size: 0.6875rem;
+  line-height: 0.9rem;
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
-.busy .when {
-  opacity: 0.7;
+.hour-line {
+  position: absolute;
+  left: var(--axis);
+  right: 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
 }
 
-.what {
-  flex: 1;
-  min-width: 0;
-  display: grid;
+.gap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bg) 70%, transparent) 0 6px, transparent 6px 12px);
+  border-radius: 6px;
+}
+
+.gap span {
+  letter-spacing: 0.3em;
+}
+
+.blocks {
+  position: absolute;
+  inset: 0 0 0 var(--axis);
+}
+
+.block {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  /* A white edge keeps neighbours apart. */
+  box-shadow: 0 0 0 1.5px var(--surface);
+  overflow: hidden;
+  color: #fff;
+  text-decoration: none;
   line-height: 1.25;
 }
 
-.title {
+.block strong {
+  font-size: 0.8125rem;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.busy .title {
-  font-weight: 500;
-  color: var(--text-2);
+.block span {
+  font-size: 0.75rem;
+  opacity: 0.92;
+  /* One line; in a narrow column the end time gives way first. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
-.who {
-  font-size: 0.875rem;
+.block.busy {
+  opacity: 0.5;
 }
 
-.repeat {
-  color: var(--text-2);
-  flex-shrink: 0;
+a.block:hover {
+  filter: brightness(1.08);
+}
+
+.now-line {
+  position: absolute;
+  left: calc(var(--axis) - 4px);
+  right: 0;
+  border-top: 2px solid var(--late);
+  pointer-events: none;
+}
+
+.now-line::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--late);
+}
+
+.now-label {
+  position: absolute;
+  left: 0;
+  width: calc(var(--axis) - 8px);
+  margin-top: -0.45rem;
+  text-align: right;
+  font-size: 0.6875rem;
+  line-height: 0.9rem;
+  font-weight: 700;
+  color: var(--late);
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
 }
 </style>
