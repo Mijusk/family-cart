@@ -375,6 +375,10 @@ select vault.create_secret('test-secret', 'notifications_secret');
 select dispatch_notifications();
 select tests.check('dispatch: with something pending it wakes the function',
   exists (select 1 from net.http_request_queue where url = 'https://functions.example.test/send-notifications'));
+select tests.check('send-notifications: service_role claims the queue',
+  has_table_privilege('service_role', 'public.notifications', 'select, update'));
+select tests.check('send-notifications: service_role reads and drops devices',
+  has_table_privilege('service_role', 'public.push_subscriptions', 'select, delete'));
 set role authenticated;
 
 -- ── Pending request sees nothing of the group ──

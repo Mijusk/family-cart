@@ -40,6 +40,8 @@ notificaciones (Web Push), en `docs/notificaciones.md`.
 - Todas las tablas con RLS. La migración hace `revoke all` a `anon`/`authenticated` y
   concede solo lo necesario (por columna cuando aplica). Supabase da ALL por defecto a
   tablas nuevas: **cada tabla nueva necesita su revoke/grant explícito**.
+  En Supabase Cloud `service_role` tampoco recibe nada por defecto: si una Edge Function usa
+  una tabla, concédele a `service_role` justo lo que necesita.
 - Funciones: `revoke execute on all functions` y lista explícita de `grant execute`.
   Al añadir una RPC, añádela a esa lista.
 - Admin del grupo: gestiona miembros, perfiles sin cuenta y el calendario de otros
