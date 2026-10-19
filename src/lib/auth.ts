@@ -1,3 +1,4 @@
+import { disablePush } from './push'
 import { supabase } from './supabase'
 
 /** Where the links in Supabase's emails send people back to. Must be in the project's Redirect URLs. */
@@ -35,6 +36,8 @@ export async function setNewPassword(password: string) {
 }
 
 export async function signOut() {
+  // While still signed in: this device stops getting my notifications.
+  await disablePush().catch((e) => console.error('push', e))
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }

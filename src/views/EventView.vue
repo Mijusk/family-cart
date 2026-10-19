@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
-import { historyText, repeatLabel, timeLabel } from '@/lib/eventText'
+import { historyText, reminderLabel, repeatLabel, timeLabel } from '@/lib/eventText'
 import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -209,6 +209,10 @@ async function remove(scope: 'day' | 'series') {
           <li v-if="participantNames.length">
             <AppIcon name="user" :size="20" />
             <span>Con {{ participantNames.join(', ') }}</span>
+          </li>
+          <li v-if="event.reminderMinutes !== null">
+            <AppIcon name="bell" :size="20" />
+            <span>Aviso: {{ reminderLabel(event.reminderMinutes).toLowerCase() }}</span>
           </li>
         </ul>
       </section>

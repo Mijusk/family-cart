@@ -142,6 +142,8 @@ export interface CalendarEvent extends EventTiming {
   notes: string | null
   location: string | null
   timezone: string
+  /** Minutes before the start to send a reminder; null for none. */
+  reminderMinutes: number | null
   createdBy: string | null
   createdAt: string
   updatedBy: string | null

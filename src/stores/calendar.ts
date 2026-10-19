@@ -35,7 +35,18 @@ const REALTIME_TABLES = ['calendars', 'calendar_shares', 'events', 'event_except
 /** What the event form saves; the rest of an event is set by the database. */
 export type EventDraft = Pick<
   CalendarEvent,
-  'calendarId' | 'title' | 'notes' | 'location' | 'allDay' | 'startDate' | 'startTime' | 'endTime' | 'repeat' | 'repeatWeekdays' | 'repeatUntil'
+  | 'calendarId'
+  | 'title'
+  | 'notes'
+  | 'location'
+  | 'allDay'
+  | 'startDate'
+  | 'startTime'
+  | 'endTime'
+  | 'repeat'
+  | 'repeatWeekdays'
+  | 'repeatUntil'
+  | 'reminderMinutes'
 >
 
 /**

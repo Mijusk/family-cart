@@ -6,5 +6,7 @@ import { router } from './router'
 import '@fontsource-variable/fraunces/opsz.css'
 import '@fontsource-variable/public-sans'
 import './styles/base.css'
+import { registerServiceWorker } from './lib/push'
 
 createApp(App).use(createPinia()).use(router).mount('#app')
+registerServiceWorker()

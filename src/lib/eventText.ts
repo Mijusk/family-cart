@@ -46,6 +46,28 @@ export function repeatLabel(t: EventTiming): string | null {
   return t.repeatUntil ? `${label} · hasta el ${shortDay(t.repeatUntil)}` : label
 }
 
+/** The reminder choices of the event form, in minutes before the start. */
+export const REMINDER_PRESETS = [0, 15, 60, 1440, 10080] as const
+
+function amount(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+/** "Al empezar", "1 hora antes", "2 días y 3 horas antes"… */
+export function reminderLabel(minutes: number): string {
+  if (minutes === 0) return 'Al empezar'
+  if (minutes === 10080) return '1 semana antes'
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const mins = minutes % 60
+  const parts = [
+    days && amount(days, 'día', 'días'),
+    hours && amount(hours, 'hora', 'horas'),
+    mins && amount(mins, 'minuto', 'minutos'),
+  ].filter((p): p is string => !!p)
+  return `${list(parts)} antes`
+}
+
 const FIELD_LABELS: Record<string, string> = {
   title: 'el título',
   notes: 'las notas',
@@ -59,6 +81,7 @@ const FIELD_LABELS: Record<string, string> = {
   repeat_until: 'la repetición',
   calendar_id: 'la carpeta',
   timezone: 'la zona horaria',
+  reminder_minutes: 'el aviso',
 }
 
 /** What a history entry did, without the author: "cambió el título y la fecha". */
