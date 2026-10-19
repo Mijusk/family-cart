@@ -1,7 +1,7 @@
 import type { ClockTime, IsoDate } from '@/types'
 
-// The "metro lines" of the week view. Each occurrence of a day is a station. When others start
-// while it is still on, its line runs down past them to a stop: a short extra row with the time
+// The "metro lines" of the week view. Each occurrence of a day is a station. When it overlaps
+// others, its line runs down past them to a stop: a short extra row with the time
 // it ends, in its place in the day's order. So the list reads as a timeline (what overlaps what,
 // when the day is free again) and stays compact: an occurrence nothing overlaps is a lone station.
 // A lane whose line has stopped is free for the next one, like the branches of a git graph.
@@ -58,8 +58,14 @@ export function metroRows(items: MetroItem[], day: IsoDate): MetroRow[] {
   )
   // Still on when the day ends: the line runs off the bottom, into the next day.
   const onwards = (i: number) => end[i] === Infinity
-  // A line when the next item starts while it is on; with a stop unless it runs into the next day.
-  const lined = items.map((o, i) => timed(o) && i + 1 < items.length && start[i + 1]! < end[i]!)
+  // A line when it overlaps another timed item, or the next item starts while it is on; with a
+  // stop unless it runs into the next day.
+  const overlaps = (i: number, j: number) => start[i]! < end[j]! && start[j]! < end[i]!
+  const lined = items.map(
+    (o, i) =>
+      timed(o) &&
+      ((i + 1 < items.length && start[i + 1]! < end[i]!) || items.some((p, j) => j !== i && timed(p) && overlaps(i, j))),
+  )
 
   // Stations in the items' order; each stop after the stations that start before it ends, and
   // before those that start just then (they don't overlap).
