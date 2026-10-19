@@ -348,13 +348,13 @@ isOneToOne: false
                   ]
                 },"people": {
                   Row: {
-                    "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"updated_at": string,"updated_by": string | null,"user_id": string | null
+                    "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": string[],"updated_at": string,"updated_by": string | null,"user_id": string | null
                   }
                   Insert: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: string[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Update: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: string[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -649,6 +649,9 @@ isOneToOne: false
 "enqueue_event_reminders":
 { Args: { "at"?: string }; Returns: number
                            },
+"enqueue_task_reminders":
+{ Args: { "at"?: string }; Returns: number
+                           },
 "event_owners":
 { Args: { "event_ids": (string)[] }; Returns: {
               "color": string,"event_id": string,"owner_id": string
@@ -659,6 +662,9 @@ isOneToOne: false
                            },
 "event_snapshot":
 { Args: { "e": Database["public"]['Tables']["events"]['Row'] }; Returns: Json
+                           },
+"event_when":
+{ Args: { "all_day": boolean,"d": string,"t": string,"today": string }; Returns: string
                            },
 "finish_trip":
 { Args: { "trip_id": string }; Returns: number

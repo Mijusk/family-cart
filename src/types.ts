@@ -29,7 +29,11 @@ export interface Person {
   hasAccount: boolean
   /** Folder of the last event this person created; new events go there. */
   lastCalendarId: string | null
+  /** Kinds of notification this person turned off, on every device. */
+  mutedNotifications: NotificationKind[]
 }
+
+export type NotificationKind = 'event_reminder' | 'event_changed' | 'task_assigned' | 'task_due' | 'join_request' | 'member_approved'
 
 /** A person inside a group. Name and color come from the person. */
 export interface Member {
