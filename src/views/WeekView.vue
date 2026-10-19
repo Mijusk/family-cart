@@ -102,7 +102,7 @@ const week = computed(() =>
   }),
 )
 /** The same gutter width every day, so the times line up down the week. */
-const gutterWidth = computed(() => `${Math.max(1, ...week.value.flatMap((d) => d.metro.map((row) => row.length))) * 12}px`)
+const gutterWidth = computed(() => `${Math.max(1, ...week.value.flatMap((d) => d.metro.map((row) => row.cells.length))) * 14}px`)
 
 const filtered = computed(() => people.value.size > 0 || activeFolders.value.size > 0)
 
@@ -179,40 +179,58 @@ function ownerName(id: string): string {
         </h2>
         <ul class="rows">
           <li v-if="!d.items.length" class="nothing muted">Nada</li>
-          <li v-for="(o, i) in d.items" :key="o.key">
-            <span v-if="o.busy" class="occurrence busy">
-              <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
-                <span v-for="(c, n) in d.metro[i]" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
-                  <template v-if="c">
-                    <span v-if="c.up" class="line up" />
-                    <span v-if="c.down" class="line down" :class="{ end: c.end }" />
-                    <span v-if="c.dot" class="dot" />
-                  </template>
+          <li v-for="r in d.metro" :key="d.items[r.item]!.key + (r.end ? ':end' : '')">
+            <template v-for="o in [d.items[r.item]!]" :key="o.key">
+              <span v-if="r.end" class="occurrence ends" :class="{ busy: o.busy }">
+                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
+                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
+                    <template v-if="c">
+                      <span v-if="c.up" class="line up" />
+                      <span v-if="c.down" class="line down" />
+                      <span v-if="c.dot" class="dot" />
+                      <span v-if="c.stop" class="stop" />
+                    </template>
+                  </span>
+                </span>
+                <span class="when" :style="{ color: o.color }">{{ o.endTime }}</span>
+                <span class="muted ends-what">Termina {{ o.busy ? 'Ocupado' : o.title }}</span>
+              </span>
+              <span v-else-if="o.busy" class="occurrence busy">
+                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
+                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
+                    <template v-if="c">
+                      <span v-if="c.up" class="line up" />
+                      <span v-if="c.down" class="line down" />
+                      <span v-if="c.dot" class="dot" />
+                      <span v-if="c.stop" class="stop" />
+                    </template>
+                  </span>
+                </span>
+                <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
+                <span class="what">
+                  <span class="title">Ocupado</span>
+                  <span class="muted who">{{ ownerName(o.ownerId) }}</span>
                 </span>
               </span>
-              <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
-              <span class="what">
-                <span class="title">Ocupado</span>
-                <span class="muted who">{{ ownerName(o.ownerId) }}</span>
-              </span>
-            </span>
-            <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
-              <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
-                <span v-for="(c, n) in d.metro[i]" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
-                  <template v-if="c">
-                    <span v-if="c.up" class="line up" />
-                    <span v-if="c.down" class="line down" :class="{ end: c.end }" />
-                    <span v-if="c.dot" class="dot" />
-                  </template>
+              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
+                <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
+                  <span v-for="(c, n) in r.cells" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
+                    <template v-if="c">
+                      <span v-if="c.up" class="line up" />
+                      <span v-if="c.down" class="line down" />
+                      <span v-if="c.dot" class="dot" />
+                      <span v-if="c.stop" class="stop" />
+                    </template>
+                  </span>
                 </span>
-              </span>
-              <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
-              <span class="what">
-                <span class="title">{{ o.title }}</span>
-                <span class="muted who">{{ ownerName(o.ownerId) }}</span>
-              </span>
-              <AppIcon v-if="o.repeating" name="repeat" :size="16" class="repeat" />
-            </RouterLink>
+                <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
+                <span class="what">
+                  <span class="title">{{ o.title }}</span>
+                  <span class="muted who">{{ ownerName(o.ownerId) }}</span>
+                </span>
+                <AppIcon v-if="o.repeating" name="repeat" :size="16" class="repeat" />
+              </RouterLink>
+            </template>
           </li>
         </ul>
       </section>
@@ -356,7 +374,7 @@ a.occurrence:hover {
 
 .lane {
   position: relative;
-  width: 12px;
+  width: 14px;
 }
 
 .lane.faded {
@@ -365,8 +383,8 @@ a.occurrence:hover {
 
 .line {
   position: absolute;
-  left: 4.5px;
-  width: 3px;
+  left: 5px;
+  width: 4px;
   background: currentColor;
 }
 
@@ -380,21 +398,47 @@ a.occurrence:hover {
   bottom: 0;
 }
 
-.line.down.end {
-  bottom: 6px;
-  border-radius: 0 0 2px 2px;
-}
-
 .dot {
   position: absolute;
   top: 50%;
   left: 0;
-  width: 12px;
-  height: 12px;
-  margin-top: -6px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Where a line ends: a short crossbar, like the end of a metro line. */
+.stop {
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 12px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* A line's stop: a short row with the time it ends. */
+.occurrence.ends {
+  --row-pad: 0px;
+  min-height: 24px;
+  font-size: 0.8125rem;
+}
+
+.ends .when {
+  font-size: 0.8125rem;
+}
+
+.ends-what {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .when {
