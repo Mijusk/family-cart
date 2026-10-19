@@ -447,22 +447,16 @@ isOneToOne: false
                   ]
                 },"tasks": {
                   Row: {
-                    "assigned_to": string | null,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"done_at": string | null,"done_by": string | null,"due_date": string | null,"id": string,"list_id": string,"notes": string | null,"position": number,"title": string,"updated_at": string,"updated_by": string | null
+                    "assignees": string[],"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"done_at": string | null,"done_by": string | null,"due_date": string | null,"id": string,"list_id": string,"notes": string | null,"position": number,"title": string,"updated_at": string,"updated_by": string | null
                   }
                   Insert: {
-                    "assigned_to"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id": string,"notes"?: string | null,"position": number,"title": string,"updated_at"?: string,"updated_by"?: string | null
+                    "assignees"?: string[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id": string,"notes"?: string | null,"position": number,"title": string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "assigned_to"?: string | null,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id"?: string,"notes"?: string | null,"position"?: number,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
+                    "assignees"?: string[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id"?: string,"notes"?: string | null,"position"?: number,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
-      foreignKeyName: "tasks_assigned_to_fkey"
-      columns: ["assigned_to"]
-isOneToOne: false
-      referencedRelation: "people"
-      referencedColumns: ["id"]
-    },{
       foreignKeyName: "tasks_created_by_fkey"
       columns: ["created_by"]
 isOneToOne: false
@@ -680,6 +674,9 @@ isOneToOne: false
                            },
 "notify_busy_groups":
 { Args: { "cid": string }; Returns: undefined
+                           },
+"people_see_task_list":
+{ Args: { "lid": string,"pids": string[] }; Returns: boolean
                            },
 "person_sees_task_list":
 { Args: { "lid": string,"pid": string }; Returns: boolean

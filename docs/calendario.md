@@ -162,7 +162,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - **Mes:** solo eventos puntuales y excepciones.
 - En Hoy, Semana y Mes, deslizar el dedo hacia un lado pasa al día, la semana o el mes siguiente (hacia la izquierda) o anterior (hacia la derecha), como las flechas. El contenido sigue al dedo y entra deslizándose desde el lado (también con las flechas); sin animación si el móvil pide reducir el movimiento.
 - **Persona:** el calendario de una persona.
-- **Evento:** crear y editar rápido, duplicar un día, elegir carpeta y grupos extra, icono ⓘ y aviso de "está editando".
+- **Evento:** crear y editar rápido, duplicar un día, elegir carpeta, participantes ("Con quién": miembros activos del grupo actual, sin el dueño de la carpeta) y grupos extra, icono ⓘ y aviso de "está editando".
   - En un evento que se repite, editar o borrar pregunta "solo este día" (excepción) o "toda la serie".
   - Si no hay carpeta, "Nueva carpeta…" en el propio formulario crea una privada (nombre y color); compartirla llega con "Mis carpetas".
 

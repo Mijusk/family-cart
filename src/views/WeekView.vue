@@ -137,11 +137,11 @@ function ownerName(id: string): string {
         v-for="m in members"
         :key="m.id"
         type="button"
-        class="chip"
-        :class="{ on: people.has(m.personId) }"
+        class="choice"
         :aria-pressed="people.has(m.personId)"
         @click="people = toggle(people, m.personId)"
       >
+        <AppIcon v-if="people.has(m.personId)" name="check" :size="16" />
         <span class="swatch" :style="{ background: m.color }" />{{ groupStore.isMe(m.id) ? 'Tú' : m.name }}
       </button>
     </div>
@@ -150,11 +150,11 @@ function ownerName(id: string): string {
         v-for="c in availableFolders"
         :key="c.id"
         type="button"
-        class="chip"
-        :class="{ on: activeFolders.has(c.id) }"
+        class="choice"
         :aria-pressed="activeFolders.has(c.id)"
         @click="folders = toggle(folders, c.id)"
       >
+        <AppIcon v-if="activeFolders.has(c.id)" name="check" :size="16" />
         <span class="swatch folder" :style="{ background: c.color }" />{{ c.name }}
       </button>
     </div>
@@ -249,30 +249,14 @@ function ownerName(id: string): string {
   overflow-x: auto;
 }
 
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.chip.on {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
 .swatch {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+}
+
+.choice[aria-pressed='true'] .swatch {
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .swatch.folder {

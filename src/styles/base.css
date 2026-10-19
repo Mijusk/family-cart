@@ -285,6 +285,51 @@ a {
   border-color: var(--primary);
 }
 
+/* ── Choices ─────────────────────────────────────────────── */
+
+/* A pill to pick something: a person, a list, a filter. Picked ones are filled, so they stand out
+   at a glance (also when the phone darkens the page on its own). */
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.choice[aria-pressed='true'],
+.choice[aria-checked='true'] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.choice[aria-pressed='true'] .muted,
+.choice[aria-checked='true'] .muted {
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* A person's color dot keeps a ring so it shows on the green too. */
+.choice[aria-pressed='true'] .dot,
+.choice[aria-checked='true'] .dot {
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 /* ── Onboarding (welcome, join, loading/error screens) ───── */
 
 .onboard {

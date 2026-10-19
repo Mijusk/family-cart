@@ -298,32 +298,34 @@ export const useCalendarStore = defineStore('calendar', () => {
   // ── Events ─────────────────────────────────────────────────
 
   /**
-   * Creates or updates a whole event (the series, if it repeats) and its extra groups. The saved
+   * Creates or updates a whole event (the series, if it repeats), its extra groups and who goes. The saved
    * row goes into the store at once, so the screens show it; a reload in the background (and
    * Realtime) brings the rest (exceptions, history…). That reload failing doesn't undo the save.
    */
-  async function saveEvent(draft: EventDraft, groupIds: string[], id?: string): Promise<string> {
+  async function saveEvent(draft: EventDraft, groupIds: string[], participantIds: string[], id?: string): Promise<string> {
     const row = fromEvent(draft)
     const { data, error } = id
       ? await supabase.from('events').update(row).eq('id', id).select().single()
       : await supabase.from('events').insert(row).select().single()
     if (error) throw error
     await setEventGroups(data.id, groupIds)
-    putEvent(toEvent(data), groupIds)
+    await setParticipants(data.id, participantIds)
+    putEvent(toEvent(data), groupIds, participantIds)
     void reload().catch(() => {})
     return data.id
   }
 
   /** A saved event, shown before the reload brings it. */
-  function putEvent(event: CalendarEvent, groupIds: string[]) {
+  function putEvent(event: CalendarEvent, groupIds: string[], participantIds: string[]) {
     const i = events.value.findIndex((e) => e.id === event.id)
     if (i === -1) events.value.push(event)
     else events.value[i] = event
     // Its folder is one I can edit, so it is loaded; the owner and color are the folder's.
     const folder = calendarById(event.calendarId)
     if (folder) owners.value[event.id] = { ownerId: folder.ownerId, color: folder.color }
-    // setEventGroups left exactly these.
+    // setEventGroups and setParticipants left exactly these.
     eventGroups.value[event.id] = groupIds
+    participants.value[event.id] = participantIds
   }
 
   async function setEventGroups(eventId: string, groupIds: string[]) {
@@ -336,6 +338,20 @@ export const useCalendarStore = defineStore('calendar', () => {
     }
     if (removed.length) {
       const { error } = await supabase.from('event_shares').delete().eq('event_id', eventId).in('group_id', removed)
+      if (error) throw error
+    }
+  }
+
+  async function setParticipants(eventId: string, personIds: string[]) {
+    const current = participants.value[eventId] ?? []
+    const added = personIds.filter((p) => !current.includes(p))
+    const removed = current.filter((p) => !personIds.includes(p))
+    if (added.length) {
+      const { error } = await supabase.from('event_participants').insert(added.map((person_id) => ({ event_id: eventId, person_id })))
+      if (error) throw error
+    }
+    if (removed.length) {
+      const { error } = await supabase.from('event_participants').delete().eq('event_id', eventId).in('person_id', removed)
       if (error) throw error
     }
   }

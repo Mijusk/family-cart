@@ -27,7 +27,7 @@ decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md
   `busy_events(gid)`. Borrado suave con `deletion_batch` y RPCs de papelera; `event_history`
   lo escriben triggers.
 - Tareas: `task_lists` (de una persona, como las carpetas) → `tasks` (orden en `position`
-  numérica; `done_at`/`done_by` solo por la RPC `set_task_done`). Se comparten enteras con
+  numérica; varias personas en `assignees`; `done_at`/`done_by` solo por la RPC `set_task_done`). Se comparten enteras con
   grupos vía `task_list_shares`; sin grupos es privada. Borrado suave como en el calendario.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.

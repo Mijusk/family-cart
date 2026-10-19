@@ -244,7 +244,7 @@ export interface Task {
   listId: string
   title: string
   notes: string | null
-  assignedTo: string | null
+  assignees: string[]
   dueDate: IsoDate | null
   /** Manual order inside the list. */
   position: number

@@ -55,6 +55,7 @@ const form = reactive({
   location: '',
   notes: '',
   groupIds: [] as string[],
+  participantIds: [] as string[],
   newFolderName: '',
   newFolderColor: PERSON_COLORS[2] as string,
 })
@@ -99,6 +100,7 @@ function fill() {
       location: shown.location ?? '',
       notes: shown.notes ?? '',
       groupIds: editingId.value ? [...(calendar.eventGroups[source.id] ?? [])] : [groupStore.group.id],
+      participantIds: [...(calendar.participants[source.id] ?? [])],
     })
     if (onlyDay.value && day) form.startDate = exception?.overrides.startDate ?? day
   } else {
@@ -226,6 +228,29 @@ function toggleGroup(id: string) {
   form.groupIds = form.groupIds.includes(id) ? form.groupIds.filter((g) => g !== id) : [...form.groupIds, id]
 }
 
+// ── Who goes ─────────────────────────────────────────────────
+
+/**
+ * People who go with the folder's owner: they see the event and it shows on their day. Anyone
+ * active in the current group, plus whoever is on it already from elsewhere.
+ */
+const participantOptions = computed(() => {
+  const options = groupStore.activeMembers
+    .filter((m) => m.personId !== folderOwnerId.value)
+    .sort((a, b) => Number(groupStore.isMe(b.id)) - Number(groupStore.isMe(a.id)))
+    .map((m) => ({ id: m.personId, name: groupStore.isMe(m.id) ? 'Tú' : m.name, color: m.color }))
+  for (const id of form.participantIds) {
+    if (id !== folderOwnerId.value && !options.some((o) => o.id === id)) {
+      options.push({ id, name: calendar.personName(id), color: 'var(--text-2)' })
+    }
+  }
+  return options
+})
+
+function toggleParticipant(id: string) {
+  form.participantIds = form.participantIds.includes(id) ? form.participantIds.filter((p) => p !== id) : [...form.participantIds, id]
+}
+
 // ── Save ─────────────────────────────────────────────────────
 
 function validate(): string | null {
@@ -280,7 +305,9 @@ async function save() {
     }
     const offered = groupOptions.value.map((g) => g.id)
     const groupIds = form.groupIds.filter((id) => offered.includes(id) && !calendar.sharedGroupIds(calendarId).includes(id))
-    const id = await calendar.saveEvent(draft, groupIds, editingId.value ?? undefined)
+    // The owner goes anyway.
+    const participantIds = form.participantIds.filter((p) => p !== folderOwnerId.value)
+    const id = await calendar.saveEvent(draft, groupIds, participantIds, editingId.value ?? undefined)
     saved = true
     // Back to where the form was opened from: the event, or the calendar view.
     if (editingId.value) {
@@ -431,6 +458,24 @@ function cancel() {
         <textarea v-model="form.notes" class="field" rows="3" maxlength="2000" />
       </label>
 
+      <fieldset v-if="!onlyDay && participantOptions.length" class="groups">
+        <legend class="label">Con quién</legend>
+        <div class="choices">
+          <button
+            v-for="p in participantOptions"
+            :key="p.id"
+            type="button"
+            class="choice"
+            :aria-pressed="form.participantIds.includes(p.id)"
+            @click="toggleParticipant(p.id)"
+          >
+            <AppIcon v-if="form.participantIds.includes(p.id)" name="check" :size="16" />
+            <span class="dot" :style="{ background: p.color }" />{{ p.name }}
+          </button>
+        </div>
+        <p class="muted hint-below">También les sale en su día del calendario.</p>
+      </fieldset>
+
       <fieldset v-if="!onlyDay && groupOptions.length" class="groups">
         <legend class="label">Lo ve también</legend>
         <label v-for="g in groupOptions" :key="g.id" class="check">
@@ -576,5 +621,16 @@ textarea.field {
 
 .groups legend {
   margin-bottom: 4px;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.hint-below {
+  margin-top: 4px;
+  font-size: 0.875rem;
 }
 </style>

@@ -17,9 +17,11 @@ calendario puede usar después las mismas piezas.
    calendario, los administradores no gestionan las listas de otros por estar compartidas con su
    grupo.
 4. **Quién usa las tareas** (crear, editar, marcar, reordenar, borrar): cualquiera que vea la lista.
-5. **Asignar:** a alguien que vea la lista (la dueña o un miembro activo de un grupo con el que está
-   compartida). En una lista privada, solo a la dueña o a nadie. Si alguien deja de ver la lista
-   (sale del grupo o se deja de compartir con él), sus tareas de esa lista quedan sin asignar.
+5. **Asignar:** a una o varias personas que vean la lista (la dueña o miembros activos de un grupo
+   con el que está compartida). En una lista privada, solo a la dueña o a nadie. Si alguien deja de
+   ver la lista (sale del grupo o se deja de compartir con él), sale de sus tareas de esa lista; el
+   resto de asignados se queda. Sigue siendo una sola tarea: la marca cualquiera y queda hecha
+   para todos.
 6. **Fecha sin hora** (`due_date`), opcional. Atrasada = fecha pasada y sin hacer.
 7. **Orden manual** con `position` numérica: mover una tarea es un solo `update` con un valor entre
    sus dos vecinas. Las nuevas entran abajo (la base de datos pone `max + 1`). "Ordenar por fecha"
@@ -49,7 +51,9 @@ calendario puede usar después las mismas piezas.
 
 **tasks**
 - `id`, `list_id`, `title` (obligatorio, sin espacios a los lados, 1–120), `notes` (opcional, ≤ 2000)
-- `assigned_to` → people (opcional), `due_date` (opcional), `position` (numeric)
+- `assignees` (uuid[] de people, vacío = nadie; sin repetidos), `due_date` (opcional), `position` (numeric).
+  Un array y no una tabla aparte para que crear y editar sigan siendo un solo insert o update (y
+  cuenten como edición). Sin clave foránea: al borrar una persona, un trigger la quita.
 - `done_at`, `done_by`
 - auditoría
 
@@ -59,14 +63,14 @@ tres secciones.
 ## 3. Permisos
 
 Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
-`can_share_task_list(lid, gid)`, `person_sees_task_list(pid, lid)` (para `assigned_to`),
+`can_share_task_list(lid, gid)`, `person_sees_task_list(pid, lid)` y `people_see_task_list(pids, lid)` (para `assignees`),
 `is_live_task_list(lid)`.
 
 - **Ver la lista y sus tareas:** quien la gestiona, y los miembros activos de los grupos con los que
   está compartida (mientras no esté borrada).
 - **Gestionar la lista:** `can_manage_person(dueña)`. Solo se actualiza `name` por columna; borrar y
   restaurar van por RPC.
-- **Tareas:** insert y update por columnas (`title`, `notes`, `assigned_to`, `due_date`, `position`)
+- **Tareas:** insert y update por columnas (`title`, `notes`, `assignees`, `due_date`, `position`)
   para quien ve la lista; sin `delete`. `created_by`/`updated_by` los ponen triggers.
 - **Salir de un grupo** (`retire_member`): sus listas dejan de compartirse con él y deja de estar
   asignado a tareas de listas que ya no ve.
@@ -83,7 +87,7 @@ Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
   con un aviso). Arrastrar
   para ordenar (también en el móvil, pulsando y arrastrando). Fecha como etiqueta ("Hoy", "Mañana",
   "jue 23 oct"; atrasada en rojo suave). "Ordenar por fecha". Hechas plegadas abajo.
-- **Tarea** (`/tareas/:id`): título, nota, persona, fecha, ⓘ con creada y editada por quién y
+- **Tarea** (`/tareas/:id`): título, nota, personas (se marcan varias), fecha, ⓘ con creada y editada por quién y
   cuándo, borrar con "Deshacer".
 - **Mis listas** (`/tareas/listas`, enlace en la cabecera de Tareas): crear, renombrar, compartir con
   mis grupos (casillas) y borrar; deja claro si es privada o con quién se comparte. Los

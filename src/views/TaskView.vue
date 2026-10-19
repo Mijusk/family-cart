@@ -80,18 +80,24 @@ function saveNotes() {
 
 const assignees = computed(() => {
   const all = task.value ? store.assignees(task.value.listId) : []
-  // Someone outside this group can still be the one it is assigned to.
-  const current = task.value?.assignedTo
-  if (current && !all.some((a) => a.personId === current)) {
-    all.push({ personId: current, name: store.personName(current), color: store.personColor(current) })
+  // Someone outside this group can still be on it.
+  for (const id of task.value?.assignees ?? []) {
+    if (!all.some((a) => a.personId === id)) all.push({ personId: id, name: store.personName(id), color: store.personColor(id) })
   }
   return all
 })
 
 const isPrivate = computed(() => !!list.value && !store.sharedGroupIds(list.value.id).length)
 
-function assign(personId: string | null) {
-  if (task.value && personId !== task.value.assignedTo) void save({ assignedTo: personId })
+/** A person on or off the task; null takes everyone off. */
+function toggleAssignee(personId: string | null) {
+  if (!task.value) return
+  const current = task.value.assignees
+  if (personId === null) {
+    if (current.length) void save({ assignees: [] })
+  } else {
+    void save({ assignees: current.includes(personId) ? current.filter((id) => id !== personId) : [...current, personId] })
+  }
 }
 
 function setDue(day: string | null) {
@@ -200,16 +206,17 @@ const edited = computed(() => !!task.value?.updatedBy && task.value.updatedAt !=
 
       <fieldset class="group">
         <legend class="label">Para quién</legend>
-        <div class="chips">
-          <button type="button" class="chip" :aria-pressed="!task.assignedTo" @click="assign(null)">Nadie</button>
+        <div class="choices">
+          <button type="button" class="choice" :aria-pressed="!task.assignees.length" @click="toggleAssignee(null)">Nadie</button>
           <button
             v-for="a in assignees"
             :key="a.personId"
             type="button"
-            class="chip"
-            :aria-pressed="task.assignedTo === a.personId"
-            @click="assign(a.personId)"
+            class="choice"
+            :aria-pressed="task.assignees.includes(a.personId)"
+            @click="toggleAssignee(a.personId)"
           >
+            <AppIcon v-if="task.assignees.includes(a.personId)" name="check" :size="16" />
             <span class="dot" :style="{ background: a.color }" />{{ a.name }}
           </button>
         </div>
@@ -221,9 +228,9 @@ const edited = computed(() => !!task.value?.updatedBy && task.value.updatedAt !=
           Fecha
           <span v-if="due" class="due" :class="{ late: due.overdue }">{{ due.text }}</span>
         </legend>
-        <div class="chips">
-          <button type="button" class="chip" :aria-pressed="task.dueDate === today" @click="setDue(today)">Hoy</button>
-          <button type="button" class="chip" :aria-pressed="task.dueDate === addDays(today, 1)" @click="setDue(addDays(today, 1))">Mañana</button>
+        <div class="choices">
+          <button type="button" class="choice" :aria-pressed="task.dueDate === today" @click="setDue(today)">Hoy</button>
+          <button type="button" class="choice" :aria-pressed="task.dueDate === addDays(today, 1)" @click="setDue(addDays(today, 1))">Mañana</button>
           <input
             type="date"
             class="field date"
@@ -231,7 +238,7 @@ const edited = computed(() => !!task.value?.updatedBy && task.value.updatedAt !=
             aria-label="Otro día"
             @change="setDue(($event.target as HTMLInputElement).value || null)"
           />
-          <button v-if="task.dueDate" type="button" class="chip" @click="setDue(null)">Sin fecha</button>
+          <button v-if="task.dueDate" type="button" class="choice" @click="setDue(null)">Sin fecha</button>
         </div>
       </fieldset>
 
@@ -350,31 +357,6 @@ const edited = computed(() => !!task.value?.updatedBy && task.value.updatedAt !=
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-}
-
-.chip[aria-pressed='true'] {
-  border-color: var(--primary);
-  background: var(--primary-soft);
 }
 
 .dot {

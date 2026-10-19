@@ -65,6 +65,13 @@ function offset(index: number): number {
   return 0
 }
 
+const names = new Intl.ListFormat('es', { type: 'conjunction' })
+
+/** "Tú", "Daniel y Pablo"… */
+function whoLine(task: Task): string {
+  return names.format(task.assignees.map((id) => store.personName(id)))
+}
+
 function doneLine(task: Task): string {
   return `Hecha por ${store.personName(task.doneBy, 'ti')} ${timeAgo(task.doneAt!)}`
 }
@@ -93,13 +100,21 @@ function doneLine(task: Task): string {
       <RouterLink :to="{ name: 'task', params: { id: task.id } }" class="body">
         <span class="title">{{ task.title }}</span>
         <span v-if="task.doneAt" class="meta muted">{{ doneLine(task) }}</span>
-        <span v-else-if="task.dueDate || task.assignedTo || task.notes || showList" class="meta">
+        <span v-else-if="task.dueDate || task.assignees.length || task.notes || showList" class="meta">
           <span v-if="dueLabel(task, today)" class="due" :class="{ late: dueLabel(task, today)!.overdue }">
             {{ dueLabel(task, today)!.text }}
           </span>
-          <span v-if="task.assignedTo" class="who muted">
-            <PersonAvatar :name="store.personName(task.assignedTo)" :color="store.personColor(task.assignedTo)" :size="20" />
-            {{ store.personName(task.assignedTo) }}
+          <span v-if="task.assignees.length" class="who muted">
+            <span class="avatars">
+              <PersonAvatar
+                v-for="id in task.assignees.slice(0, 3)"
+                :key="id"
+                :name="store.personName(id)"
+                :color="store.personColor(id)"
+                :size="20"
+              />
+            </span>
+            {{ whoLine(task) }}
           </span>
           <span v-if="showList" class="muted">{{ store.listById(task.listId)?.name }}</span>
           <AppIcon v-if="task.notes" name="note" :size="16" class="muted" />
@@ -217,6 +232,20 @@ function doneLine(task: Task): string {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Several people overlap a little, each with a ring so they stay apart. */
+.avatars {
+  display: inline-flex;
+}
+
+.avatars > * + * {
+  margin-left: -6px;
+}
+
+.avatars > * {
+  box-shadow: 0 0 0 2px var(--surface);
+  border-radius: 50%;
 }
 
 .grip {

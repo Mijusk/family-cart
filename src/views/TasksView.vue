@@ -47,7 +47,7 @@ const byDate = computed(() => route.query.orden === 'fecha')
 const shownLists = computed(() => (currentList.value ? [currentList.value] : store.groupLists))
 
 function visible(task: Task): boolean {
-  return !onlyMine.value || task.assignedTo === groupStore.me?.id
+  return !onlyMine.value || (!!groupStore.me && task.assignees.includes(groupStore.me.id))
 }
 
 /** Pending tasks per list, in manual order (or by date). */
@@ -110,7 +110,7 @@ function add() {
   if (!title || !listId) return
   // With "Mías" on, a new task is mine, or it would vanish from the view.
   const mine = onlyMine.value && store.assignees(listId).some((a) => a.personId === groupStore.me?.id)
-  store.addTask(listId, title.slice(0, 120), mine ? { assignedTo: groupStore.me!.id } : {}).catch((e) => toast.show(friendlyError(e)))
+  store.addTask(listId, title.slice(0, 120), mine ? { assignees: [groupStore.me!.id] } : {}).catch((e) => toast.show(friendlyError(e)))
   newTitle.value = ''
   titleInput.value?.focus()
 }
@@ -159,12 +159,12 @@ function move(id: string, beforeId: string | null, afterId: string | null) {
 
     <template v-else>
       <nav class="tabs" aria-label="Listas">
-        <button type="button" class="chip" :aria-pressed="!currentList" @click="setQuery('lista', null)">Todas</button>
+        <button type="button" class="choice" :aria-pressed="!currentList" @click="setQuery('lista', null)">Todas</button>
         <button
           v-for="l in store.groupLists"
           :key="l.id"
           type="button"
-          class="chip"
+          class="choice"
           :aria-pressed="currentList?.id === l.id"
           @click="setQuery('lista', l.id)"
         >
@@ -239,24 +239,7 @@ function move(id: string, beforeId: string | null, afterId: string | null) {
   overflow-x: auto;
 }
 
-.chip {
-  flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.chip[aria-pressed='true'] {
-  border-color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.chip .muted {
+.choice .muted {
   font-weight: 500;
 }
 
@@ -303,8 +286,8 @@ function move(id: string, beforeId: string | null, afterId: string | null) {
 }
 
 .sort[aria-pressed='true'] {
-  background: var(--primary-soft);
-  color: var(--primary-strong);
+  background: var(--primary);
+  color: #fff;
 }
 
 .add {
