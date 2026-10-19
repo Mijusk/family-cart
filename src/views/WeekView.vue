@@ -6,6 +6,7 @@ import CalendarTabs from '@/components/CalendarTabs.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
+import { metroRows } from '@/lib/metro'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { addDays, isIsoDate, longDay, shortDay, startOfWeek, today } from '@/utils/days'
@@ -95,8 +96,13 @@ function shows(o: ReturnType<typeof calendar.occurrencesOn>[number]): boolean {
 }
 
 const week = computed(() =>
-  days.value.map((day) => ({ day, items: calendar.occurrencesOn(day).filter(shows) })),
+  days.value.map((day) => {
+    const items = calendar.occurrencesOn(day).filter(shows)
+    return { day, items, metro: metroRows(items, day) }
+  }),
 )
+/** The same gutter width every day, so the times line up down the week. */
+const gutterWidth = computed(() => `${Math.max(1, ...week.value.flatMap((d) => d.metro.map((row) => row.length))) * 12}px`)
 
 const filtered = computed(() => people.value.size > 0 || activeFolders.value.size > 0)
 
@@ -173,18 +179,34 @@ function ownerName(id: string): string {
         </h2>
         <ul class="rows">
           <li v-if="!d.items.length" class="nothing muted">Nada</li>
-          <li v-for="o in d.items" :key="o.key">
+          <li v-for="(o, i) in d.items" :key="o.key">
             <span v-if="o.busy" class="occurrence busy">
-              <span class="bar" :style="{ background: o.color }" />
-              <span class="when">{{ timeLabel(o, d.day) }}</span>
+              <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
+                <span v-for="(c, n) in d.metro[i]" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
+                  <template v-if="c">
+                    <span v-if="c.up" class="line up" />
+                    <span v-if="c.down" class="line down" :class="{ end: c.end }" />
+                    <span v-if="c.dot" class="dot" />
+                  </template>
+                </span>
+              </span>
+              <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
               <span class="what">
                 <span class="title">Ocupado</span>
                 <span class="muted who">{{ ownerName(o.ownerId) }}</span>
               </span>
             </span>
             <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
-              <span class="bar" :style="{ background: o.color }" />
-              <span class="when">{{ timeLabel(o, d.day) }}</span>
+              <span class="metro" aria-hidden="true" :style="{ width: gutterWidth }">
+                <span v-for="(c, n) in d.metro[i]" :key="n" class="lane" :class="{ faded: c?.faded }" :style="c ? { color: c.color } : undefined">
+                  <template v-if="c">
+                    <span v-if="c.up" class="line up" />
+                    <span v-if="c.down" class="line down" :class="{ end: c.end }" />
+                    <span v-if="c.dot" class="dot" />
+                  </template>
+                </span>
+              </span>
+              <span class="when" :style="{ color: o.color }">{{ timeLabel(o, d.day) }}</span>
               <span class="what">
                 <span class="title">{{ o.title }}</span>
                 <span class="muted who">{{ ownerName(o.ownerId) }}</span>
@@ -302,12 +324,18 @@ function ownerName(id: string): string {
   font-size: 0.9375rem;
 }
 
+/* No lines between rows: the metro lines run from one row into the next. */
+.rows > li + li {
+  border-top: 0;
+}
+
 .occurrence {
+  --row-pad: 5px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 8px var(--gutter);
+  gap: 10px;
+  min-height: 46px;
+  padding: var(--row-pad) var(--gutter);
   color: inherit;
   text-decoration: none;
 }
@@ -316,29 +344,76 @@ a.occurrence:hover {
   background: var(--primary-soft);
 }
 
-.bar {
+/* ── Metro lines (src/lib/metro.ts) ── */
+
+.metro {
+  display: flex;
   align-self: stretch;
-  width: 4px;
-  border-radius: 2px;
   flex-shrink: 0;
+  /* Over the row's padding too, so a line meets the next row's. */
+  margin-block: calc(-1 * var(--row-pad));
 }
 
-.busy .bar {
+.lane {
+  position: relative;
+  width: 12px;
+}
+
+.lane.faded {
   opacity: 0.45;
 }
 
+.line {
+  position: absolute;
+  left: 4.5px;
+  width: 3px;
+  background: currentColor;
+}
+
+.line.up {
+  top: 0;
+  height: 50%;
+}
+
+.line.down {
+  top: 50%;
+  bottom: 0;
+}
+
+.line.down.end {
+  bottom: 6px;
+  border-radius: 0 0 2px 2px;
+}
+
+.dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
 .when {
-  width: 7.5rem;
+  width: 6.75rem;
   flex-shrink: 0;
   font-size: 0.875rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--text-2);
+}
+
+.busy .when {
+  opacity: 0.7;
 }
 
 .what {
   flex: 1;
   min-width: 0;
   display: grid;
+  line-height: 1.25;
 }
 
 .title {
