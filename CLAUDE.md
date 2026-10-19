@@ -31,7 +31,8 @@ notificaciones (Web Push), en `docs/notificaciones.md`.
   numérica; varias personas en `assignees`; `done_at`/`done_by` solo por la RPC `set_task_done`). Se comparten enteras con
   grupos vía `task_list_shares`; sin grupos es privada. Borrado suave como en el calendario.
 - Notificaciones: `push_subscriptions` (dispositivos) y la cola `notifications`, que llenan
-  triggers y pg_cron (`events.reminder_minutes`) y vacía la Edge Function `send-notifications`.
+  triggers y pg_cron (`events.reminder_minutes`, tareas con fecha) y vacía la Edge Function
+  `send-notifications`. Cada persona apaga tipos en `people.muted_notifications`.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 

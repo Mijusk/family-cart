@@ -13,6 +13,7 @@ import type {
   Member,
   MemberRole,
   MemberStatus,
+  NotificationKind,
   Person,
   Product,
   RepeatKind,
@@ -59,6 +60,7 @@ export const toPerson = (r: PersonRow): Person => ({
   color: r.color,
   hasAccount: r.user_id !== null,
   lastCalendarId: r.last_calendar_id,
+  mutedNotifications: r.muted_notifications as NotificationKind[],
 })
 
 /** A member row plus its person; an unknown person (not loaded yet) shows as "Alguien". */

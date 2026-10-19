@@ -1,3 +1,4 @@
+import type { NotificationKind } from '@/types'
 import { supabase } from './supabase'
 
 // Notifications on this device (Web Push). The service worker (public/sw.js) shows them; the
@@ -13,6 +14,16 @@ const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
  * - off / on: ready to turn on, or already on.
  */
 export type PushState = 'unsupported' | 'install-first' | 'denied' | 'off' | 'on'
+
+/** Each kind a person can turn off (people.muted_notifications), in the order Cuenta lists them. */
+export const NOTIFICATION_KINDS: { kind: NotificationKind; label: string }[] = [
+  { kind: 'event_reminder', label: 'Recordatorios de eventos' },
+  { kind: 'event_changed', label: 'Cambios en tus eventos' },
+  { kind: 'task_assigned', label: 'Tareas que te asignan' },
+  { kind: 'task_due', label: 'Tareas para hoy' },
+  { kind: 'join_request', label: 'Solicitudes para entrar en tus grupos' },
+  { kind: 'member_approved', label: 'Cuando te aceptan en un grupo' },
+]
 
 const isIos = () =>
   /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)

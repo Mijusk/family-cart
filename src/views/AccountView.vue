@@ -4,12 +4,13 @@ import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { signOut } from '@/lib/auth'
-import { disablePush, enablePush, pushState, type PushState } from '@/lib/push'
+import { disablePush, enablePush, NOTIFICATION_KINDS, pushState, type PushState } from '@/lib/push'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import { PERSON_COLORS } from '@/utils/colors'
 import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
+import type { NotificationKind } from '@/types'
 
 const groupStore = useGroupStore()
 const toast = useToastStore()
@@ -75,6 +76,25 @@ async function togglePush() {
   }
 }
 
+// ── Which kinds (for the person, on every device) ─────────────
+
+const savingKinds = ref(false)
+
+async function toggleKind(kind: NotificationKind) {
+  if (savingKinds.value) return
+  const muted = me.value.mutedNotifications
+  savingKinds.value = true
+  try {
+    await groupStore.updatePerson(me.value.id, {
+      mutedNotifications: muted.includes(kind) ? muted.filter((k) => k !== kind) : [...muted, kind],
+    })
+  } catch (e) {
+    toast.show(friendlyError(e))
+  } finally {
+    savingKinds.value = false
+  }
+}
+
 /** The group store hears the sign-out and starts over; App.vue then shows the sign-in screen. */
 async function logOut() {
   leaving.value = true
@@ -134,7 +154,7 @@ async function logOut() {
       <template v-if="push === 'off' || push === 'on'">
         <p>
           {{ push === 'on' ? 'Activados.' : 'Desactivados.' }}
-          <span class="muted">Recordatorios de eventos, tareas que te asignen y solicitudes para entrar en tus grupos.</span>
+          <span class="muted">Abajo eliges qué te avisa.</span>
         </p>
         <button
           type="button"
@@ -156,6 +176,25 @@ async function logOut() {
       </p>
       <p v-else class="muted">Este navegador no puede recibir avisos.</p>
     </div>
+
+    <h2 class="section-title"><span>Qué te avisa</span></h2>
+    <div class="panel kinds">
+      <div class="choices">
+        <button
+          v-for="k in NOTIFICATION_KINDS"
+          :key="k.kind"
+          type="button"
+          class="choice"
+          :aria-pressed="!me.mutedNotifications.includes(k.kind)"
+          :disabled="savingKinds"
+          @click="toggleKind(k.kind)"
+        >
+          <AppIcon v-if="!me.mutedNotifications.includes(k.kind)" name="check" :size="16" />
+          {{ k.label }}
+        </button>
+      </div>
+    </div>
+    <p class="muted note">Vale para todos tus dispositivos.</p>
 
     <div class="logout">
       <button type="button" class="btn btn-ghost btn-block" :disabled="leaving" @click="logOut">
@@ -220,6 +259,10 @@ async function logOut() {
 
 .push p {
   font-size: 0.9375rem;
+}
+
+.kinds {
+  flex-direction: column;
 }
 
 .logout {

@@ -368,6 +368,103 @@ select tests.check('reminders: a day moved to another time follows it',
   enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '09:00') at time zone 'Europe/Madrid') = 0
   and enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '10:30') at time zone 'Europe/Madrid') = 1);
 
+-- Changes to events: Pablo's swimming goes to Daniel (with him) and Marta (admin).
+select tests.as_user('marta@ejemplo.com');
+set role authenticated;
+update events set start_time = '18:00', end_time = '19:00' where id = '00000000-0000-4000-8000-0000000000f8';
+reset role;
+select tests.check('changes: marta moves swimming, daniel hears it and she does not',
+  (select count(*) from notifications where kind = 'event_changed' and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2')
+     and title = 'Marta ha cambiado «Natación»' and body = 'Cambia en todas sus repeticiones.'
+     and url = '/calendario/evento/' || '00000000-0000-4000-8000-0000000000f8') = 1
+  and not exists (select 1 from notifications where kind = 'event_changed' and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') and title like 'Marta %'));
+set role authenticated;
+update events set location = 'Piscina municipal' where id = '00000000-0000-4000-8000-0000000000f8';
+update events set notes = 'Gorro y gafas' where id = '00000000-0000-4000-8000-0000000000f8';
+reset role;
+select tests.check('changes: two saves in a row leave one notice, and a note is not news',
+  (select count(*) from notifications where kind = 'event_changed' and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title like '%Natación%' and sent_at is null) = 1);
+set role authenticated;
+insert into event_exceptions (event_id, occurrence_date, status) values ('00000000-0000-4000-8000-0000000000f8', date_trunc('week', current_date)::date + 16, 'cancelled');
+reset role;
+select tests.check('changes: cancelling one day tells daniel',
+  exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title = 'Marta ha cancelado «Natación»'
+            and body = 'Solo el ' || short_day(date_trunc('week', current_date)::date + 16, current_date) || '.'
+            and url = '/calendario/evento/' || '00000000-0000-4000-8000-0000000000f8' || '?dia=' || (date_trunc('week', current_date)::date + 16)));
+set role authenticated;
+delete from event_exceptions where event_id = '00000000-0000-4000-8000-0000000000f8' and occurrence_date = date_trunc('week', current_date)::date + 16;
+reset role;
+select tests.check('changes: putting the day back drops the unsent notice',
+  not exists (select 1 from notifications where title = 'Marta ha cancelado «Natación»'));
+set role authenticated;
+insert into event_exceptions (event_id, occurrence_date, status, overrides) values ('00000000-0000-4000-8000-0000000000f8', date_trunc('week', current_date)::date + 16, 'modified', '{"notes": "Sin gorro"}');
+reset role;
+select tests.check('changes: a note on one day is not news',
+  not exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title like '%Natación%' and body like 'Solo el%'));
+set role authenticated;
+update event_exceptions set overrides = '{"start_time": "19:00", "notes": "Sin gorro"}' where event_id = '00000000-0000-4000-8000-0000000000f8' and occurrence_date = date_trunc('week', current_date)::date + 16;
+reset role;
+select tests.check('changes: moving one day says when',
+  exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title = 'Marta ha cambiado «Natación»'
+            and body = 'Solo el ' || short_day(date_trunc('week', current_date)::date + 16, current_date) || ': ahora '
+                       || short_day(date_trunc('week', current_date)::date + 16, current_date) || ' a las 19:00 · Piscina municipal'));
+set role authenticated;
+select delete_event('00000000-0000-4000-8000-0000000000f8');
+reset role;
+select tests.check('changes: deleting tells daniel, and replaces what was unsent',
+  (select count(*) from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title like '%Natación%' and sent_at is null) = 1
+  and exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title = 'Marta ha borrado «Natación»'
+                and body = 'Con todas sus repeticiones.' and url = '/calendario'));
+set role authenticated;
+select restore_event('00000000-0000-4000-8000-0000000000f8');
+reset role;
+select tests.check('changes: undoing the deletion drops it',
+  not exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title like '%Natación%' and sent_at is null));
+insert into events (id, calendar_id, title, start_date, start_time, end_time)
+values ('00000000-0000-4000-8000-0000000000fe', '00000000-0000-4000-8000-0000000000e4', 'Excursión', current_date - 5, '09:00', '17:00');
+insert into event_participants (event_id, person_id) values ('00000000-0000-4000-8000-0000000000fe', (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'));
+set role authenticated;
+update events set title = 'Excursión al museo' where id = '00000000-0000-4000-8000-0000000000fe';
+reset role;
+select tests.check('changes: an event already past is not news',
+  not exists (select 1 from notifications where title like '%Excursión%'));
+
+-- Choosing which kinds
+select tests.as_user('daniel@ejemplo.com');
+set role authenticated;
+update people set muted_notifications = '{event_changed}' where id = my_person_id();
+select tests.check('prefs: daniel turns off event changes', (select muted_notifications from people where id = my_person_id()) = '{event_changed}');
+select tests.expect_error('prefs: only known kinds', $$update people set muted_notifications = '{spam}' where id = my_person_id()$$, 'check constraint');
+update people set muted_notifications = '{task_due}' where user_id = '00000000-0000-4000-8000-0000000000c1';
+select tests.check('prefs: not someone else''s', (select muted_notifications from people where user_id = '00000000-0000-4000-8000-0000000000c1') = '{}');
+select tests.as_user('marta@ejemplo.com');
+update events set location = 'Polideportivo' where id = '00000000-0000-4000-8000-0000000000f8';
+reset role;
+select tests.check('prefs: then he does not get them',
+  not exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and title like '%Natación%' and sent_at is null));
+update people set muted_notifications = '{}' where id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2');
+
+-- Tasks due today, at 09:00
+update tasks set due_date = current_date + 2 where id = '00000000-0000-4000-8000-000000000022';
+select tests.check('tasks due: nothing before 09:00', enqueue_task_reminders(((current_date + 2) + time '08:50') at time zone 'Europe/Madrid') = 0);
+select tests.check('tasks due: at 09:00', enqueue_task_reminders(((current_date + 2) + time '09:00') at time zone 'Europe/Madrid') = 1);
+select enqueue_task_reminders(((current_date + 2) + time '09:05') at time zone 'Europe/Madrid');
+select tests.check('tasks due: once each, to marta and daniel',
+  (select array_agg(person_id order by person_id) from notifications
+    where kind = 'task_due' and title = 'Llamar al fontanero'
+      and body = 'Para hoy · ' || (select name from task_lists where id = '00000000-0000-4000-8000-000000000011')
+      and url = '/tareas/00000000-0000-4000-8000-000000000022')
+  = (select array_agg(id order by id) from people where user_id in ('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000c2')));
+insert into tasks (list_id, title, due_date) values ('00000000-0000-4000-8000-000000000011', 'Pagar el comedor', current_date + 30);
+select enqueue_task_reminders(((current_date + 30) + time '09:00') at time zone 'Europe/Madrid');
+select tests.check('tasks due: with no one assigned, the list''s owner',
+  (select array_agg(person_id) from notifications where kind = 'task_due' and title = 'Pagar el comedor') = array[(select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')]);
+insert into tasks (list_id, title, due_date, done_at) values ('00000000-0000-4000-8000-000000000011', 'Pedir presupuesto', current_date + 31, now());
+select tests.check('tasks due: not when it is done', enqueue_task_reminders(((current_date + 31) + time '09:00') at time zone 'Europe/Madrid') = 0);
+set role authenticated;
+select tests.expect_error('tasks due: only from the database', $$select enqueue_task_reminders()$$, 'permission denied');
+reset role;
+
 select dispatch_notifications();
 select tests.check('dispatch: without its secrets it calls nothing', not exists (select 1 from net.http_request_queue where url = 'https://functions.example.test/send-notifications'));
 select vault.create_secret('https://functions.example.test/send-notifications', 'notifications_function_url');
@@ -427,6 +524,12 @@ select tests.expect_error('marta: profile cannot be admin', $$select set_member_
 select tests.expect_error('marta: last admin cannot step down', $$select set_member_role('00000000-0000-4000-8000-0000000000a1', 'member')$$, 'last admin');
 select approve_member('00000000-0000-4000-8000-0000000000a5');
 select tests.check('marta: approves lucia', (select status from members where id = '00000000-0000-4000-8000-0000000000a5') = 'active');
+reset role;
+select tests.check('push: lucia hears she is in',
+  exists (select 1 from notifications where kind = 'member_approved' and title = 'Ya estás en Casa Martín García'
+            and body = 'Marta ha aceptado tu solicitud.'
+            and person_id = (select person_id from members where id = '00000000-0000-4000-8000-0000000000a5')));
+set role authenticated;
 select set_member_role('00000000-0000-4000-8000-0000000000a2', 'admin');
 select tests.check('marta: makes daniel admin', (select role from members where id = '00000000-0000-4000-8000-0000000000a2') = 'admin');
 select tests.check('marta: creates a profile', create_profile('00000000-0000-4000-8000-000000000001', 'Bebé') is not null);

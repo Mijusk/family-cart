@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import { isAuthRetryableFetchError, type RealtimeChannel, type RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
-import type { Group, Member, MemberRole, Membership, Person } from '@/types'
+import type { Group, Member, MemberRole, Membership, NotificationKind, Person } from '@/types'
 import { errorText, isNetworkError } from '@/utils/errors'
 import { useCalendarStore } from './calendar'
 import { useListStore } from './list'
@@ -542,10 +542,13 @@ export const useGroupStore = defineStore('group', () => {
   // ── Profile ────────────────────────────────────────────────
 
   /** My own name and color, or those of a profile I manage. */
-  async function updatePerson(personId: string, changes: { displayName?: string; color?: string }) {
+  async function updatePerson(
+    personId: string,
+    changes: { displayName?: string; color?: string; mutedNotifications?: NotificationKind[] },
+  ) {
     const { data, error } = await supabase
       .from('people')
-      .update({ display_name: changes.displayName, color: changes.color })
+      .update({ display_name: changes.displayName, color: changes.color, muted_notifications: changes.mutedNotifications })
       .eq('id', personId)
       .select()
       .single()

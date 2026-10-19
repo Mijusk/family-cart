@@ -6,8 +6,9 @@ inicio y abierta desde ese icono.
 
 ## 1. Decisiones (con Luis, 18-oct)
 
-1. **Qué avisa:** recordatorios de eventos, tareas que te asignan y solicitudes para entrar en un
-   grupo (a sus administradores). Nada más en la V1.
+1. **Qué avisa:** recordatorios de eventos, cambios en tus eventos, tareas que te asignan, tareas
+   para hoy, solicitudes para entrar en un grupo (a sus administradores) y que te acepten en uno.
+   La compra no avisa (decisión de Luis, 19-oct).
 2. **Recordatorio por evento**, uno solo, en el formulario: Sin aviso · Al empezar · 15 minutos ·
    1 hora · 1 día · 1 semana antes · Personalizado (días, horas y minutos; como mucho 30 días).
    Es del evento, no de cada persona. En los que se repiten, avisa en cada repetición; un día
@@ -21,14 +22,26 @@ inicio y abierta desde ese icono.
    perfil sin cuenta no recibe nada.
 6. **Cada dispositivo se activa aparte**, desde Cuenta → «Avisos en este dispositivo». Al cerrar
    sesión, ese dispositivo deja de recibir los avisos de esa cuenta.
+7. **Cambios en eventos:** a los mismos que el recordatorio (dueño y participantes, o los admins
+   por un perfil sin cuenta), menos a quien hace el cambio. Avisa al cambiar hora, fecha, título,
+   lugar, repetición o carpeta, al cancelar o cambiar un solo día y al borrar; las notas no. Solo si
+   al evento le quedan días por delante. Varios guardados seguidos o un «Deshacer» dejan solo la
+   última noticia (lo que aún no se ha enviado se descarta).
+8. **Tareas para hoy:** a las 09:00 del día de la tarea (zona del primer grupo con el que está
+   compartida la lista, o de un grupo de su dueña), a los asignados; sin asignados, a la dueña de la
+   lista. Las hechas o borradas no avisan.
+9. **Qué te avisa:** en Cuenta, cada persona apaga los tipos que no quiere
+   (`people.muted_notifications`); vale para todos sus dispositivos.
 
 ## 2. Cómo funciona
 
 ```
 pg_cron (cada minuto) → dispatch_notifications()
    ├─ enqueue_event_reminders(): escribe en notifications los recordatorios que tocan
+   ├─ enqueue_task_reminders(): las tareas para hoy, a las 09:00
    └─ si hay algo pendiente: pg_net → Edge Function send-notifications
-triggers en tasks / members ──────────→ notifications (tarea asignada, solicitud)
+triggers en tasks, members, events y event_exceptions → notifications (tarea asignada, solicitud,
+   aceptado en un grupo, cambio en un evento)
 send-notifications: marca como enviadas las pendientes y las manda a cada dispositivo (web-push)
 public/sw.js (en el móvil): muestra el aviso; al tocarlo abre la app en esa pantalla
 ```
@@ -78,7 +91,7 @@ en Vault, así que los avisos solo se quedan en la cola; los tests lo cubren.
 
 ## 4. Fuera de esta V1
 
-- Elegir qué tipos de aviso quiere cada persona, o silenciar un grupo.
+- Silenciar un grupo o un evento concreto.
 - Varios recordatorios por evento, o recordatorios personales distintos del evento.
-- Recordatorio de tareas con fecha.
+- Avisos de la compra.
 - App nativa (Capacitor): cambiaría el envío a FCM/APNs, no la cola.
