@@ -1,11 +1,12 @@
 import type { ClockTime, IsoDate } from '@/types'
 
-// The "metro lines" of the week view. Each timed occurrence of a day is a station on a lane; its
-// line runs down past the rows that start while it is still on, and ends there. A lane whose line
-// has ended is free for the next station, like the branches of a git graph. Rows stay a list:
-// a line spans rows, not a time scale.
+// The "metro lines" of the week view. Each occurrence of a day is a station. When others start
+// while it is still on, its line runs down past them to a stop: a short extra row with the time
+// it ends, in its place in the day's order. So the list reads as a timeline (what overlaps what,
+// when the day is free again) and stays compact: an occurrence nothing overlaps is a lone station.
+// A lane whose line has stopped is free for the next one, like the branches of a git graph.
 
-/** At most this many lanes a day; more at once go without a line. */
+/** At most this many lines at once; more go as lone stations. */
 export const MAX_LANES = 4
 
 export interface MetroItem {
@@ -25,55 +26,76 @@ export interface MetroCell {
   faded: boolean
   /** The station: this row's own occurrence. */
   dot: boolean
+  /** The line's stop: it ends here. */
+  stop: boolean
   /** A line from the top of the row to its middle. */
   up: boolean
   /** A line from the middle to the bottom of the row. */
   down: boolean
-  /** The line ends near the bottom of this row (it doesn't reach the next one). */
-  end: boolean
 }
 
-export type MetroRow = (MetroCell | null)[]
+export interface MetroRow {
+  /** Index of the occurrence in the day's items. */
+  item: number
+  /** Its stop row, rather than its station. */
+  end: boolean
+  cells: (MetroCell | null)[]
+}
 
 const minutes = (t: ClockTime) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
 
 /**
- * The gutter of each row, for `items` as the day lists them (from the day before first, then all
- * day, then by start). Every row has the same number of columns: the most any row uses.
+ * The rows of a day, for `items` as the day lists them (from the day before first, then all day,
+ * then by start): each item's station, and the stops of those with a line. Every row has the same
+ * number of columns: the most any row uses.
  */
 export function metroRows(items: MetroItem[], day: IsoDate): MetroRow[] {
   const timed = (o: MetroItem) => !o.allDay && o.startTime !== null && o.endTime !== null
-  // When each row starts and when each timed occurrence ends, in minutes of `day`.
+  // When each item starts and ends, in minutes of `day`.
   const start = items.map((o) => (o.date < day ? -1 : timed(o) ? minutes(o.startTime!) : 0))
   const end = items.map((o) =>
     !timed(o) ? 0 : o.date < day ? minutes(o.endTime!) : o.crossesMidnight ? Infinity : minutes(o.endTime!),
   )
+  // Still on when the day ends: the line runs off the bottom, into the next day.
+  const onwards = (i: number) => end[i] === Infinity
+  // A line when the next item starts while it is on; with a stop unless it runs into the next day.
+  const lined = items.map((o, i) => timed(o) && i + 1 < items.length && start[i + 1]! < end[i]!)
 
-  const rows: MetroRow[] = items.map(() => Array<MetroCell | null>(MAX_LANES + 1).fill(null))
+  // Stations in the items' order; each stop after the stations that start before it ends, and
+  // before those that start just then (they don't overlap).
+  const order = [
+    ...items.map((_, i) => ({ item: i, end: false, at: start[i]!, rank: 1 })),
+    ...items.flatMap((_, i) => (lined[i] && !onwards(i) ? [{ item: i, end: true, at: end[i]!, rank: 0 }] : [])),
+  ].sort((a, b) => a.at - b.at || a.rank - b.rank || (a.end ? 0 : a.item - b.item))
+
+  const rows = order.map((r) => ({ item: r.item, end: r.end, cells: Array<MetroCell | null>(MAX_LANES + 1).fill(null) }))
+  const stopRow = new Map(rows.flatMap((r, k) => (r.end ? [[r.item, k] as const] : [])))
   /** The first row each lane is free again from. */
   const freeFrom = Array<number>(MAX_LANES).fill(0)
+  const dropped = new Set<number>()
 
-  items.forEach((o, i) => {
-    const cell = { color: o.color, faded: o.busy }
-    const lane = timed(o) ? freeFrom.findIndex((row) => row <= i) : -1
+  rows.forEach((row, k) => {
+    if (row.end) return
+    const i = row.item
+    const cell = { color: items[i]!.color, faded: items[i]!.busy, stop: false }
+    const lane = lined[i] ? freeFrom.findIndex((free) => free <= k) : -1
     if (lane === -1) {
-      // All day, or no lane left: a station without a line, in the first column nothing crosses.
-      const column = rows[i]!.findIndex((c) => c === null)
-      rows[i]![column] = { ...cell, dot: true, up: false, down: false, end: false }
+      // No line, or no lane left: a lone station in the first column nothing crosses.
+      if (lined[i]) dropped.add(i)
+      const column = row.cells.findIndex((c) => c === null)
+      row.cells[column] = { ...cell, dot: true, up: items[i]!.date < day, down: false }
       return
     }
-    // The rows it is still on for: those that start before it ends.
-    let last = i
-    while (last + 1 < items.length && start[last + 1]! < end[i]!) last++
-    // Still on when the day ends: the line runs off the bottom, into the next day.
-    const onwards = end[i] === Infinity
+    const last = onwards(i) ? rows.length - 1 : stopRow.get(i)!
     freeFrom[lane] = last + 1
-    rows[i]![lane] = { ...cell, dot: true, up: o.date < day, down: last > i || onwards, end: false }
-    for (let k = i + 1; k <= last; k++) {
-      rows[k]![lane] = { ...cell, dot: false, up: true, down: true, end: k === last && !onwards }
+    row.cells[lane] = { ...cell, dot: true, up: items[i]!.date < day, down: true }
+    for (let n = k + 1; n <= last; n++) {
+      const stop = n === last && !onwards(i)
+      rows[n]!.cells[lane] = { ...cell, dot: false, stop, up: true, down: !stop }
     }
   })
 
-  const columns = Math.max(1, ...rows.map((row) => row.reduce((n, c, k) => (c ? k + 1 : n), 0)))
-  return rows.map((row) => row.slice(0, columns))
+  const kept = rows.filter((r) => !(r.end && dropped.has(r.item)))
+  const columns = Math.max(1, ...kept.map((r) => r.cells.reduce((n, c, k) => (c ? k + 1 : n), 0)))
+  return kept.map((r) => ({ ...r, cells: r.cells.slice(0, columns) }))
 }
