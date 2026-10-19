@@ -739,6 +739,9 @@ isOneToOne: false
                            },
 "set_task_done":
 { Args: { "done": boolean,"task_id": string }; Returns: undefined
+                           },
+"task_list_viewers":
+{ Args: { "lid": string,"pids": string[] }; Returns: string[]
                            }
           }
           Enums: {
