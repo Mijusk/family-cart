@@ -36,7 +36,8 @@ public/sw.js (en el móvil): muestra el aviso; al tocarlo abre la app en esa pan
 - **`push_subscriptions`**: un dispositivo de una persona (`endpoint`, claves). Se guarda con la RPC
   `save_push_subscription` (si el dispositivo era de otra cuenta, pasa a la nueva); cada uno ve y
   borra solo los suyos. La función borra los que el navegador ya no acepta (404/410).
-- **`notifications`**: la cola. Solo la base de datos y la función (service role) la tocan. Una
+- **`notifications`**: la cola. Solo la base de datos y la función (service role, con `grant`
+  explícito: Supabase Cloud no se lo da solo) la tocan. Una
   `dedupe_key` evita escribir dos veces el mismo recordatorio. Las de más de 1 hora sin enviar ya no
   se envían, y todas se borran a los 7 días.
 - **Recordatorios**: `enqueue_event_reminders(at)` mira los últimos 15 minutos (por si una vuelta de
