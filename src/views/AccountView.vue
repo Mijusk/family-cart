@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { signOut } from '@/lib/auth'
+import { disablePush, enablePush, pushState, type PushState } from '@/lib/push'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import { PERSON_COLORS } from '@/utils/colors'
@@ -46,6 +47,31 @@ async function pickColor(color: string) {
     await groupStore.updatePerson(me.value.id, { color })
   } catch (e) {
     toast.show(friendlyError(e))
+  }
+}
+
+// ── Notifications on this device ──────────────────────────────
+
+const push = ref<PushState | null>(null)
+const pushBusy = ref(false)
+void pushState().then((state) => (push.value = state))
+
+async function togglePush() {
+  if (pushBusy.value) return
+  pushBusy.value = true
+  try {
+    if (push.value === 'on') {
+      await disablePush()
+      push.value = 'off'
+    } else {
+      push.value = await enablePush()
+      if (push.value === 'on') toast.show('Avisos activados en este dispositivo')
+    }
+  } catch (e) {
+    // The browser's own errors (no push service, blocked…) aren't Supabase ones.
+    toast.show(e instanceof DOMException ? 'Este navegador no ha podido activar los avisos.' : friendlyError(e))
+  } finally {
+    pushBusy.value = false
   }
 }
 
@@ -103,6 +129,34 @@ async function logOut() {
     </div>
     <p class="muted note">Es el color con el que te verá tu familia en la app.</p>
 
+    <h2 class="section-title"><span>Avisos en este dispositivo</span></h2>
+    <div v-if="push" class="panel push">
+      <template v-if="push === 'off' || push === 'on'">
+        <p>
+          {{ push === 'on' ? 'Activados.' : 'Desactivados.' }}
+          <span class="muted">Recordatorios de eventos, tareas que te asignen y solicitudes para entrar en tus grupos.</span>
+        </p>
+        <button
+          type="button"
+          class="btn"
+          :class="push === 'on' ? 'btn-ghost' : 'btn-primary'"
+          :disabled="pushBusy"
+          @click="togglePush"
+        >
+          <AppIcon name="bell" :size="20" />
+          {{ push === 'on' ? 'Desactivar' : 'Activar avisos' }}
+        </button>
+      </template>
+      <p v-else-if="push === 'install-first'" class="muted">
+        En iPhone y iPad los avisos solo llegan con la app en la pantalla de inicio. En Safari, toca
+        <strong>Compartir</strong> y luego <strong>Añadir a pantalla de inicio</strong>; ábrela desde ese icono y vuelve aquí.
+      </p>
+      <p v-else-if="push === 'denied'" class="muted">
+        Los avisos están bloqueados para esta app. Permítelos en los ajustes del navegador o del móvil y vuelve aquí.
+      </p>
+      <p v-else class="muted">Este navegador no puede recibir avisos.</p>
+    </div>
+
     <div class="logout">
       <button type="button" class="btn btn-ghost btn-block" :disabled="leaving" @click="logOut">
         <AppIcon name="logout" :size="20" />
@@ -157,6 +211,15 @@ async function logOut() {
 .note {
   padding: 8px var(--gutter) 0;
   font-size: 0.875rem;
+}
+
+.push {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.push p {
+  font-size: 0.9375rem;
 }
 
 .logout {

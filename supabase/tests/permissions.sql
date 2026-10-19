@@ -313,6 +313,70 @@ select tests.check('tasks: empty_trash clears old tasks too', empty_trash() = 1)
 select tests.check('tasks: the old task is gone', not exists (select 1 from tasks where id = '00000000-0000-4000-8000-000000000027'));
 set role authenticated;
 
+-- ── Notifications ──
+select tests.as_user('daniel@ejemplo.com');
+select save_push_subscription('https://push.example.test/daniel-phone', 'p256dh-key', 'auth-key');
+select tests.check('push: daniel saves his device', (select count(*) from push_subscriptions) = 1);
+select tests.expect_error('push: no direct insert',
+  $$insert into push_subscriptions (person_id, endpoint, p256dh, auth) values (my_person_id(), 'https://x.test/y', 'a', 'b')$$, 'permission denied');
+select tests.expect_error('push: the outbox is not readable', $$select * from notifications$$, 'permission denied');
+select tests.expect_error('push: nobody writes to the outbox', $$select notify(my_person_id(), 'task_assigned', 'x', 'y', '/')$$, 'permission denied');
+select tests.expect_error('push: reminders only from the database', $$select enqueue_event_reminders()$$, 'permission denied');
+update tasks set assignees = assignees || (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000024';
+select tests.as_user('marta@ejemplo.com');
+select tests.check('push: marta does not see daniel''s device', (select count(*) from push_subscriptions) = 0);
+select save_push_subscription('https://push.example.test/daniel-phone', 'p256dh-2', 'auth-2');
+select tests.check('push: the same device signed in as marta becomes hers', (select count(*) from push_subscriptions) = 1);
+delete from push_subscriptions;
+select tests.check('push: marta turns it off', (select count(*) from push_subscriptions) = 0);
+reset role;
+select tests.check('push: a task assigned to marta tells her, once',
+  (select count(*) from notifications where kind = 'task_assigned' and url = '/tareas/00000000-0000-4000-8000-000000000024') = 1
+  and (select person_id from notifications where kind = 'task_assigned' and url = '/tareas/00000000-0000-4000-8000-000000000024')
+      = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')
+  and (select title from notifications where url = '/tareas/00000000-0000-4000-8000-000000000024') = 'Daniel te ha asignado una tarea');
+select tests.check('push: the request to join tells the admins',
+  exists (select 1 from notifications where kind = 'join_request' and body = 'Lucía quiere unirse al grupo.'
+            and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')));
+
+update events set reminder_minutes = 60 where id = '00000000-0000-4000-8000-0000000000f3';
+select tests.check('reminders: nothing before its time', enqueue_event_reminders(((current_date + 3) + time '16:20') at time zone 'Europe/Madrid') = 0);
+select tests.check('reminders: one hour before the dentist', enqueue_event_reminders(((current_date + 3) + time '16:30') at time zone 'Europe/Madrid') = 1);
+select enqueue_event_reminders(((current_date + 3) + time '16:35') at time zone 'Europe/Madrid');
+select tests.check('reminders: written once, for marta, with when and where',
+  (select count(*) = 1 and bool_and(title = 'Dentista' and body = 'Hoy a las 17:30 · Clínica Sonrisas'
+          and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'))
+     from notifications where kind = 'event_reminder' and title = 'Dentista'));
+update events set reminder_minutes = 1440 where id = '00000000-0000-4000-8000-0000000000f2';
+select enqueue_event_reminders(((current_date + 9) + time '09:00') at time zone 'Europe/Madrid');
+select tests.check('reminders: an all-day event counts from 09:00',
+  (select body from notifications where title = 'Viaje a Valencia') = 'Mañana, todo el día · Valencia');
+update events set reminder_minutes = 0 where id = '00000000-0000-4000-8000-0000000000f8';
+select tests.check('reminders: Pablo''s swimming goes to Daniel (with him) and Marta (admin)',
+  (select array_agg(p.user_id order by p.user_id) from event_reminder_people('00000000-0000-4000-8000-0000000000f8') r join people p on p.id = r)
+  = array['00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000c2']::uuid[]);
+update events set reminder_minutes = 0 where id = '00000000-0000-4000-8000-0000000000f7';
+select tests.check('reminders: a repeating event, on one of its days',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 7) + time '09:00') at time zone 'Europe/Madrid') = 1);
+select tests.check('reminders: not on a cancelled day',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 11) + time '09:00') at time zone 'Europe/Madrid') = 0);
+select tests.check('reminders: not on a day off the series',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 12) + time '09:00') at time zone 'Europe/Madrid') = 0);
+insert into event_exceptions (event_id, occurrence_date, status, overrides)
+values ('00000000-0000-4000-8000-0000000000f7', date_trunc('week', current_date)::date + 8, 'modified', '{"start_time": "10:30"}');
+select tests.check('reminders: a day moved to another time follows it',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '09:00') at time zone 'Europe/Madrid') = 0
+  and enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '10:30') at time zone 'Europe/Madrid') = 1);
+
+select dispatch_notifications();
+select tests.check('dispatch: without its secrets it calls nothing', not exists (select 1 from net.http_request_queue where url = 'https://functions.example.test/send-notifications'));
+select vault.create_secret('https://functions.example.test/send-notifications', 'notifications_function_url');
+select vault.create_secret('test-secret', 'notifications_secret');
+select dispatch_notifications();
+select tests.check('dispatch: with something pending it wakes the function',
+  exists (select 1 from net.http_request_queue where url = 'https://functions.example.test/send-notifications'));
+set role authenticated;
+
 -- ── Pending request sees nothing of the group ──
 select tests.as_user('lucia@ejemplo.com');
 select tests.check('lucia pending: no items', (select count(*) from items) = 0);

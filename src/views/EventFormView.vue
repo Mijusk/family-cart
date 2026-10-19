@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
+import { REMINDER_PRESETS, reminderLabel } from '@/lib/eventText'
 import { goBack } from '@/router/back'
 import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -56,6 +57,11 @@ const form = reactive({
   notes: '',
   groupIds: [] as string[],
   participantIds: [] as string[],
+  /** '' for none, a preset's minutes, or 'custom' (then the three fields below). */
+  reminder: '' as string,
+  reminderDays: 0,
+  reminderHours: 0,
+  reminderMins: 0,
   newFolderName: '',
   newFolderColor: PERSON_COLORS[2] as string,
 })
@@ -101,6 +107,7 @@ function fill() {
       notes: shown.notes ?? '',
       groupIds: editingId.value ? [...(calendar.eventGroups[source.id] ?? [])] : [groupStore.group.id],
       participantIds: [...(calendar.participants[source.id] ?? [])],
+      ...reminderFields(source.reminderMinutes),
     })
     if (onlyDay.value && day) form.startDate = exception?.overrides.startDate ?? day
   } else {
@@ -251,6 +258,30 @@ function toggleParticipant(id: string) {
   form.participantIds = form.participantIds.includes(id) ? form.participantIds.filter((p) => p !== id) : [...form.participantIds, id]
 }
 
+// ── Reminder ─────────────────────────────────────────────────
+
+const REMINDER_MAX = 30 * 1440
+
+function reminderFields(minutes: number | null) {
+  const custom = minutes !== null && !(REMINDER_PRESETS as readonly number[]).includes(minutes)
+  return {
+    reminder: minutes === null ? '' : custom ? 'custom' : String(minutes),
+    reminderDays: custom ? Math.floor(minutes / 1440) : 0,
+    reminderHours: custom ? Math.floor((minutes % 1440) / 60) : 0,
+    reminderMins: custom ? minutes % 60 : 0,
+  }
+}
+
+/** Minutes before the start, null for none; NaN if the custom one is out of range. */
+const reminderMinutes = computed((): number | null => {
+  if (form.reminder === '') return null
+  if (form.reminder !== 'custom') return Number(form.reminder)
+  const parts = [form.reminderDays, form.reminderHours, form.reminderMins].map((n) => Math.floor(Number(n) || 0))
+  if (parts.some((n) => n < 0)) return NaN
+  const total = parts[0]! * 1440 + parts[1]! * 60 + parts[2]!
+  return total <= REMINDER_MAX ? total : NaN
+})
+
 // ── Save ─────────────────────────────────────────────────────
 
 function validate(): string | null {
@@ -260,6 +291,7 @@ function validate(): string | null {
   if (!form.allDay && form.startTime === form.endTime) return 'La hora de fin tiene que ser distinta de la de inicio.'
   if (onlyDay.value) return null
   if (form.calendarId === NEW_FOLDER && !form.newFolderName.trim()) return 'Ponle nombre a la carpeta nueva.'
+  if (Number.isNaN(reminderMinutes.value)) return 'El aviso puede ser como mucho 30 días antes.'
   if ((form.repeat === 'weekly' || form.repeat === 'biweekly') && !form.weekdays.length)
     return 'Elige al menos un día de la semana.'
   if (form.repeat !== 'none' && form.repeatUntil && form.repeatUntil < form.startDate)
@@ -302,6 +334,7 @@ async function save() {
       repeat: form.repeat,
       repeatWeekdays: weekly ? form.weekdays : null,
       repeatUntil: form.repeat !== 'none' && form.repeatUntil ? form.repeatUntil : null,
+      reminderMinutes: reminderMinutes.value,
     }
     const offered = groupOptions.value.map((g) => g.id)
     const groupIds = form.groupIds.filter((id) => offered.includes(id) && !calendar.sharedGroupIds(calendarId).includes(id))
@@ -457,6 +490,35 @@ function cancel() {
         Notas
         <textarea v-model="form.notes" class="field" rows="3" maxlength="2000" />
       </label>
+
+      <template v-if="!onlyDay">
+        <label class="label">
+          Aviso
+          <select v-model="form.reminder" class="field">
+            <option value="">Sin aviso</option>
+            <option v-for="m in REMINDER_PRESETS" :key="m" :value="String(m)">{{ reminderLabel(m) }}</option>
+            <option value="custom">Personalizado…</option>
+          </select>
+        </label>
+        <div v-if="form.reminder === 'custom'" class="custom-reminder" role="group" aria-label="Aviso personalizado">
+          <label class="label">
+            Días
+            <input v-model.number="form.reminderDays" type="number" inputmode="numeric" min="0" max="30" class="field" />
+          </label>
+          <label class="label">
+            Horas
+            <input v-model.number="form.reminderHours" type="number" inputmode="numeric" min="0" max="23" class="field" />
+          </label>
+          <label class="label">
+            Minutos
+            <input v-model.number="form.reminderMins" type="number" inputmode="numeric" min="0" max="59" step="5" class="field" />
+          </label>
+        </div>
+        <p v-if="form.reminder !== ''" class="muted hint">
+          {{ form.reminder === 'custom' && !Number.isNaN(reminderMinutes) ? `${reminderLabel(reminderMinutes!)}. ` : '' }}Llega a quien
+          va al evento, en los móviles con los avisos activados en Cuenta.
+        </p>
+      </template>
 
       <fieldset v-if="!onlyDay && participantOptions.length" class="groups">
         <legend class="label">Con quién</legend>
@@ -621,6 +683,13 @@ textarea.field {
 
 .groups legend {
   margin-bottom: 4px;
+}
+
+.custom-reminder {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: -6px;
 }
 
 .dot {

@@ -159,6 +159,7 @@ export const toEvent = (r: EventRow): CalendarEvent => ({
   repeat: r.repeat as RepeatKind,
   repeatWeekdays: r.repeat_weekdays,
   repeatUntil: r.repeat_until,
+  reminderMinutes: r.reminder_minutes,
   createdBy: r.created_by,
   createdAt: r.created_at,
   updatedBy: r.updated_by,
@@ -167,7 +168,10 @@ export const toEvent = (r: EventRow): CalendarEvent => ({
 
 /** The writable fields of an event. */
 export const fromEvent = (
-  e: Pick<CalendarEvent, 'calendarId' | 'title' | 'notes' | 'location' | 'allDay' | 'startDate' | 'startTime' | 'endTime' | 'repeat' | 'repeatWeekdays' | 'repeatUntil'>,
+  e: Pick<
+    CalendarEvent,
+    'calendarId' | 'title' | 'notes' | 'location' | 'allDay' | 'startDate' | 'startTime' | 'endTime' | 'repeat' | 'repeatWeekdays' | 'repeatUntil' | 'reminderMinutes'
+  >,
 ) => ({
   calendar_id: e.calendarId,
   title: e.title,
@@ -180,6 +184,7 @@ export const fromEvent = (
   repeat: e.repeat,
   repeat_weekdays: e.repeatWeekdays,
   repeat_until: e.repeatUntil,
+  reminder_minutes: e.reminderMinutes,
 })
 
 /** Overrides are stored with the column names of events. */

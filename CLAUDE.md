@@ -5,7 +5,8 @@ calendario por persona (rutina diaria, horario semanal, eventos puntuales) compa
 llama **Family App** (el repo sigue siendo `family-cart`).
 
 **Antes de tocar nada del calendario, lee `docs/calendario.md`**: diseño completo,
-decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`.
+decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`; las
+notificaciones (Web Push), en `docs/notificaciones.md`.
 
 ## Stack
 
@@ -29,6 +30,8 @@ decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md
 - Tareas: `task_lists` (de una persona, como las carpetas) → `tasks` (orden en `position`
   numérica; varias personas en `assignees`; `done_at`/`done_by` solo por la RPC `set_task_done`). Se comparten enteras con
   grupos vía `task_list_shares`; sin grupos es privada. Borrado suave como en el calendario.
+- Notificaciones: `push_subscriptions` (dispositivos) y la cola `notifications`, que llenan
+  triggers y pg_cron (`events.reminder_minutes`) y vacía la Edge Function `send-notifications`.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 

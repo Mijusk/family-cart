@@ -199,13 +199,13 @@ isOneToOne: false
                   ]
                 },"events": {
                   Row: {
-                    "all_day": boolean,"calendar_id": string,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"end_time": string | null,"id": string,"location": string | null,"notes": string | null,"repeat": string,"repeat_until": string | null,"repeat_weekdays": (number)[] | null,"start_date": string,"start_time": string | null,"timezone": string,"title": string,"updated_at": string,"updated_by": string | null,"event_snapshot": Json | null
+                    "all_day": boolean,"calendar_id": string,"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"end_time": string | null,"id": string,"location": string | null,"notes": string | null,"reminder_minutes": number | null,"repeat": string,"repeat_until": string | null,"repeat_weekdays": (number)[] | null,"start_date": string,"start_time": string | null,"timezone": string,"title": string,"updated_at": string,"updated_by": string | null,"event_snapshot": Json | null
                   }
                   Insert: {
-                    "all_day"?: boolean,"calendar_id": string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"end_time"?: string | null,"id"?: string,"location"?: string | null,"notes"?: string | null,"repeat"?: string,"repeat_until"?: string | null,"repeat_weekdays"?: (number)[] | null,"start_date": string,"start_time"?: string | null,"timezone"?: string,"title": string,"updated_at"?: string,"updated_by"?: string | null
+                    "all_day"?: boolean,"calendar_id": string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"end_time"?: string | null,"id"?: string,"location"?: string | null,"notes"?: string | null,"reminder_minutes"?: number | null,"repeat"?: string,"repeat_until"?: string | null,"repeat_weekdays"?: (number)[] | null,"start_date": string,"start_time"?: string | null,"timezone"?: string,"title": string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "all_day"?: boolean,"calendar_id"?: string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"end_time"?: string | null,"id"?: string,"location"?: string | null,"notes"?: string | null,"repeat"?: string,"repeat_until"?: string | null,"repeat_weekdays"?: (number)[] | null,"start_date"?: string,"start_time"?: string | null,"timezone"?: string,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
+                    "all_day"?: boolean,"calendar_id"?: string,"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"end_time"?: string | null,"id"?: string,"location"?: string | null,"notes"?: string | null,"reminder_minutes"?: number | null,"repeat"?: string,"repeat_until"?: string | null,"repeat_weekdays"?: (number)[] | null,"start_date"?: string,"start_time"?: string | null,"timezone"?: string,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -327,6 +327,25 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"notifications": {
+                  Row: {
+                    "body": string,"created_at": string,"dedupe_key": string | null,"id": string,"kind": string,"person_id": string,"sent_at": string | null,"title": string,"url": string
+                  }
+                  Insert: {
+                    "body"?: string,"created_at"?: string,"dedupe_key"?: string | null,"id"?: string,"kind": string,"person_id": string,"sent_at"?: string | null,"title": string,"url"?: string
+                  }
+                  Update: {
+                    "body"?: string,"created_at"?: string,"dedupe_key"?: string | null,"id"?: string,"kind"?: string,"person_id"?: string,"sent_at"?: string | null,"title"?: string,"url"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "notifications_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"people": {
                   Row: {
                     "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"updated_at": string,"updated_by": string | null,"user_id": string | null
@@ -374,6 +393,25 @@ isOneToOne: false
       columns: ["group_id"]
 isOneToOne: false
       referencedRelation: "groups"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"push_subscriptions": {
+                  Row: {
+                    "auth": string,"created_at": string,"endpoint": string,"id": string,"p256dh": string,"person_id": string
+                  }
+                  Insert: {
+                    "auth": string,"created_at"?: string,"endpoint": string,"id"?: string,"p256dh": string,"person_id": string
+                  }
+                  Update: {
+                    "auth"?: string,"created_at"?: string,"endpoint"?: string,"id"?: string,"p256dh"?: string,"person_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "push_subscriptions_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: false
+      referencedRelation: "people"
       referencedColumns: ["id"]
     }
                   ]
@@ -599,16 +637,25 @@ isOneToOne: false
 "delete_task_list":
 { Args: { "list_id": string }; Returns: string
                            },
+"dispatch_notifications":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "editable_calendar_ids":
 { Args: Record<PropertyKey, never>; Returns: string[]
                            },
 "empty_trash":
 { Args: { "max_age"?: string }; Returns: number
                            },
+"enqueue_event_reminders":
+{ Args: { "at"?: string }; Returns: number
+                           },
 "event_owners":
 { Args: { "event_ids": (string)[] }; Returns: {
               "color": string,"event_id": string,"owner_id": string
             }[]
+                           },
+"event_reminder_people":
+{ Args: { "eid": string }; Returns: string[]
                            },
 "event_snapshot":
 { Args: { "e": Database["public"]['Tables']["events"]['Row'] }; Returns: Json
@@ -638,6 +685,9 @@ isOneToOne: false
                            },
 "is_live_task_list":
 { Args: { "lid": string }; Returns: boolean
+                           },
+"is_series_date":
+{ Args: { "d": string,"e": Database["public"]['Tables']["events"]['Row'] }; Returns: boolean
                            },
 "leave_group":
 { Args: { "gid": string }; Returns: undefined
@@ -671,6 +721,9 @@ isOneToOne: false
                            },
 "normalize_name":
 { Args: { "name": string }; Returns: string
+                           },
+"notify":
+{ Args: { "body": string,"dedupe_key"?: string,"kind": string,"person": string,"title": string,"url": string }; Returns: undefined
                            },
 "notify_busy_groups":
 { Args: { "cid": string }; Returns: undefined
@@ -734,11 +787,17 @@ isOneToOne: false
 "retire_member":
 { Args: { "target_member_id": string }; Returns: undefined
                            },
+"save_push_subscription":
+{ Args: { "auth": string,"endpoint": string,"p256dh": string }; Returns: undefined
+                           },
 "set_member_role":
 { Args: { "member_id": string,"new_role": string }; Returns: undefined
                            },
 "set_task_done":
 { Args: { "done": boolean,"task_id": string }; Returns: undefined
+                           },
+"short_day":
+{ Args: { "d": string,"today": string }; Returns: string
                            },
 "task_list_viewers":
 { Args: { "lid": string,"pids": string[] }; Returns: string[]
