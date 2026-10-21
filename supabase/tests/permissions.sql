@@ -340,15 +340,15 @@ select tests.check('push: the request to join tells the admins',
             and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')));
 
 update events set reminder_minutes = 60 where id = '00000000-0000-4000-8000-0000000000f3';
-select tests.check('reminders: nothing before its time', enqueue_event_reminders(((current_date + 3) + time '16:20') at time zone 'Europe/Madrid') = 0);
-select tests.check('reminders: one hour before the dentist', enqueue_event_reminders(((current_date + 3) + time '16:30') at time zone 'Europe/Madrid') = 1);
-select enqueue_event_reminders(((current_date + 3) + time '16:35') at time zone 'Europe/Madrid');
+select tests.check('reminders: nothing before its time', enqueue_event_reminders(((date_trunc('week', current_date)::date + 3) + time '16:20') at time zone 'Europe/Madrid') = 0);
+select tests.check('reminders: one hour before the dentist', enqueue_event_reminders(((date_trunc('week', current_date)::date + 3) + time '16:30') at time zone 'Europe/Madrid') = 1);
+select enqueue_event_reminders(((date_trunc('week', current_date)::date + 3) + time '16:35') at time zone 'Europe/Madrid');
 select tests.check('reminders: written once, for marta, with when and where',
   (select count(*) = 1 and bool_and(title = 'Dentista' and body = 'Hoy a las 17:30 · Clínica Sonrisas'
           and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'))
      from notifications where kind = 'event_reminder' and title = 'Dentista'));
 update events set reminder_minutes = 1440 where id = '00000000-0000-4000-8000-0000000000f2';
-select enqueue_event_reminders(((current_date + 9) + time '09:00') at time zone 'Europe/Madrid');
+select enqueue_event_reminders(((date_trunc('week', current_date)::date + 9) + time '09:00') at time zone 'Europe/Madrid');
 select tests.check('reminders: an all-day event counts from 09:00',
   (select body from notifications where title = 'Viaje a Valencia') = 'Mañana, todo el día · Valencia');
 update events set reminder_minutes = 0 where id = '00000000-0000-4000-8000-0000000000f8';
