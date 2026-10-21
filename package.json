@@ -12,7 +12,9 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
-    "db:test": "docker exec -i supabase_db_family-cart psql -U postgres -d postgres < supabase/tests/permissions.sql"
+    "db:test": "docker exec -i supabase_db_family-cart psql -U postgres -d postgres < supabase/tests/permissions.sql",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -29,6 +31,7 @@
     "supabase": "^2.118.0",
     "typescript": "~6.0",
     "vite": "^8.3.1",
+    "vitest": "^5.0.5",
     "vue-tsc": "^3.3.11"
   }
 }

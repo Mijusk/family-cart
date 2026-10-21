@@ -1,0 +1,53 @@
+# Runs on every pull request and on main: the app (types, unit tests, build) and the database
+# (migrations + seed from scratch, permission tests, generated types up to date).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (types, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  db:
+    name: Database (migrations, permissions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Same as `npm run db:start`: applies every migration and seed.sql to a fresh database.
+      - run: npm run db:start
+      - name: Permission tests
+        run: |
+          npm run --silent db:test | tee db-test.log
+          if grep -q '^FAIL' db-test.log || ! tail -n 1 db-test.log | grep -q ' 0 failed$'; then
+            echo "::error::Permission tests failed"
+            exit 1
+          fi
+      - name: database.types.ts matches the schema
+        run: |
+          npm run --silent db:types
+          git diff --exit-code src/lib/database.types.ts || {
+            echo "::error::src/lib/database.types.ts is outdated: run npm run db:types and commit it"
+            exit 1
+          }
