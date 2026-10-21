@@ -2,7 +2,8 @@
 import { RouterLink } from 'vue-router'
 import AppIcon from './AppIcon.vue'
 
-// Switches between the calendar's views (Hoy, Semana, Mes), with a way to the folders.
+// Switches between the calendar's views (Hoy, Semana, Mes), with a way to the folders and to
+// "Planificar con IA".
 
 const tabs = [
   { name: 'calendar', label: 'Hoy' },
@@ -18,6 +19,7 @@ const tabs = [
     </RouterLink>
   </nav>
   <p class="more">
+    <RouterLink :to="{ name: 'plan' }"><AppIcon name="spark" :size="16" /> Planificar con IA</RouterLink>
     <RouterLink :to="{ name: 'folders' }"><AppIcon name="folder" :size="16" /> Mis carpetas</RouterLink>
   </p>
 </template>
@@ -45,8 +47,11 @@ const tabs = [
 }
 
 .more {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  column-gap: 16px;
   margin: -4px var(--gutter) 8px;
-  text-align: right;
 }
 
 .more a {

@@ -90,6 +90,12 @@ export const router = createRouter({
       meta: { section: 'calendar' },
     },
     {
+      path: '/calendario/planificar',
+      name: 'plan',
+      component: () => import('@/views/PlanView.vue'),
+      meta: { section: 'calendar' },
+    },
+    {
       path: '/calendario/papelera',
       name: 'trash',
       component: () => import('@/views/TrashView.vue'),
