@@ -33,7 +33,7 @@ http://127.0.0.1:54324.
 | `npm run db:reset` | Borra la base de datos y la recrea desde `supabase/migrations` + `supabase/seed.sql` |
 | `npm run db:types` | Regenera `src/lib/database.types.ts` después de cambiar el esquema |
 | `npm run db:test` | Comprueba los permisos (RLS y funciones) contra los datos de ejemplo; no cambia nada |
-| `npm test` | Tests unitarios (Vitest): repeticiones, fechas, textos, escala de la semana, tareas |
+| `npm test` | Tests unitarios (Vitest): repeticiones, fechas, textos, escala de la semana, tareas y el feed `.ics` |
 | `npm run build` | Type-check (vue-tsc) + build de producción |
 
 GitHub Actions (`.github/workflows/ci.yml`) pasa en cada PR los tests y el build y, con Supabase

@@ -33,6 +33,8 @@ notificaciones (Web Push), en `docs/notificaciones.md`.
 - Notificaciones: `push_subscriptions` (dispositivos) y la cola `notifications`, que llenan
   triggers y pg_cron (`events.reminder_minutes`, tareas con fecha) y vacía la Edge Function
   `send-notifications`. Cada persona apaga tipos en `people.muted_notifications`.
+- Calendario en el móvil: `calendar_feeds` (enlace privado por persona) y la Edge Function
+  `calendar-feed`, que sirve el `.ics` con lo que esa persona ve (`docs/calendario.md` §13).
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 

@@ -21,4 +21,6 @@ function resolveUrl(configured: string): string {
   return parsed.origin
 }
 
-export const supabase = createClient<Database>(resolveUrl(url), key)
+export const supabaseUrl = resolveUrl(url)
+
+export const supabase = createClient<Database>(supabaseUrl, key)

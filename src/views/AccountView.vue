@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { signOut } from '@/lib/auth'
+import { createFeed, deleteFeed, feedSubscribeUrl, feedUrl, loadFeedToken } from '@/lib/feed'
 import { disablePush, enablePush, NOTIFICATION_KINDS, pushState, type PushState } from '@/lib/push'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
@@ -92,6 +93,46 @@ async function toggleKind(kind: NotificationKind) {
     toast.show(friendlyError(e))
   } finally {
     savingKinds.value = false
+  }
+}
+
+// ── Calendar on the phone (feed link) ─────────────────────────
+
+const feedToken = ref<string | null | undefined>(undefined)
+const feedBusy = ref(false)
+void loadFeedToken()
+  .then((token) => (feedToken.value = token))
+  .catch(() => (feedToken.value = null))
+
+async function feedAction(run: () => Promise<string | null>, done: string) {
+  if (feedBusy.value) return
+  feedBusy.value = true
+  try {
+    feedToken.value = await run()
+    toast.show(done)
+  } catch (e) {
+    toast.show(friendlyError(e))
+  } finally {
+    feedBusy.value = false
+  }
+}
+
+function newFeed() {
+  if (feedToken.value && !window.confirm('¿Cambiar el enlace? Los calendarios que usen el actual dejarán de actualizarse.')) return
+  void feedAction(createFeed, feedToken.value ? 'Enlace cambiado' : 'Enlace creado')
+}
+
+function removeFeed() {
+  if (!window.confirm('¿Quitar el enlace? Los calendarios que lo usen dejarán de actualizarse.')) return
+  void feedAction(async () => (await deleteFeed(), null), 'Enlace quitado')
+}
+
+async function copyFeed() {
+  try {
+    await navigator.clipboard.writeText(feedUrl(feedToken.value!))
+    toast.show('Enlace copiado')
+  } catch {
+    toast.show('No se pudo copiar: mantén pulsado el enlace')
   }
 }
 
@@ -196,6 +237,43 @@ async function logOut() {
     </div>
     <p class="muted note">Vale para todos tus dispositivos.</p>
 
+    <h2 class="section-title"><span>Calendario en el móvil</span></h2>
+    <div v-if="feedToken !== undefined" class="panel feed">
+      <p>
+        Ve tus eventos y los de tu familia en el calendario del móvil (Google, iPhone, Outlook).
+        <span class="muted">Solo lectura: se cambian aquí, en Family App.</span>
+      </p>
+      <template v-if="feedToken">
+        <div class="feed-actions">
+          <a class="btn btn-primary" :href="feedSubscribeUrl(feedToken)">
+            <AppIcon name="calendar" :size="20" />
+            Añadir al calendario
+          </a>
+          <button type="button" class="btn btn-ghost" @click="copyFeed">
+            <AppIcon name="copy" :size="20" />
+            Copiar enlace
+          </button>
+        </div>
+        <p class="muted small">
+          En Google Calendar (desde el ordenador): <strong>Otros calendarios</strong> →
+          <strong>+</strong> → <strong>Desde URL</strong> y pega el enlace. Google lo actualiza cada
+          pocas horas.
+        </p>
+        <div class="feed-actions">
+          <button type="button" class="btn btn-ghost" :disabled="feedBusy" @click="newFeed">Cambiar enlace</button>
+          <button type="button" class="btn btn-ghost" :disabled="feedBusy" @click="removeFeed">
+            <AppIcon name="trash" :size="20" />
+            Quitar
+          </button>
+        </div>
+      </template>
+      <button v-else type="button" class="btn btn-primary" :disabled="feedBusy" @click="newFeed">
+        <AppIcon name="calendar" :size="20" />
+        {{ feedBusy ? 'Creando…' : 'Crear enlace' }}
+      </button>
+    </div>
+    <p class="muted note">El enlace es privado: quien lo tenga ve tu calendario. Si se comparte sin querer, cámbialo.</p>
+
     <div class="logout">
       <button type="button" class="btn btn-ghost btn-block" :disabled="leaving" @click="logOut">
         <AppIcon name="logout" :size="20" />
@@ -263,6 +341,25 @@ async function logOut() {
 
 .kinds {
   flex-direction: column;
+}
+
+.feed {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.feed p {
+  font-size: 0.9375rem;
+}
+
+.feed .small {
+  font-size: 0.875rem;
+}
+
+.feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .logout {

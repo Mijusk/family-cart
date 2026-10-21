@@ -23,7 +23,26 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "calendar_shares": {
+            "calendar_feeds": {
+                  Row: {
+                    "created_at": string,"person_id": string,"token": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"person_id": string,"token": string
+                  }
+                  Update: {
+                    "created_at"?: string,"person_id"?: string,"token"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "calendar_feeds_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: true
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"calendar_shares": {
                   Row: {
                     "calendar_id": string,"group_id": string,"level": string,"shared_at": string,"shared_by": string | null
                   }
@@ -613,6 +632,9 @@ isOneToOne: false
 "close_trip":
 { Args: { "reason": string,"target_trip_id": string }; Returns: number
                            },
+"create_calendar_feed":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
 "create_calendar_for":
 { Args: { "color": string,"group_id": string,"name": string,"owner_id": string }; Returns: string
                            },
@@ -627,6 +649,9 @@ isOneToOne: false
                            },
 "delete_calendar":
 { Args: { "calendar_id": string }; Returns: string
+                           },
+"delete_calendar_feed":
+{ Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "delete_event":
 { Args: { "event_id": string }; Returns: string
@@ -665,6 +690,9 @@ isOneToOne: false
                            },
 "event_when":
 { Args: { "all_day": boolean,"d": string,"t": string,"today": string }; Returns: string
+                           },
+"feed_calendar":
+{ Args: { "feed_token": string }; Returns: Json
                            },
 "finish_trip":
 { Args: { "trip_id": string }; Returns: number

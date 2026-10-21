@@ -176,7 +176,7 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual, e
 
 ## 9. Fuera de la V1 (pero preparado)
 
-- Importar calendarios externos (`.ics`, colegio, trabajo).
+- Importar calendarios externos (`.ics`, colegio, trabajo). Exportar ya se puede: §13.
 - Exportar horarios (CSV/JSON) para generar tablas de tareas con IA.
 - Repartos de tareas familiares (las tareas puntuales llegan en el PR 8, ver `docs/tareas.md`).
 - Entrar con Google.
@@ -204,3 +204,28 @@ Navegación: la barra inferior muestra las secciones activas del grupo actual, e
 6. **PR 6 — Tiempo real y aviso de "está editando"** ✅: Postgres changes para lo que cada uno ve; para las franjas "Ocupado" un trigger manda un aviso vacío al canal `calendar:<grupo>` (`realtime.send`) y la app recarga. "Está editando" con Presence en el canal `event-edit:<evento>`.
 7. **PR 7 — Navegación y flujos** ✅: volver atrás a la vista de donde se venía (`goBack()`), estado de las vistas en la URL, la hora de fin sigue a la de inicio, mensajes de error y reintentar.
 8. **PR 8 — Tareas**: listas de tareas puntuales con el mismo modelo de propiedad y compartición que las carpetas. Diseño en `docs/tareas.md`. La barra queda en Compra · Tareas · Calendario · Grupo, con Historial dentro de Compra. Las tareas con fecha en Hoy llegarán después.
+
+## 13. Calendario en el móvil (feed `.ics`)
+
+Cada persona con cuenta puede crear, en **Cuenta → Calendario en el móvil**, un enlace privado al
+que se suscribe el calendario del móvil (Google, iPhone, Outlook). Es de solo lectura y se
+actualiza solo (Google, cada pocas horas). Decidido con Luis el 21 oct 2026.
+
+- **Qué sale:** lo mismo que esa persona ve en la app, de todos sus grupos: sus eventos, los
+  compartidos con ella y aquellos en los que participa, y las franjas «Ocupado». Los de otra
+  persona llevan su nombre delante («Daniel · Pádel») y la carpeta en la descripción. Los puntuales
+  de hace más de un año no salen.
+- **Enlace:** `calendar_feeds` (un token aleatorio por persona; solo lo ve su dueña). Las RPCs
+  `create_calendar_feed` (crea el enlace o lo cambia; el anterior deja de funcionar) y
+  `delete_calendar_feed`.
+- **Datos:** `feed_calendar(token)`, solo para `service_role`. No repite las reglas de permisos:
+  durante esa llamada actúa como la dueña del enlace (`request.jwt.claim.sub`), así que
+  `can_view_event` y `busy_events` responden igual que en la app.
+- **Edge Function `calendar-feed`:** `GET /functions/v1/calendar-feed/<token>.ics`, sin
+  comprobación de JWT (la clave es el token). El `.ics` se construye en `ics.ts` (TypeScript puro,
+  con tests en `npm test` que comparan las repeticiones con `src/lib/recurrence.ts`): repeticiones
+  como `RRULE` en la zona del evento (la hora se mantiene con el cambio de hora), días cancelados
+  como `EXDATE` y días cambiados como otro `VEVENT` con `RECURRENCE-ID`.
+- **Puesta en marcha:** `npx supabase db push` y
+  `npx supabase functions deploy calendar-feed --no-verify-jwt`. En local la función no arranca
+  con `db:start`; se prueba con `npx supabase functions serve`.

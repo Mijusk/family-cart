@@ -128,6 +128,45 @@ select tests.check('calendar: a member cannot read the busy events', (select cou
 select tests.check('calendar: busy folder name stays hidden', not exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e3'));
 select tests.check('calendar: but its share is visible', exists (select 1 from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e3' and level = 'busy'));
 select tests.check('calendar: a member cannot edit a busy share', not can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
+-- Calendar feed: the link shows what its owner sees in the app (Marta, still a plain member here).
+select tests.check('feed: create a link', create_calendar_feed() ~ '^[0-9a-f]{64}$');
+select tests.expect_error('feed: no token chosen by hand', $$insert into calendar_feeds (person_id, token) values (my_person_id(), repeat('a', 64))$$, 'permission denied');
+select tests.expect_error('feed: only the Edge Function reads a feed', $$select feed_calendar(repeat('a', 64))$$, 'permission denied');
+select count(*) as marta_sees from events where deleted_at is null \gset
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('feed: daniel creates his', create_calendar_feed() is not null);
+select count(*) as daniel_sees from events where deleted_at is null \gset
+select tests.check('feed: each one sees only their own link', (select count(*) from calendar_feeds) = 1);
+select tests.as_user('marta@ejemplo.com');
+reset role;
+select token as marta_feed from calendar_feeds where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') \gset
+select token as daniel_feed from calendar_feeds where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') \gset
+set role service_role;
+select feed_calendar(:'marta_feed') as marta_json \gset
+select feed_calendar(:'daniel_feed') as daniel_json \gset
+select feed_calendar(repeat('0', 64)) is null as unknown_is_null \gset
+reset role;
+select tests.check('feed: marta''s has the events she sees', jsonb_array_length((:'marta_json'::jsonb)->'events') = :marta_sees);
+select tests.check('feed: with her private dentist', (:'marta_json'::jsonb)->'events' @> '[{"title": "Dentista", "mine": true}]');
+select tests.check('feed: and Daniel''s busy slots (3)', jsonb_array_length((:'marta_json'::jsonb)->'busy') = 3);
+select tests.check('feed: busy slots without details', ((:'marta_json'::jsonb)->'busy')::text !~ 'Crossfit|Box Norte|Gimnasio');
+select tests.check('feed: daniel''s has the events he sees', jsonb_array_length((:'daniel_json'::jsonb)->'events') = :daniel_sees);
+select tests.check('feed: without Marta''s private dentist', not ((:'daniel_json'::jsonb)->'events' @> '[{"title": "Dentista"}]'));
+select tests.check('feed: unknown token gives nothing', :'unknown_is_null');
+set role authenticated;
+select tests.as_user('marta@ejemplo.com');
+select tests.check('feed: marta asks for a new link', create_calendar_feed() is not null);
+select tests.check('feed: a new link replaces the old one', (select token from calendar_feeds) <> :'marta_feed');
+select tests.as_user('daniel@ejemplo.com');
+select from delete_calendar_feed();
+select tests.check('feed: removing it', not exists (select 1 from calendar_feeds));
+reset role;
+set role service_role;
+select feed_calendar(:'marta_feed') is null and feed_calendar(:'daniel_feed') is null as old_links_dead \gset
+reset role;
+select tests.check('feed: old and removed links stop working', :'old_links_dead');
+set role authenticated;
+select tests.as_user('marta@ejemplo.com');
 reset role;
 update members set role = 'admin' where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1');
 set role authenticated;
