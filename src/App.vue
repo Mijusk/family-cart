@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import BottomNav from '@/components/BottomNav.vue'
+import OfflineBanner from '@/components/OfflineBanner.vue'
 import UndoToast from '@/components/UndoToast.vue'
 import { useOnResume } from '@/composables/resume'
 import { sectionRedirect } from '@/router'
@@ -61,6 +62,7 @@ async function retry() {
 <template>
   <!-- Without the tab bar, --nav-height drops to 0 so docked buttons and toasts sit at the bottom edge. -->
   <div class="app" :class="{ 'no-nav': route.meta.hideNav || groupStore.status !== 'ready' }">
+    <OfflineBanner v-if="groupStore.status === 'ready'" />
     <main class="column">
       <!-- Screens that need a group never render without one (e.g. just after leaving the last group). -->
       <div v-if="!canShowRoute" class="onboard" aria-busy="true">

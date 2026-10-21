@@ -34,7 +34,7 @@ const isStandalone = () =>
 
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 
-/** Registered once at start; it only handles notifications, so it never serves a stale app. */
+/** Registered once at start: notifications, and the app cached to open without connection (see public/sw.js). */
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return
   navigator.serviceWorker.register('/sw.js').catch((e) => console.error('service worker', e))

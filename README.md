@@ -67,6 +67,9 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
   (RPC) atómicas, para que dos personas a la vez no se pisen. `npm run db:test` las comprueba.
 - **Tiempo real:** los stores aplican cada cambio en local al momento, lo guardan en Supabase (en cola,
   en orden) y escuchan Realtime; al reconectar (móvil que vuelve de segundo plano) recargan todo.
+- **Sin conexión:** el service worker guarda la app, así que abre sin red, y el móvil guarda la última
+  lista de la compra que mandó el servidor. Sin red se puede seguir añadiendo y marcando: los cambios
+  esperan en cola y se guardan al volver la conexión (con la app abierta). Un aviso arriba lo indica.
 - **Catálogo de autocompletado:** lo mantiene un trigger sobre `items`.
 - **Varios grupos:** una persona puede estar en varios grupos (familia, pareja…). Se cambia
   tocando el nombre del grupo arriba; el último abierto se recuerda en `localStorage`. Al salir de un

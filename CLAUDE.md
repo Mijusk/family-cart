@@ -83,6 +83,13 @@ Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar
 - Colores de persona: `src/utils/colors.ts` y `random_person_color()` en SQL deben
   coincidir (contraste suficiente con texto blanco).
 - Preparada para PWA/Capacitor más adelante: nada que dependa solo de escritorio.
+- Sin conexión: `public/sw.js` guarda la app (páginas primero a la red, `/assets/` con hash desde
+  la caché; la lista la escribe el build en `/sw-precache.js`). `src/lib/offline.ts` guarda en el
+  dispositivo lo último que mandó el servidor (sesión, grupo, lista de la compra), por cuenta, y
+  lo borra al cerrar sesión. Sin red al abrir, `group.savedCopy` abre esa copia y al volver la red
+  carga de verdad sin pantalla de carga. Los cambios de la compra esperan en la cola de
+  `persist()` hasta que vuelva la red (mientras la app siga abierta). Calendario y tareas no
+  tienen copia: sin red muestran su error con «Reintentar».
 
 ## Forma de trabajar
 
