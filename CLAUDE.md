@@ -62,9 +62,10 @@ npm run build      # vue-tsc + vite build
 ```
 
 CI (`.github/workflows/ci.yml`) corre en cada PR: `npm test` y `build`, y en otro job levanta
-Supabase desde cero (migraciones + seed), pasa `db:test` y comprueba que `database.types.ts` está
-al día. Las funciones puras (`recurrence`, `days`, `eventText`, `timeline`, `tasks`…) llevan sus
-tests al lado (`*.test.ts`); al cambiar una, añade el caso.
+Supabase desde cero (migraciones + seed) y pasa `db:test`. Los tests de permisos tienen que pasar
+cualquier día de la semana: usa las fechas igual que `seed.sql` (`date_trunc('week', current_date)`
+para el calendario, `current_date` para las tareas). Las funciones puras (`recurrence`, `days`,
+`eventText`, `timeline`, `tasks`…) llevan sus tests al lado (`*.test.ts`); al cambiar una, añade el caso.
 
 Datos de prueba (`seed.sql`), contraseña `demo1234`: `marta@ejemplo.com` (admin),
 `daniel@ejemplo.com` (miembro), `lucia@ejemplo.com` (pendiente); perfiles sin cuenta

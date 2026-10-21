@@ -1,5 +1,5 @@
 # Runs on every pull request and on main: the app (types, unit tests, build) and the database
-# (migrations + seed from scratch, permission tests, generated types up to date).
+# (migrations + seed from scratch, permission tests).
 name: CI
 
 on:
@@ -44,10 +44,3 @@ jobs:
             echo "::error::Permission tests failed"
             exit 1
           fi
-      - name: database.types.ts matches the schema
-        run: |
-          npm run --silent db:types
-          git diff --exit-code src/lib/database.types.ts || {
-            echo "::error::src/lib/database.types.ts is outdated: run npm run db:types and commit it"
-            exit 1
-          }

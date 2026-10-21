@@ -37,7 +37,7 @@ http://127.0.0.1:54324.
 | `npm run build` | Type-check (vue-tsc) + build de producción |
 
 GitHub Actions (`.github/workflows/ci.yml`) pasa en cada PR los tests y el build y, con Supabase
-levantado desde cero, las migraciones, `db:test` y la comprobación de que los tipos generados están al día.
+levantado desde cero, las migraciones y `db:test`.
 
 `npm run dev` ya escucha en la red local (`--host`): al arrancar, además de
 `http://localhost:5173` sale una línea `Network: http://<IP-de-tu-PC>:5173`, que es la que
