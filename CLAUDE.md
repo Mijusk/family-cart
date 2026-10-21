@@ -98,7 +98,10 @@ Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar
   `/rest/v1` y una sesión con JWT firmado a mano en `localStorage`.
 - Lógica del calendario fuera de los componentes: fechas en `src/utils/days.ts`, repeticiones
   en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts`, datos en
-  `src/stores/calendar.ts`.
+  `src/stores/calendar.ts`. El store carga enteras las carpetas y los eventos que se repiten, pero
+  los puntuales y las excepciones solo de un rango de días que crece cuando una vista pide días
+  cerca del borde: las vistas llaman a `ensureLoaded(grupo, desde, hasta)` con lo que muestran y
+  las del evento a `ensureEvent()` (trae el evento aunque esté fuera, p. ej. desde un aviso).
 - Volver atrás siempre con `goBack()` de `src/router/back.ts` (como el botón atrás del móvil), no con
   un enlace fijo; el estado de las vistas (día, semana, filtros, día elegido del mes) va en la URL.
 - Al desplegar en Supabase Cloud: proveedor Email activado, inicio de sesión anónimo

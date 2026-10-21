@@ -59,10 +59,11 @@ watch(
   (id, before) => {
     // Another group: its people and folders are others.
     if (before && id !== before) void router.replace({ query: {} })
-    calendar.ensureLoaded(id).catch(() => {})
+    calendar.ensureLoaded(id, weekStart.value, addDays(weekStart.value, 6)).catch(() => {})
   },
   { immediate: true },
 )
+watch(weekStart, (start) => calendar.ensureLoaded(groupStore.group.id, start, addDays(start, 6)).catch(() => {}))
 
 function toggle(set: Set<string>, id: string): Set<string> {
   const next = new Set(set)

@@ -171,6 +171,11 @@ function defaultCalendar(): string {
   return (editable.find((c) => c.ownerId === groupStore.me?.id) ?? editable[0])?.id ?? NEW_FOLDER
 }
 
+// Before the watch below, so it sees 'loading' while the event or that day's changes are on their way.
+const sourceId = editingId.value ?? copyOf.value
+void (sourceId ? calendar.ensureEvent(groupStore.group.id, sourceId, queryDay.value) : calendar.ensureLoaded(groupStore.group.id)).catch(
+  () => {},
+)
 watch(
   () => calendar.status,
   (status) => {
@@ -178,7 +183,6 @@ watch(
   },
   { immediate: true },
 )
-void calendar.ensureLoaded(groupStore.group.id).catch(() => {})
 
 const notFound = computed(() => ready.value && (editingId.value || copyOf.value) && !calendar.eventById(editingId.value ?? copyOf.value!))
 

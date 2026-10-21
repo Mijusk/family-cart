@@ -55,8 +55,8 @@ const swipeArea = ref<HTMLElement | null>(null)
 const slide = useSwipe(swipeArea, moveMonth)
 
 watch(
-  () => groupStore.group.id,
-  (id) => calendar.ensureLoaded(id).catch(() => {}),
+  () => [groupStore.group.id, weeks.value[0]![0]!, weeks.value.at(-1)![6]!] as const,
+  ([id, first, last]) => calendar.ensureLoaded(id, first, last).catch(() => {}),
   { immediate: true },
 )
 

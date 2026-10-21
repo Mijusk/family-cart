@@ -25,7 +25,11 @@ const eventId = computed(() => String(route.params.id))
 const event = computed(() => calendar.eventById(eventId.value))
 const seriesDate = computed(() => (isIsoDate(route.query.dia) ? route.query.dia : event.value?.startDate ?? ''))
 
-void calendar.ensureLoaded(groupStore.group.id).catch(() => {})
+watch(
+  () => [eventId.value, route.query.dia] as const,
+  ([id, day]) => calendar.ensureEvent(groupStore.group.id, id, isIsoDate(day) ? day : null).catch(() => {}),
+  { immediate: true },
+)
 
 const repeating = computed(() => event.value?.repeat !== 'none')
 const exception = computed(() =>
