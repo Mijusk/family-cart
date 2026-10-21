@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { isAuthRetryableFetchError, type RealtimeChannel, type RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { toGroup, toMember, toPerson, type GroupRow } from '@/lib/mappers'
+import { clearSnapshots, readSnapshot, saveSnapshot, snapshotUser } from '@/lib/offline'
 import type { Group, Member, MemberRole, Membership, NotificationKind, Person } from '@/types'
 import { errorText, isNetworkError } from '@/utils/errors'
 import { useCalendarStore } from './calendar'
@@ -38,6 +39,18 @@ interface MembershipRow {
   groups: { name: string } | null
 }
 
+/** What the device keeps of the session to open without connection (see lib/offline). */
+interface SavedSession {
+  email: string | null
+  me: Person
+  memberships: Membership[]
+}
+
+interface SavedGroup {
+  group: Group
+  members: Member[]
+}
+
 /** Last group opened on this device, so the app reopens it next time. */
 const ACTIVE_GROUP_KEY = 'family-cart:active-group'
 
@@ -64,6 +77,12 @@ export const useGroupStore = defineStore('group', () => {
   const errorMessage = ref<string | null>(null)
   /** Whether the last failed load never reached the server, as opposed to the server answering with an error. */
   const offline = ref(false)
+  /**
+   * Opened without connection from the copy saved on this device: the shopping list works (its
+   * changes wait for the connection) and the rest shows what it can. Loaded for real once the
+   * connection is back.
+   */
+  const savedCopy = ref(false)
   const userId = ref<string | null>(null)
   const email = ref<string | null>(null)
   /** The signed-in person. */
@@ -145,9 +164,12 @@ export const useGroupStore = defineStore('group', () => {
     return init()
   }
 
-  async function bootstrap() {
-    status.value = 'loading'
-    errorMessage.value = null
+  /** `quiet`: back online after opening from the saved copy, so what is on screen stays meanwhile. */
+  async function bootstrap(quiet = false) {
+    if (!quiet) {
+      status.value = 'loading'
+      errorMessage.value = null
+    }
     try {
       const { data, error } = await supabase.auth.getSession()
       // Offline: show the retry screen. Any other auth error (an expired or revoked session) means
@@ -156,6 +178,8 @@ export const useGroupStore = defineStore('group', () => {
       const user = error ? null : data.session?.user
       if (!user) {
         clearSession()
+        clearSnapshots()
+        savedCopy.value = false
         status.value = 'signed-out'
         return
       }
@@ -165,14 +189,55 @@ export const useGroupStore = defineStore('group', () => {
       if (user.is_anonymous || !(await loadMe())) {
         // Cleared first, so the SIGNED_OUT event this fires doesn't start another reload.
         clearSession()
+        clearSnapshots()
+        savedCopy.value = false
         await supabase.auth.signOut({ scope: 'local' })
         status.value = 'signed-out'
         return
       }
       subscribeToMine()
       await pickGroup()
+      savedCopy.value = false
     } catch (e) {
+      const unreachable = isNetworkError(e) || isAuthRetryableFetchError(e)
+      // Still without connection: the next 'online' (or coming back to the app) tries again.
+      if (quiet && unreachable) return console.error(e)
+      if (!quiet && unreachable && openSavedCopy()) return
       fail(e)
+    }
+  }
+
+  /**
+   * Without connection, opens the last group as it was saved on this device; false if there is
+   * no copy (never opened here, or signed out since).
+   */
+  function openSavedCopy(): boolean {
+    // A session that couldn't be refreshed offline still belongs to the last account here.
+    const uid = userId.value ?? snapshotUser()
+    const session = uid && readSnapshot<SavedSession>(uid, 'session')
+    if (!uid || !session) return false
+    const wanted = readActiveGroup()
+    const active = session.memberships.filter((m) => m.status === 'active')
+    const target = active.find((m) => m.groupId === wanted) ?? active[0]
+    const saved = target && readSnapshot<SavedGroup>(uid, `group:${target.groupId}`)
+    if (!target || !saved) return false
+    userId.value = uid
+    email.value = session.email
+    me.value = session.me
+    memberships.value = session.memberships
+    activeGroupId = target.groupId
+    myMemberId.value = target.memberId
+    current.value = saved.group
+    members.value = saved.members
+    useListStore().openSaved(target.groupId)
+    savedCopy.value = true
+    status.value = 'ready'
+    return true
+  }
+
+  function saveSession() {
+    if (userId.value && me.value) {
+      saveSnapshot(userId.value, 'session', { email: email.value, me: me.value, memberships: memberships.value } satisfies SavedSession)
     }
   }
 
@@ -197,6 +262,7 @@ export const useGroupStore = defineStore('group', () => {
   function fail(e: unknown) {
     console.error(e)
     status.value = 'error'
+    savedCopy.value = false
     errorMessage.value = errorText(e) || 'Error desconocido'
     offline.value = isNetworkError(e) || isAuthRetryableFetchError(e)
     initPromise = null
@@ -227,6 +293,7 @@ export const useGroupStore = defineStore('group', () => {
     if (error) throw error
     me.value = data ? toPerson(data) : null
     memberships.value = data ? data.members.map(toMembership) : []
+    saveSession()
     return !!data
   }
 
@@ -239,6 +306,7 @@ export const useGroupStore = defineStore('group', () => {
       .order('created_at', { ascending: false })
     if (error) throw error
     memberships.value = data.map(toMembership)
+    saveSession()
   }
 
   function toMembership(d: MembershipRow): Membership {
@@ -332,6 +400,8 @@ export const useGroupStore = defineStore('group', () => {
     const mine = data.members.find((m) => m.person_id === me.value?.id)?.people
     if (mine) me.value = toPerson(mine)
     renameMembership(current.value)
+    if (userId.value) saveSnapshot(userId.value, `group:${gid}`, { group: current.value, members: members.value } satisfies SavedGroup)
+    saveSession()
   }
 
   function renameMembership(group: Group) {
@@ -395,6 +465,7 @@ export const useGroupStore = defineStore('group', () => {
    * from the background or the connection coming back, before Realtime has caught up by itself.
    */
   async function catchUp() {
+    if (savedCopy.value) return bootstrap(true)
     if (status.value !== 'ready' && status.value !== 'no-group') return
     const gid = current.value?.id
     // Approved somewhere, or no longer in this group: this also opens the right group.
@@ -561,6 +632,8 @@ export const useGroupStore = defineStore('group', () => {
     status,
     errorMessage,
     offline,
+    savedCopy,
+    userId,
     email,
     me,
     group,

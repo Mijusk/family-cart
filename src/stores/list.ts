@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -12,8 +12,10 @@ import {
   type ProductRow,
   type TripRow,
 } from '@/lib/mappers'
+import { readSnapshot, saveSnapshot, whenOnline } from '@/lib/offline'
 import { deletePhoto, newPhotoPath, showPhotoLocally, uploadPhoto } from '@/lib/photos'
 import type { Item, Product, Trip } from '@/types'
+import { isNetworkError } from '@/utils/errors'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
 import { useGroupStore } from './group'
@@ -43,6 +45,16 @@ export interface TripSummary {
 
 /** How far back the history goes. */
 const HISTORY_DAYS = 60
+/** Tries for a write that doesn't reach the server although the phone says it is online. */
+const NETWORK_TRIES = 3
+const RETRY_MS = 3_000
+
+/** What the device keeps of a group's list to open without connection (see lib/offline). */
+interface SavedList {
+  items: Item[]
+  products: Product[]
+  trips: Trip[]
+}
 
 const byNewest = (a: Item, b: Item) => b.addedAt.localeCompare(a.addedAt)
 const isOnList = (item: Item) => item.status === 'pending' || item.status === 'not_found'
@@ -57,6 +69,7 @@ function upsert<T extends { id: string }>(list: Ref<T[]>, row: T) {
  * Every action updates local state first (so the UI reacts instantly) and then writes to
  * Supabase. Realtime echoes the row back to every device, including this one, where
  * upsert() makes the echo a no-op. If a write fails, the store reloads from the server.
+ * Without connection, writes wait in order until it comes back (while the app stays open).
  */
 export const useListStore = defineStore('list', () => {
   const groupStore = useGroupStore()
@@ -66,6 +79,8 @@ export const useListStore = defineStore('list', () => {
   const items = ref<Item[]>([])
   const products = ref<Product[]>([])
   const trips = ref<Trip[]>([])
+  /** Writes not saved yet: waiting for the connection, or on their way. */
+  const pendingWrites = ref(0)
   let channel: RealtimeChannel | null = null
 
   // ── Getters ────────────────────────────────────────────────
@@ -135,11 +150,42 @@ export const useListStore = defineStore('list', () => {
   // ── Loading & realtime ─────────────────────────────────────
 
   async function load(gid: string) {
-    unload()
+    // The same group again (back online after opening the saved copy): its list stays meanwhile.
+    if (gid !== groupId.value) unload()
     groupId.value = gid
     await refresh()
     subscribe(gid)
   }
+
+  /** Opening without connection: the list as it was last saved on this device, if it was. */
+  function openSaved(gid: string) {
+    unload()
+    groupId.value = gid
+    const saved = groupStore.userId ? readSnapshot<SavedList>(groupStore.userId, `list:${gid}`) : null
+    if (!saved) return
+    items.value = saved.items
+    products.value = saved.products
+    trips.value = saved.trips
+  }
+
+  /**
+   * Keeps a copy of the list on the device, once nothing is waiting to be saved: changes still
+   * on their way would be lost if the app were closed, so the copy doesn't show them.
+   */
+  let saveTimer: ReturnType<typeof setTimeout> | undefined
+  watch(
+    () => [items.value, products.value, trips.value, pendingWrites.value] as const,
+    () => {
+      clearTimeout(saveTimer)
+      saveTimer = setTimeout(() => {
+        const gid = groupId.value
+        const uid = groupStore.userId
+        if (!gid || !uid || pendingWrites.value) return
+        saveSnapshot(uid, `list:${gid}`, { items: items.value, products: products.value, trips: trips.value } satisfies SavedList)
+      }, 1_000)
+    },
+    { deep: true },
+  )
 
   /** Stops listening to the current group and drops its data (switching or leaving groups). */
   function unload() {
@@ -224,7 +270,23 @@ export const useListStore = defineStore('list', () => {
   let writeSeq = 0
   function persist(request: () => PromiseLike<{ error: unknown }>) {
     writeSeq++
+    pendingWrites.value++
     writes = writes.then(async () => {
+      try {
+        await send(request)
+      } finally {
+        pendingWrites.value--
+      }
+    })
+  }
+
+  /**
+   * One write, once there is connection. If it doesn't reach the server it waits for the
+   * connection and tries again (a few times if the phone says it is online, as on a weak signal).
+   */
+  async function send(request: () => PromiseLike<{ error: unknown }>) {
+    for (let tries = 1; ; tries++) {
+      await whenOnline()
       let error: unknown
       try {
         ;({ error } = await request())
@@ -232,11 +294,19 @@ export const useListStore = defineStore('list', () => {
         error = e // a rejected write must not stall the queue
       }
       if (!error) return
+      if (isNetworkError(error)) {
+        if (!navigator.onLine) continue
+        if (tries < NETWORK_TRIES) {
+          await new Promise((resolve) => setTimeout(resolve, RETRY_MS))
+          continue
+        }
+      }
       console.error(error)
       toast.show('No se pudo guardar el cambio. Revisa la conexión.')
       // Not awaited: refresh() waits for this queue to drain, which includes this very write.
       void refresh().catch(console.error)
-    })
+      return
+    }
   }
 
   // ── Internal helpers ───────────────────────────────────────
@@ -577,7 +647,9 @@ export const useListStore = defineStore('list', () => {
     findPendingDuplicate,
     suggest,
     usualProducts,
+    pendingWrites,
     load,
+    openSaved,
     refresh,
     unload,
     addItem,
