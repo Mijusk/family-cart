@@ -14,6 +14,7 @@ import {
   toPerson,
 } from '@/lib/mappers'
 import { crossesMidnight, occurrencesBetween } from '@/lib/recurrence'
+import { addDays, today } from '@/utils/days'
 import type {
   BusyEvent,
   Calendar,
@@ -49,9 +50,16 @@ export type EventDraft = Pick<
   | 'reminderMinutes'
 >
 
+/** Days loaded around what a view shows, so moving to the next week or month needs no load. */
+const RANGE_MARGIN_DAYS = 31
+/** How far the loaded days grow past what a view shows when it has to. */
+const RANGE_STEP_DAYS = 92
+
 /**
- * Everything of the calendar the signed-in person can see, plus the busy slots of the current
- * group. A family has few events, so it is all loaded at once and repetitions are expanded here.
+ * The calendar the signed-in person can see, plus the busy slots of the current group, with
+ * repetitions expanded here. Folders and repeating events are loaded whole (there are few);
+ * one-off events and exceptions, which pile up over the years, only for a range of days that
+ * grows as the views ask for days outside it.
  */
 export const useCalendarStore = defineStore('calendar', () => {
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
@@ -73,6 +81,10 @@ export const useCalendarStore = defineStore('calendar', () => {
   let loadedGroupId: string | null = null
   /** Every load gets a number; only the latest one is applied. */
   let loadSeq = 0
+  /** Days whose one-off events and exceptions are loaded. */
+  let range = { from: addDays(today(new Date()), -RANGE_STEP_DAYS), to: addDays(today(new Date()), RANGE_STEP_DAYS) }
+  /** Events opened outside the range (from a notification, say), loaded with all their exceptions. */
+  const pinnedIds = new Set<string>()
 
   const editableCalendars = computed(() =>
     calendars.value.filter((c) => editableIds.value.has(c.id)).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
@@ -110,17 +122,30 @@ export const useCalendarStore = defineStore('calendar', () => {
     subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
     try {
-      const [cals, shareRows, eventRows, exceptionRows, eventShareRows, participantRows, editable, busy] = await Promise.all([
+      // The day before too: what starts then may run past midnight into the first day.
+      const from = addDays(range.from, -1)
+      const to = range.to
+      const orPinned = (column: string) => (pinnedIds.size ? `,${column}.in.(${[...pinnedIds].join(',')})` : '')
+      const [cals, shareRows, eventRows, exceptionRows, editable, busy] = await Promise.all([
         supabase.from('calendars').select().is('deleted_at', null),
         supabase.from('calendar_shares').select(),
-        supabase.from('events').select().is('deleted_at', null),
-        supabase.from('event_exceptions').select('event_id, occurrence_date, status, overrides'),
-        supabase.from('event_shares').select('event_id, group_id'),
-        supabase.from('event_participants').select(),
+        supabase
+          .from('events')
+          .select('*, event_shares(group_id), event_participants(person_id)')
+          .is('deleted_at', null)
+          .or(`repeat.neq.none,and(start_date.gte.${from},start_date.lte.${to})${orPinned('id')}`),
+        // Those of a day in the range, or moved into it from another day.
+        supabase
+          .from('event_exceptions')
+          .select('event_id, occurrence_date, status, overrides')
+          .or(
+            `and(occurrence_date.gte.${from},occurrence_date.lte.${to}),` +
+              `and(overrides->>start_date.gte.${from},overrides->>start_date.lte.${to})${orPinned('event_id')}`,
+          ),
         supabase.rpc('editable_calendar_ids'),
         supabase.rpc('busy_events', { gid: groupId }),
       ])
-      for (const res of [cals, shareRows, eventRows, exceptionRows, eventShareRows, participantRows, editable, busy]) {
+      for (const res of [cals, shareRows, eventRows, exceptionRows, editable, busy]) {
         if (res.error) throw res.error
       }
       const loadedEvents = eventRows.data!.map(toEvent)
@@ -134,8 +159,8 @@ export const useCalendarStore = defineStore('calendar', () => {
       shares.value = shareRows.data!.map(toCalendarShare)
       events.value = loadedEvents
       exceptions.value = exceptionRows.data!.map(toException)
-      eventGroups.value = groupBy(eventShareRows.data!, (r) => r.event_id, (r) => r.group_id)
-      participants.value = groupBy(participantRows.data!, (r) => r.event_id, (r) => r.person_id)
+      eventGroups.value = Object.fromEntries(eventRows.data!.map((r) => [r.id, r.event_shares.map((s) => s.group_id)]))
+      participants.value = Object.fromEntries(eventRows.data!.map((r) => [r.id, r.event_participants.map((p) => p.person_id)]))
       owners.value = Object.fromEntries(ownerRows.data!.map((r) => [r.event_id, { ownerId: r.owner_id, color: r.color }]))
       editableIds.value = new Set(editable.data!)
       busyEvents.value = busy.data!.map(toBusyEvent)
@@ -152,12 +177,44 @@ export const useCalendarStore = defineStore('calendar', () => {
     return loadedGroupId ? load(loadedGroupId) : Promise.resolve()
   }
 
+  function isLoaded(groupId: string): boolean {
+    return groupId === loadedGroupId && (status.value === 'ready' || status.value === 'loading')
+  }
+
   /**
-   * For the views: loads only if this group isn't loaded or loading yet, or the last load failed.
-   * Realtime keeps it fresh after that, so moving between Hoy, Semana and Mes costs nothing.
+   * Makes the range hold [from, to] with room around it; whether it had to grow. It grows a good
+   * stretch at once, so the next weeks or months need no load either.
    */
-  function ensureLoaded(groupId: string): Promise<void> {
-    if (groupId === loadedGroupId && (status.value === 'ready' || status.value === 'loading')) return Promise.resolve()
+  function growRange(from: IsoDate, to: IsoDate): boolean {
+    if (addDays(from, -RANGE_MARGIN_DAYS) >= range.from && addDays(to, RANGE_MARGIN_DAYS) <= range.to) return false
+    const wantFrom = addDays(from, -RANGE_STEP_DAYS)
+    const wantTo = addDays(to, RANGE_STEP_DAYS)
+    range = { from: wantFrom < range.from ? wantFrom : range.from, to: wantTo > range.to ? wantTo : range.to }
+    return true
+  }
+
+  /**
+   * For the views, with the days they show: loads only if this group isn't loaded or loading yet,
+   * the last load failed, or those days are near the edge of the range. Realtime keeps it fresh
+   * after that, so moving between Hoy, Semana and Mes costs nothing.
+   */
+  function ensureLoaded(groupId: string, from?: IsoDate, to?: IsoDate): Promise<void> {
+    const grown = from !== undefined && growRange(from, to ?? from)
+    if (!grown && isLoaded(groupId)) return Promise.resolve()
+    return load(groupId)
+  }
+
+  /**
+   * For the event screens: also loads the event when it is outside the range (opened from a
+   * notification, say) and the exceptions of `day`. Meanwhile the status is 'loading', so the
+   * screen neither shows it as missing nor fills a form without that day's changes.
+   */
+  function ensureEvent(groupId: string, eventId: string, day?: IsoDate | null): Promise<void> {
+    const grown = !!day && growRange(day, day)
+    const missing = !eventById(eventId) && !pinnedIds.has(eventId)
+    if (missing) pinnedIds.add(eventId)
+    if (!grown && !missing && isLoaded(groupId)) return Promise.resolve()
+    if (status.value === 'ready') status.value = 'loading'
     return load(groupId)
   }
 
@@ -328,6 +385,8 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   /** A saved event, shown before the reload brings it. */
   function putEvent(event: CalendarEvent, groupIds: string[], participantIds: string[]) {
+    // Saved on a day outside the range, the next load would leave it out.
+    pinnedIds.add(event.id)
     const i = events.value.findIndex((e) => e.id === event.id)
     if (i === -1) events.value.push(event)
     else events.value[i] = event
@@ -533,6 +592,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     channelGroupId = null
     clearTimeout(reloadTimer)
     loadedGroupId = null
+    pinnedIds.clear()
     status.value = 'idle'
     calendars.value = []
     shares.value = []
@@ -561,6 +621,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     personName,
     load,
     ensureLoaded,
+    ensureEvent,
     reload,
     reloadSoon,
     unload,
@@ -583,12 +644,6 @@ export const useCalendarStore = defineStore('calendar', () => {
     purge,
   }
 })
-
-function groupBy<T>(rows: T[], key: (r: T) => string, value: (r: T) => string): Record<string, string[]> {
-  const out: Record<string, string[]> = {}
-  for (const r of rows) (out[key(r)] ??= []).push(value(r))
-  return out
-}
 
 /** All-day first, then by start time; what started the night before goes first of all. */
 function byStart(day: IsoDate) {

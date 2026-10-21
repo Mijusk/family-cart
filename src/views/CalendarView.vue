@@ -33,8 +33,8 @@ function backToToday() {
 }
 
 watch(
-  () => groupStore.group.id,
-  (id) => calendar.ensureLoaded(id).catch(() => {}),
+  () => [groupStore.group.id, day.value] as const,
+  ([id, shown]) => calendar.ensureLoaded(id, shown).catch(() => {}),
   { immediate: true },
 )
 
