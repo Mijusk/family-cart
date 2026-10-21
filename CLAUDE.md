@@ -104,7 +104,8 @@ Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar
   Docker sirve PostgREST (binario estático) sobre ese Postgres, con un proxy de Vite de
   `/rest/v1` y una sesión con JWT firmado a mano en `localStorage`.
 - Lógica del calendario fuera de los componentes: fechas en `src/utils/days.ts`, repeticiones
-  en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts`, datos en
+  en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts` (y el texto de
+  «Planificar con IA» en `src/lib/planText.ts`), datos en
   `src/stores/calendar.ts`. El store carga enteras las carpetas y los eventos que se repiten, pero
   los puntuales y las excepciones solo de un rango de días que crece cuando una vista pide días
   cerca del borde: las vistas llaman a `ensureLoaded(grupo, desde, hasta)` con lo que muestran y

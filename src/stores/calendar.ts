@@ -613,6 +613,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     participants,
     owners,
     people,
+    busyEvents,
     editableCalendars,
     eventById,
     calendarById,
