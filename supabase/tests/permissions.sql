@@ -478,6 +478,102 @@ select tests.check('send-notifications: service_role reads and drops devices',
   has_table_privilege('service_role', 'public.push_subscriptions', 'select, delete'));
 set role authenticated;
 
+-- ── Connected AI apps (OAuth tokens): only what the mcp function uses ──
+reset role;
+-- An OAuth session of Marta's, as Supabase Auth leaves it when she allows an app.
+insert into auth.sessions (id, user_id) values ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000c1');
+insert into push_subscriptions (person_id, endpoint, p256dh, auth)
+  values ((select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), 'https://push.example/marta', 'k', 'a');
+-- Expect no error: runs sql, passes if it raises none.
+create function tests.expect_ok(name text, sql text) returns void language plpgsql as $$
+begin
+  execute sql;
+  perform tests.check(name, true);
+exception when others then
+  perform tests.check(name || ' [' || sqlerrm || ']', false);
+end $$;
+grant execute on function tests.expect_ok(text, text) to authenticated, service_role;
+create function tests.api(method text, path text) returns void language sql as $$
+  select set_config('request.method', method, false), set_config('request.path', path, false);
+$$;
+create function tests.as_app(email text, session uuid) returns void language plpgsql security definer as $$
+begin
+  perform tests.as_user(email);
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', current_setting('request.jwt.claim.sub'), 'role', 'authenticated',
+    'client_id', '00000000-0000-4000-8000-0000000000b1', 'session_id', session)::text, false);
+end $$;
+grant execute on function tests.api(text, text), tests.as_app(text, uuid) to authenticated, service_role;
+grant usage on schema tests to service_role;
+grant execute on function tests.check(text, boolean) to service_role;
+grant insert on tests.results to service_role; grant usage on sequence tests.results_n_seq to service_role;
+set role authenticated;
+
+select tests.as_user('marta@ejemplo.com');
+select set_config('request.jwt.claims', '', false);
+select tests.api('DELETE', 'rpc/delete_event');
+select tests.expect_ok('ai: the app''s own session is not limited', $$select public.check_api_request()$$);
+select tests.check('ai: the app''s own session is not a connected app', not is_oauth_client());
+
+select tests.as_app('marta@ejemplo.com', '00000000-0000-4000-8000-0000000000a1');
+select tests.check('ai: an OAuth token is a connected app', is_oauth_client());
+select tests.api('GET', 'events');
+select tests.expect_ok('ai: reads events', $$select public.check_api_request()$$);
+select tests.api('POST', 'rpc/busy_events');
+select tests.expect_ok('ai: reads busy slots', $$select public.check_api_request()$$);
+select tests.api('POST', 'event_exceptions');
+select tests.expect_ok('ai: changes one day', $$select public.check_api_request()$$);
+select tests.api('PATCH', 'tasks');
+select tests.expect_ok('ai: changes tasks', $$select public.check_api_request()$$);
+select tests.api('POST', 'items');
+select tests.expect_ok('ai: adds to the shopping list', $$select public.check_api_request()$$);
+select tests.api('DELETE', 'events');
+select tests.expect_error('ai: cannot delete events', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/delete_event');
+select tests.expect_error('ai: cannot send events to the trash', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/purge_calendar');
+select tests.expect_error('ai: cannot empty the trash', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/leave_group');
+select tests.expect_error('ai: cannot leave a group', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/set_member_role');
+select tests.expect_error('ai: cannot change roles', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('PATCH', 'people');
+select tests.expect_error('ai: cannot change people', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('PATCH', 'items');
+select tests.expect_error('ai: cannot tick off or edit products', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('DELETE', 'items');
+select tests.expect_error('ai: cannot remove products', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('GET', 'push_subscriptions');
+select tests.expect_error('ai: cannot read devices through the API', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('GET', 'event_history');
+select tests.expect_error('ai: cannot read the history', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('GET', 'rpc/busy_events');
+select tests.expect_error('ai: RPCs only by POST', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/graphql');
+select tests.expect_error('ai: no GraphQL', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.check('ai: does not see devices (Realtime goes by RLS)', (select count(*) from push_subscriptions) = 0);
+select tests.expect_error('ai: cannot upload photos',
+  $$insert into storage.objects (bucket_id, name) values ('item-photos', '00000000-0000-4000-8000-000000000001/x.jpg')$$, 'row-level security');
+
+select tests.as_app('marta@ejemplo.com', '00000000-0000-4000-8000-0000000000a2');
+select tests.api('GET', 'events');
+select tests.expect_error('ai: a revoked app (its session gone) is stopped at once', $$select public.check_api_request()$$, 'access revoked');
+
+select tests.as_user('marta@ejemplo.com');
+select set_config('request.jwt.claims', '', false);
+select tests.check('ai: Marta herself still sees her device', (select count(*) from push_subscriptions) = 1);
+with i as (insert into storage.objects (bucket_id, name) values ('item-photos', '00000000-0000-4000-8000-000000000001/x.jpg') returning 1)
+select tests.check('ai: Marta herself can upload photos', (select count(*) from i) = 1);
+
+-- PostgREST runs the check for every caller: anonymous and the service role too.
+reset role;
+set role service_role;
+select tests.api('PATCH', 'notifications');
+select tests.expect_ok('ai: the service role passes', $$select public.check_api_request()$$);
+reset role;
+select set_config('request.method', '', false), set_config('request.path', '', false);
+set role authenticated;
+
 -- ── Pending request sees nothing of the group ──
 select tests.as_user('lucia@ejemplo.com');
 select tests.check('lucia pending: no items', (select count(*) from items) = 0);

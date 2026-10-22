@@ -139,6 +139,14 @@ export const router = createRouter({
       meta: { hideNav: true, anyone: true, public: true },
     },
     {
+      // Supabase Auth's OAuth consent screen (Authorization Path in the dashboard, docs/ia.md).
+      // Signed out, the guard sends it through /entrar and back, query included.
+      path: '/autorizar',
+      name: 'authorize',
+      component: () => import('@/views/AuthorizeView.vue'),
+      meta: { hideNav: true, public: true },
+    },
+    {
       path: '/bienvenida',
       name: 'welcome',
       component: () => import('@/views/WelcomeView.vue'),

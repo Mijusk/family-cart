@@ -1,7 +1,8 @@
-import type { EventTiming, HistoryEntry, IsoDate } from '@/types'
-import { longDay, shortDay, WEEKDAY_NAMES } from '@/utils/days'
+import type { EventTiming, HistoryEntry, IsoDate } from '../types.ts'
+import { longDay, shortDay, WEEKDAY_NAMES } from '../utils/isoDays.ts'
 
-// How events read in Spanish: times, repetitions and history lines.
+// How events read in Spanish: times, repetitions and history lines. The mcp Edge Function imports
+// this file under Deno, so its imports are relative and keep the .ts extension.
 
 /**
  * "Todo el día", "08:00 – 15:00", "23:00 – 00:30 (+1)" (or "… del día siguiente" when `long`), or

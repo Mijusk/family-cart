@@ -1,8 +1,9 @@
-import type { EventException, EventOverrides, EventTiming, IsoDate } from '@/types'
-import { addDays, dayOfMonth, daysBetween, startOfWeek, weekday } from '@/utils/days'
+import type { EventException, EventOverrides, EventTiming, IsoDate } from '../types.ts'
+import { addDays, dayOfMonth, daysBetween, startOfWeek, weekday } from '../utils/isoDays.ts'
 
 // Expands repeating events into their dates. Pure functions: no Vue, no Supabase, so they can
-// move to a native app or a server job as they are.
+// move to a native app or a server job as they are. The mcp Edge Function imports this file under
+// Deno, so its imports are relative and keep the .ts extension.
 
 /** Whether `day` is a date of the series (before exceptions). */
 export function isSeriesDate(t: EventTiming, day: IsoDate): boolean {
