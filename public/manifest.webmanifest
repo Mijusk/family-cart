@@ -1,6 +1,6 @@
 {
-  "name": "Family App",
-  "short_name": "Family App",
+  "name": "Family-App",
+  "short_name": "Family-App",
   "description": "Compra, tareas y calendario de la familia.",
   "lang": "es",
   "start_url": "/",

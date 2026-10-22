@@ -118,7 +118,7 @@ async function revoke(clientId: string, name: string) {
     const { error } = await supabase.auth.oauth.revokeGrant({ clientId })
     if (error) throw error
     grants.value = grants.value?.filter((g) => g.clientId !== clientId) ?? null
-    toast.show(`${name} ya no puede usar tu Family App`)
+    toast.show(`${name} ya no puede usar tu Family-App`)
   } catch (e) {
     toast.show(friendlyError(e))
   } finally {
@@ -249,7 +249,7 @@ async function logOut() {
           </button>
         </li>
       </ul>
-      <p v-else class="muted">Ninguna app de IA tiene acceso a tu Family App.</p>
+      <p v-else class="muted">Ninguna app de IA tiene acceso a tu Family-App.</p>
       <p class="muted small">
         Para usarla desde Claude: en Claude, Ajustes → Conectores → Añadir conector personalizado, con esta dirección:
       </p>

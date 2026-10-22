@@ -71,7 +71,7 @@ const withdraw = () =>
 
 <template>
   <div class="onboard">
-    <p class="eyebrow">Family App</p>
+    <p class="eyebrow">Family-App</p>
 
     <p v-if="loading" class="muted">Buscando la invitación…</p>
 

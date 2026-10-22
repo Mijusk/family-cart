@@ -123,7 +123,7 @@ export function registerTaskTools(server: McpServer, ctx: Context) {
       const task = toTask(row)
       const name = await ctx.names(task.assignees)
       const who = task.assignees.length ? ` · para ${task.assignees.map(name).join(', ')}` : ''
-      return done(`Tarea creada: ${taskSummary(task, list.data.name)}${who}\nÁbrela en Family App: ${taskLink(task.id)}`)
+      return done(`Tarea creada: ${taskSummary(task, list.data.name)}${who}\nÁbrela en Family-App: ${taskLink(task.id)}`)
     },
   )
 
@@ -167,7 +167,7 @@ export function registerTaskTools(server: McpServer, ctx: Context) {
       const task = toTask(row)
       const name = await ctx.names(task.assignees)
       const who = task.assignees.length ? ` · para ${task.assignees.map(name).join(', ')}` : ''
-      return done(`Tarea cambiada: ${taskSummary(task, null)}${who}\nÁbrela en Family App: ${taskLink(task.id)}`)
+      return done(`Tarea cambiada: ${taskSummary(task, null)}${who}\nÁbrela en Family-App: ${taskLink(task.id)}`)
     },
   )
 

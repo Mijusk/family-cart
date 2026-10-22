@@ -1,4 +1,4 @@
-// Family App as a remote MCP server, for AI chats (Claude, later ChatGPT): read and write the
+// Family-App as a remote MCP server, for AI chats (Claude, later ChatGPT): read and write the
 // calendar, tasks and shopping list as the signed-in person. Design notes: docs/ia.md.
 //
 // Each person signs in with their own account through Supabase Auth's OAuth 2.1 server (the
@@ -23,7 +23,7 @@ import { registerTaskTools } from './tasks.ts'
 /** A tool call is a few hundred bytes; anything this big is not a real one. */
 const MAX_BODY_BYTES = 64 * 1024
 
-const INSTRUCTIONS = `Family App: el calendario, las tareas y la lista de la compra de una familia, como en la app.
+const INSTRUCTIONS = `Family-App: el calendario, las tareas y la lista de la compra de una familia, como en la app.
 - Empieza con quien_soy: da la fecha y la hora de hoy en la zona horaria de cada grupo y los próximos días con su día de la semana. Calcula «mañana», «el jueves» o «el martes 4» a partir de ahí y pasa siempre fechas AAAA-MM-DD y horas HH:MM (24 h, hora local).
 - Antes de crear o cambiar algo, resume a la persona lo que vas a hacer y espera a que diga que sí. Si falta algo importante (la hora, el día, la carpeta o la lista cuando hay varias), pregunta.
 - No se puede borrar nada desde aquí (eventos, tareas ni productos): si te lo piden, explica que se hace en la app. Sí se puede cancelar un solo día de algo que se repite.
@@ -49,7 +49,7 @@ export default {
       }
       const handler = createMcpHandler(
         () => {
-          const server = new McpServer({ name: 'family-app', title: 'Family App', version: '1.0.0' }, { instructions: INSTRUCTIONS })
+          const server = new McpServer({ name: 'family-app', title: 'Family-App', version: '1.0.0' }, { instructions: INSTRUCTIONS })
           const context = createContext(ctx.supabase, ctx.userClaims!.id)
           registerCalendarTools(server, context)
           registerTaskTools(server, context)

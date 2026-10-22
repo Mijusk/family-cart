@@ -363,7 +363,7 @@ enabled = false
 # domain = "example.clerk.accounts.dev"
 
 # OAuth server configuration
-# Family App signs people in to connected AI apps (the mcp function, docs/ia.md): Claude registers
+# Family-App signs people in to connected AI apps (the mcp function, docs/ia.md): Claude registers
 # itself (dynamic client registration) and the consent screen is the app's /autorizar.
 [auth.oauth_server]
 # Enable OAuth server functionality

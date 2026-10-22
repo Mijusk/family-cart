@@ -7,7 +7,7 @@ import { useGroupStore } from '@/stores/group'
 import { friendlyError } from '@/utils/errors'
 
 // Consent screen of Supabase Auth's OAuth 2.1 server (docs/ia.md): an AI app (Claude…) sends the
-// person here with ?authorization_id=… to let it use Family App with their account. Signed out,
+// person here with ?authorization_id=… to let it use Family-App with their account. Signed out,
 // the router guard goes through /entrar and comes back. Allowing or cancelling hands the browser
 // back to the app's own address, which Supabase gives.
 
@@ -30,14 +30,14 @@ function leave(url: string) {
 async function load() {
   if (!authorizationId.value) {
     status.value = 'error'
-    error.value = 'Falta el código de la autorización. Vuelve a conectar Family App desde la app de IA.'
+    error.value = 'Falta el código de la autorización. Vuelve a conectar Family-App desde la app de IA.'
     return
   }
   const { data, error: e } = await supabase.auth.oauth.getAuthorizationDetails(authorizationId.value)
   if (e || !data) {
     status.value = 'error'
     error.value = /not found|expired|invalid/i.test(e?.message ?? '')
-      ? 'Este enlace de autorización ha caducado o ya se ha usado. Vuelve a conectar Family App desde la app de IA.'
+      ? 'Este enlace de autorización ha caducado o ya se ha usado. Vuelve a conectar Family-App desde la app de IA.'
       : friendlyError(e)
     return
   }
@@ -76,9 +76,9 @@ void load().catch((e) => {
 <template>
   <div class="onboard">
     <header>
-      <p class="eyebrow">Family App</p>
+      <p class="eyebrow">Family-App</p>
       <template v-if="status === 'ask'">
-        <h1 class="display-title">{{ clientName }} quiere acceder a tu Family App</h1>
+        <h1 class="display-title">{{ clientName }} quiere acceder a tu Family-App</h1>
         <p class="muted intro">Con tu cuenta {{ groupStore.email }}.</p>
       </template>
       <h1 v-else-if="status === 'error'" class="display-title">No se puede conectar</h1>

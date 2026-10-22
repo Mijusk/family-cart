@@ -1,6 +1,6 @@
-# Family App desde un chat de IA — Diseño V1
+# Family-App desde un chat de IA — Diseño V1
 
-Usar Family App desde Claude (escritorio, web y móvil) y, más adelante, desde ChatGPT: «¿qué tengo el
+Usar Family-App desde Claude (escritorio, web y móvil) y, más adelante, desde ChatGPT: «¿qué tengo el
 jueves?», «ponme dentista el martes 4 a las 17:30», «añade leche a la compra». La IA lee y escribe
 como si lo hiciera la persona en la app, con su propia cuenta.
 
@@ -15,7 +15,7 @@ como si lo hiciera la persona en la app, con su propia cuenta.
 3. **Carpetas:** las mismas que en el formulario, también las de otras personas que el usuario edita
    como admin (p. ej. el Colegio de Pablo). Sin carpeta, la última usada.
 4. **El token se limita en la base de datos**, no solo con RLS (ver §3).
-5. **Textos:** pantalla «*Claude* quiere acceder a tu Family App» (con el nombre que da la app) y en
+5. **Textos:** pantalla «*Claude* quiere acceder a tu Family-App» (con el nombre que da la app) y en
    Cuenta la sección «Conectado con IA», con «Quitar acceso».
 6. **Decidido en el desarrollo** (revisar si no encaja): un evento nuevo **no** se comparte con grupos
    extra salvo que se pida (`grupos_extra`); en la app el formulario marca por defecto el grupo actual,
@@ -131,9 +131,9 @@ En PowerShell, en la carpeta del repo, con el PR fusionado en `main`:
 6. **App:** al fusionar el PR, Vercel despliega la pantalla `/autorizar` y la sección de Cuenta.
    Espera a que termine antes del paso 7.
 7. **Claude** (web o escritorio; luego también sale en el móvil): **Ajustes → Conectores → Añadir
-   conector personalizado**. Nombre: `Family App`. URL:
+   conector personalizado**. Nombre: `Family-App`. URL:
    `https://rbyevwmyusknlrltijxe.supabase.co/functions/v1/mcp` (también está en Cuenta → Conectado
-   con IA, con botón de copiar). Pulsa **Conectar**: se abre Family App, entras si hace falta y pulsas
+   con IA, con botón de copiar). Pulsa **Conectar**: se abre Family-App, entras si hace falta y pulsas
    **Permitir**. En un chat, activa el conector en el menú de herramientas.
 8. **Probar:** «¿qué tengo esta semana?», «ponme dentista el martes a las 17:30 en Médico». El evento
    aparece en la app al momento. En Cuenta → Conectado con IA sale «Claude».
