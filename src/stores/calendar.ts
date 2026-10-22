@@ -48,6 +48,7 @@ export type EventDraft = Pick<
   | 'repeatWeekdays'
   | 'repeatUntil'
   | 'reminderMinutes'
+  | 'reminderOnly'
 >
 
 /** Days loaded around what a view shows, so moving to the next week or month needs no load. */
@@ -264,6 +265,7 @@ export const useCalendarStore = defineStore('calendar', () => {
           crossesMidnight: crossesMidnight(shown),
           repeating: event.repeat !== 'none',
           modified: o.modified,
+          reminderOnly: event.reminderOnly,
         })
       }
     }
@@ -286,6 +288,7 @@ export const useCalendarStore = defineStore('calendar', () => {
           crossesMidnight: crossesMidnight(shown),
           repeating: busy.repeat !== 'none',
           modified: o.modified,
+          reminderOnly: false,
         })
       }
     }

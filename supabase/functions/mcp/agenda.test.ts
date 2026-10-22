@@ -22,6 +22,7 @@ const event = (e: Partial<AgendaEvent>): AgendaEvent => ({
   ownerId: 'marta',
   participants: [],
   editable: true,
+  reminderOnly: false,
   timing: timing({}),
   exceptions: [],
   ...e,
@@ -112,6 +113,14 @@ describe('agenda', () => {
     const night = event({ timing: timing({ startDate: '2026-11-01', startTime: '22:00', endTime: '06:00' }) })
     expect(agenda([night], '2026-11-02', '2026-11-02', name)[0]!.eventos).toEqual([])
     expect(agenda([night], '2026-11-01', '2026-11-02', name)[0]!.eventos[0]!.hora).toBe('22:00–06:00 (acaba al día siguiente)')
+  })
+
+  it('marks a recordatorio and gives only its time', () => {
+    const pill = event({ title: 'Pastilla', reminderOnly: true, timing: timing({ startTime: '09:00', endTime: '09:15' }) })
+    expect(agenda([pill], '2026-11-02', '2026-11-02', name)[0]!.eventos[0]).toMatchObject({ titulo: 'Pastilla', hora: 'aviso a las 09:00', recordatorio: true })
+    expect(eventSummary({ ...timing({ startTime: '09:00', endTime: '09:15' }), title: 'Pastilla', reminderOnly: true }, 'Salud')).toBe(
+      'Pastilla · lun 2 nov, aviso a las 09:00 · recordatorio · carpeta Salud',
+    )
   })
 
   it('cuts long notes', () => {

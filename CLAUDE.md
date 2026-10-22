@@ -24,7 +24,7 @@ en `docs/ia.md`.
   `shopping_enabled`, `tasks_enabled`, `calendar_enabled`; al menos una activa).
 - Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial.
 - Calendario: `calendars` (carpetas de una persona) → `events` (repetición en columnas
-  simples) + `event_exceptions`, `event_participants`. Se comparte con grupos vía
+  simples; `reminder_only` = «Recordatorio», solo su aviso: fuera de Semana, Mes y `busy_events`) + `event_exceptions`, `event_participants`. Se comparte con grupos vía
   `calendar_shares` (`full`/`busy`) y `event_shares`. El modo ocupado se lee solo con la RPC
   `busy_events(gid)`. Borrado suave con `deletion_batch` y RPCs de papelera; `event_history`
   lo escriben triggers.

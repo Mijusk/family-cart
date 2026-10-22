@@ -3,6 +3,7 @@
 // tested with Vitest (input.test.ts); the database checks again with its constraints and RLS.
 
 import type { CalendarEvent, ClockTime, EventOverrides, IsoDate, RepeatKind } from '../../../src/types.ts'
+import { reminderEndTime } from '../../../src/lib/recurrence.ts'
 import { addDays, daysBetween, isIsoDate, weekday } from '../../../src/utils/isoDays.ts'
 import { cleanDisplayName } from '../../../src/utils/text.ts'
 
@@ -20,6 +21,7 @@ export type EventFields = Pick<
   | 'repeatWeekdays'
   | 'repeatUntil'
   | 'reminderMinutes'
+  | 'reminderOnly'
 >
 
 /** Event fields as the tools receive them. Left out = unchanged (or the default when creating); null = clear. */
@@ -35,6 +37,7 @@ export interface EventInput {
   dias_semana?: number[] | null
   repetir_hasta?: string | null
   aviso_minutos?: number | null
+  recordatorio?: boolean
 }
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -134,6 +137,7 @@ export const NEW_EVENT: EventFields = {
   repeatWeekdays: null,
   repeatUntil: null,
   reminderMinutes: null,
+  reminderOnly: false,
 }
 
 /**
@@ -149,13 +153,16 @@ export function eventFields(input: EventInput, base: EventFields = NEW_EVENT): C
   const date = checkDate(dateRaw, 'La fecha')
   if (!date.ok) return date
 
-  const allDay = input.todo_el_dia ?? (input.hora_inicio ? false : base.allDay)
+  const reminderOnly = input.recordatorio ?? base.reminderOnly
+  const allDay = !reminderOnly && (input.todo_el_dia ?? (input.hora_inicio ? false : base.allDay))
   let startTime: ClockTime | null = null
   let endTime: ClockTime | null = null
   if (!allDay) {
     const times = checkTimes(input.hora_inicio, input.hora_fin, base.allDay ? { startTime: null, endTime: null } : base)
     if (!times.ok) return times
     ;({ startTime, endTime } = times.value)
+    // A «Recordatorio» has no end to choose: as in the form, 15 minutes after the start.
+    if (reminderOnly) endTime = reminderEndTime(startTime)
   }
 
   const notes = optionalText(input.notas === undefined ? base.notes : input.notas, NOTES_MAX, 'Las notas')
@@ -183,7 +190,12 @@ export function eventFields(input: EventInput, base: EventFields = NEW_EVENT): C
     }
   }
 
-  const reminder = input.aviso_minutos === undefined ? base.reminderMinutes : input.aviso_minutos
+  let reminder = input.aviso_minutos === undefined ? base.reminderMinutes : input.aviso_minutos
+  if (reminderOnly && reminder === null) {
+    // It exists for its notification: «Al empezar» unless one was asked for; never none.
+    if (input.aviso_minutos === null) return fail('Un recordatorio necesita un aviso (aviso_minutos, 0 = al empezar).')
+    reminder = 0
+  }
   if (reminder !== null && (!Number.isInteger(reminder) || reminder < 0 || reminder > REMINDER_MAX_MINUTES)) {
     return fail('El aviso va en minutos antes del inicio: de 0 (al empezar) a 43200 (30 días).')
   }
@@ -202,6 +214,7 @@ export function eventFields(input: EventInput, base: EventFields = NEW_EVENT): C
       repeatWeekdays,
       repeatUntil,
       reminderMinutes: reminder,
+      reminderOnly,
     },
   }
 }

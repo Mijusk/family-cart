@@ -70,6 +70,7 @@ Claude ── POST /functions/v1/mcp (sin token) ──▶ 401 + WWW-Authenticat
 | `listar_personas` | Personas de sus grupos (también sin cuenta), con su `persona_id`. |
 | `ver_eventos` | Del día «desde» al «hasta» (máx. 62 días), expandido por día: repeticiones, cancelados fuera, cambiados con sus datos, modo ocupado como «Ocupado» (`busy_events`). Filtro por persona o grupo. |
 | `crear_evento` | Como el formulario: valida, carpeta por defecto la última usada, fin antes que inicio = cruza medianoche, sin fin dura 1 h, participantes, aviso. Devuelve «Dentista · mar 4 nov, 17:30–18:30 · carpeta Médico» y el enlace. |
+| `recordatorio` (en crear y editar) | Un evento que solo es su aviso («recuérdame tomar la pastilla»): solo hora de inicio, avisa al empezar, no sale en Semana ni Mes. `ver_eventos` lo marca con `recordatorio: true`. |
 | `editar_evento` | El evento entero (la serie); lo que no se pasa no cambia, `null` borra. Mover el inicio mueve el fin. |
 | `cambiar_dia` / `cancelar_dia` | Un solo día de algo que se repite (excepción `modified` / `cancelled`). |
 | `ver_tareas` / `crear_tarea` / `editar_tarea` / `marcar_tarea` | Listas y tareas pendientes; crear al final; cambiar; hecha con `set_task_done`. |

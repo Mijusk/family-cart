@@ -45,7 +45,8 @@ const rows = computed(() => {
   return members
     .map((member) => ({
       member,
-      items: occurrences.filter((o) => calendar.peopleOf(o).includes(member.personId)),
+      // A «Recordatorio» shows on its own day only (one at 23:50 doesn't run into the next).
+      items: occurrences.filter((o) => calendar.peopleOf(o).includes(member.personId) && (!o.reminderOnly || o.date === day.value)),
     }))
     .filter((row) => row.items.length)
 })
@@ -96,9 +97,17 @@ const rows = computed(() => {
               <span class="when">{{ timeLabel(o, day) }}</span>
               <span class="what"><span class="title">Ocupado</span></span>
             </span>
-            <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
+            <RouterLink
+              v-else
+              :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }"
+              class="occurrence"
+              :class="{ reminder: o.reminderOnly }"
+            >
               <span class="bar" :style="{ background: o.color }" />
-              <span class="when">{{ timeLabel(o, day) }}</span>
+              <span class="when">
+                <template v-if="o.reminderOnly"><AppIcon name="bell" :size="14" />{{ o.startTime }}</template>
+                <template v-else>{{ timeLabel(o, day) }}</template>
+              </span>
               <span class="what">
                 <span class="title">{{ o.title }}</span>
                 <span v-if="o.location" class="muted where">{{ o.location }}</span>
@@ -192,6 +201,26 @@ a.occurrence:hover {
   width: 4px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+/* A «Recordatorio»: a short line, quieter than what takes time. */
+.reminder {
+  min-height: 40px;
+}
+
+.reminder .bar {
+  opacity: 0.45;
+}
+
+.reminder .when {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reminder .title {
+  font-weight: 500;
+  font-size: 0.9375rem;
 }
 
 .busy .bar {

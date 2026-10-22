@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EventException, EventTiming } from '@/types'
-import { crossesMidnight, isSeriesDate, occurrencesBetween, seriesDates } from './recurrence'
+import { crossesMidnight, isSeriesDate, occurrencesBetween, reminderEndTime, seriesDates } from './recurrence'
 
 // 2026-10-19 is a Monday.
 function timing(change: Partial<EventTiming> = {}): EventTiming {
@@ -146,5 +146,13 @@ describe('occurrencesBetween', () => {
     const night = timing({ startTime: '23:00', endTime: '01:00' })
     expect(dates(occurrencesBetween(night, [], '2026-10-20', '2026-10-20'))).toEqual(['2026-10-19'])
     expect(occurrencesBetween(night, [], '2026-10-21', '2026-10-21')).toEqual([])
+  })
+})
+
+describe('reminderEndTime', () => {
+  it('ends a «Recordatorio» 15 minutes after it starts, past midnight too', () => {
+    expect(reminderEndTime('09:00')).toBe('09:15')
+    expect(reminderEndTime('21:50')).toBe('22:05')
+    expect(reminderEndTime('23:50')).toBe('00:05')
   })
 })

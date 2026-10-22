@@ -66,7 +66,7 @@ const memberPeople = computed(() => new Set(groupStore.activeMembers.map((m) => 
 function onceOn(day: string) {
   return calendar
     .occurrencesOn(day)
-    .filter((o) => o.date === day && (!o.repeating || o.modified))
+    .filter((o) => o.date === day && (!o.repeating || o.modified) && !o.reminderOnly)
     .filter((o) => calendar.peopleOf(o).some((id) => memberPeople.value.has(id)))
 }
 

@@ -148,6 +148,8 @@ export interface CalendarEvent extends EventTiming {
   timezone: string
   /** Minutes before the start to send a reminder; null for none. */
   reminderMinutes: number | null
+  /** A «Recordatorio» (take a pill): only its notification matters, so Semana, Mes and the busy slots leave it out. */
+  reminderOnly: boolean
   createdBy: string | null
   createdAt: string
   updatedBy: string | null
@@ -198,6 +200,8 @@ export interface Occurrence {
   repeating: boolean
   /** Changed for this day only. */
   modified: boolean
+  /** A «Recordatorio»: Hoy lists it small, Semana and Mes leave it out. */
+  reminderOnly: boolean
 }
 
 export type HistoryAction = 'create' | 'update' | 'delete' | 'restore' | 'purge'

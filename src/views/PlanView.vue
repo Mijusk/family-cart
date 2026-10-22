@@ -107,7 +107,8 @@ const events = computed<PlanEvent[]>(() => {
   const inGroup = new Set(people.value.map((p) => p.id))
   const full = calendar.events.flatMap((e) => {
     const owner = calendar.owners[e.id]
-    if (!owner) return []
+    // A «Recordatorio» takes no time: it is no use for finding free time.
+    if (!owner || e.reminderOnly) return []
     const who = [owner.ownerId, ...(calendar.participants[e.id] ?? [])].filter((id, i, all) => inGroup.has(id) && all.indexOf(id) === i)
     if (!who.length) return []
     return [{ id: e.id, title: e.title, folder: calendar.calendarById(e.calendarId)?.name ?? null, people: who, timing: e, exceptions: calendar.exceptionsOf(e.id) }]
