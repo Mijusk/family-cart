@@ -83,3 +83,12 @@ export function occurrencesBetween(
   }
   return result.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 }
+
+/** How long a «Recordatorio» lasts: it is stored with an end (events_times), never shown. */
+export const REMINDER_LENGTH_MINUTES = 15
+
+/** The end a «Recordatorio» is saved with: its start plus 15 minutes (past midnight if need be). */
+export function reminderEndTime(start: string): string {
+  const minutes = (Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)) + REMINDER_LENGTH_MINUTES) % 1440
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}

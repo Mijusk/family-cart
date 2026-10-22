@@ -114,6 +114,13 @@ insert into calendar_shares (calendar_id, group_id, level) values ('00000000-000
 select tests.check('calendar: daniel shares Hospital as busy', (select shared_by = my_person_id() from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e5'));
 insert into calendars (id, owner_id, name) values ('00000000-0000-4000-8000-0000000000e7', my_person_id(), 'Diario');
 select tests.check('calendar: daniel creates a private folder', exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e7'));
+-- A «Recordatorio» (only its notification matters) in Hospital, shared as busy.
+insert into events (id, calendar_id, title, start_date, start_time, end_time, reminder_only, reminder_minutes)
+  values ('00000000-0000-4000-8000-0000000000fd', '00000000-0000-4000-8000-0000000000e5', 'Pastilla', current_date, '09:00', '09:15', true, 0);
+select tests.check('reminder: daniel saves a recordatorio', (select reminder_only from events where id = '00000000-0000-4000-8000-0000000000fd'));
+update events set reminder_only = false where id = '00000000-0000-4000-8000-0000000000fd';
+select tests.check('reminder: and turns it into a normal event', not (select reminder_only from events where id = '00000000-0000-4000-8000-0000000000fd'));
+update events set reminder_only = true where id = '00000000-0000-4000-8000-0000000000fd';
 
 -- Busy mode hides the details from the rest of the group, not from its admins: check it as Marta
 -- while she is a plain member.
@@ -123,6 +130,7 @@ set role authenticated;
 select tests.as_user('marta@ejemplo.com');
 select tests.check('calendar: a member sees her own, Colegio, not the busy ones (7 events)', (select count(*) from events) = 7);
 select tests.check('calendar: busy slots of Daniel''s folders', (select count(*) from busy_events('00000000-0000-4000-8000-000000000001')) = 3);
+select tests.check('reminder: a recordatorio is no busy slot', not exists (select 1 from busy_events('00000000-0000-4000-8000-000000000001') where id = '00000000-0000-4000-8000-0000000000fd'));
 select tests.check('calendar: busy slots carry the times', exists (select 1 from busy_events('00000000-0000-4000-8000-000000000001') where start_time = '19:00' and repeat_weekdays = '{2,4}'));
 select tests.check('calendar: a member cannot read the busy events', (select count(*) from events where calendar_id = '00000000-0000-4000-8000-0000000000e3') = 0);
 select tests.check('calendar: busy folder name stays hidden', not exists (select 1 from calendars where id = '00000000-0000-4000-8000-0000000000e3'));
@@ -130,6 +138,8 @@ select tests.check('calendar: but its share is visible', exists (select 1 from c
 select tests.check('calendar: a member cannot edit a busy share', not can_edit_calendar('00000000-0000-4000-8000-0000000000e3'));
 reset role;
 update members set role = 'admin' where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1');
+-- Gone again, so the counts below stay as they were.
+delete from events where id = '00000000-0000-4000-8000-0000000000fd';
 set role authenticated;
 
 select tests.check('calendar: admin sees the busy ones in full too (10 events)', (select count(*) from events) = 10);

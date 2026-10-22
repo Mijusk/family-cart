@@ -188,7 +188,9 @@ async function remove(scope: 'day' | 'series') {
             <span>
               {{ relativeDay(shownDay) === longDay(shownDay) ? longDay(shownDay) : `${relativeDay(shownDay)}, ${longDay(shownDay).toLowerCase()}` }}
               <br />
-              <span class="muted">{{ timeLabel({ ...shown, date: shownDay }, shownDay, true) }}</span>
+              <span class="muted">{{
+                event.reminderOnly ? `Recordatorio a las ${shown.startTime}` : timeLabel({ ...shown, date: shownDay }, shownDay, true)
+              }}</span>
             </span>
           </li>
           <li v-if="repeating">

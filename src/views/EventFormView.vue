@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { REMINDER_PRESETS, reminderLabel } from '@/lib/eventText'
+import { reminderEndTime } from '@/lib/recurrence'
 import { goBack } from '@/router/back'
 import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -46,6 +47,8 @@ const pageTitle = computed(() => {
 const form = reactive({
   title: '',
   calendarId: '',
+  /** A «Recordatorio»: only the notification matters; no end, not in Semana or Mes. */
+  reminderOnly: false,
   allDay: false,
   startDate: today(),
   startTime: '09:00',
@@ -94,6 +97,7 @@ function fill() {
     const shown = { ...source, ...(exception?.overrides ?? {}) }
     Object.assign(form, {
       title: shown.title,
+      reminderOnly: source.reminderOnly,
       calendarId: calendar.editableCalendars.some((c) => c.id === source.calendarId) ? source.calendarId : defaultCalendar(),
       allDay: shown.allDay,
       // A duplicate goes to the day it was opened on; the day the user changes it to after.
@@ -286,14 +290,36 @@ const reminderMinutes = computed((): number | null => {
   return total <= REMINDER_MAX ? total : NaN
 })
 
+// ── Recordatorio ─────────────────────────────────────────────
+
+const showReminderInfo = ref(false)
+
+// A «Recordatorio» is there for its notification: it gets a time and, if it had none, «Al empezar».
+watch(
+  () => form.reminderOnly,
+  (on) => {
+    if (filling || !on) return
+    form.allDay = false
+    if (form.reminder === '') form.reminder = '0'
+  },
+)
+
 // ── Save ─────────────────────────────────────────────────────
 
 function validate(): string | null {
   if (!form.title.trim()) return 'Ponle un título al evento.'
   if (!form.startDate) return 'Elige la fecha.'
+  if (form.reminderOnly && !form.startTime) return 'Indica a qué hora te avisa.'
+  if (form.reminderOnly && !onlyDay.value && form.reminder === '') return 'Un recordatorio necesita un aviso: elige cuándo.'
+  if (form.reminderOnly) return onlyDay.value ? null : validateRest()
   if (!form.allDay && (!form.startTime || !form.endTime)) return 'Indica la hora de inicio y de fin.'
   if (!form.allDay && form.startTime === form.endTime) return 'La hora de fin tiene que ser distinta de la de inicio.'
   if (onlyDay.value) return null
+  return validateRest()
+}
+
+/** What the whole event needs besides its times. */
+function validateRest(): string | null {
   if (form.calendarId === NEW_FOLDER && !form.newFolderName.trim()) return 'Ponle nombre a la carpeta nueva.'
   if (Number.isNaN(reminderMinutes.value)) return 'El aviso puede ser como mucho 30 días antes.'
   if ((form.repeat === 'weekly' || form.repeat === 'biweekly') && !form.weekdays.length)
@@ -313,10 +339,11 @@ async function save() {
     title: cleanDisplayName(form.title),
     notes: trimOrNull(form.notes),
     location: trimOrNull(form.location),
-    allDay: form.allDay,
+    allDay: form.allDay && !form.reminderOnly,
     startDate: form.startDate,
-    startTime: form.allDay ? null : form.startTime,
-    endTime: form.allDay ? null : form.endTime,
+    startTime: form.allDay && !form.reminderOnly ? null : form.startTime,
+    // A «Recordatorio» has no end to choose; it is stored 15 minutes after the start.
+    endTime: form.reminderOnly ? reminderEndTime(form.startTime) : form.allDay ? null : form.endTime,
   }
   try {
     if (onlyDay.value) {
@@ -339,6 +366,7 @@ async function save() {
       repeatWeekdays: weekly ? form.weekdays : null,
       repeatUntil: form.repeat !== 'none' && form.repeatUntil ? form.repeatUntil : null,
       reminderMinutes: reminderMinutes.value,
+      reminderOnly: form.reminderOnly,
     }
     const offered = groupOptions.value.map((g) => g.id)
     const groupIds = form.groupIds.filter((id) => offered.includes(id) && !calendar.sharedGroupIds(calendarId).includes(id))
@@ -401,6 +429,30 @@ function cancel() {
         <input v-model="form.title" class="field" maxlength="120" autocomplete="off" required />
       </label>
 
+      <div v-if="!onlyDay" class="reminder-only">
+        <div class="reminder-row">
+          <label for="reminder-only" class="reminder-label">Recordatorio</label>
+          <button
+            type="button"
+            class="icon-btn"
+            aria-label="Qué es un recordatorio"
+            :aria-expanded="showReminderInfo"
+            aria-controls="reminder-info"
+            @click="showReminderInfo = !showReminderInfo"
+          >
+            <AppIcon name="info" :size="20" />
+          </button>
+          <input id="reminder-only" v-model="form.reminderOnly" type="checkbox" role="switch" class="switch" />
+        </div>
+        <div v-if="showReminderInfo" id="reminder-info" class="reminder-info" role="note">
+          <p>
+            Para cosas que solo necesitan un aviso, como tomar una pastilla. Te llega el aviso a su hora (y se repite si lo
+            eliges), sale pequeño en Hoy y no ocupa sitio en Semana ni en Mes. Tampoco cuenta como «Ocupado» para el grupo.
+          </p>
+          <button type="button" class="link" @click="showReminderInfo = false">Entendido</button>
+        </div>
+      </div>
+
       <template v-if="!onlyDay">
         <label class="label">
           Carpeta
@@ -433,7 +485,7 @@ function cancel() {
         </div>
       </template>
 
-      <label class="check">
+      <label v-if="!form.reminderOnly" class="check">
         <input v-model="form.allDay" type="checkbox" />
         Todo el día
       </label>
@@ -443,7 +495,11 @@ function cancel() {
         <input v-model="form.startDate" type="date" class="field" required />
       </label>
 
-      <div v-if="!form.allDay" class="times">
+      <label v-if="form.reminderOnly" class="label">
+        Hora del aviso
+        <input v-model="form.startTime" type="time" class="field" required />
+      </label>
+      <div v-else-if="!form.allDay" class="times">
         <label class="label">
           Empieza
           <input v-model="form.startTime" type="time" class="field" required />
@@ -453,7 +509,7 @@ function cancel() {
           <input v-model="form.endTime" type="time" class="field" required />
         </label>
       </div>
-      <p v-if="crossesMidnight" class="muted hint">Termina al día siguiente.</p>
+      <p v-if="crossesMidnight && !form.reminderOnly" class="muted hint">Termina al día siguiente.</p>
 
       <template v-if="!onlyDay">
         <label class="label">
@@ -499,7 +555,7 @@ function cancel() {
         <label class="label">
           Aviso
           <select v-model="form.reminder" class="field">
-            <option value="">Sin aviso</option>
+            <option v-if="!form.reminderOnly" value="">Sin aviso</option>
             <option v-for="m in REMINDER_PRESETS" :key="m" :value="String(m)">{{ reminderLabel(m) }}</option>
             <option value="custom">Personalizado…</option>
           </select>
@@ -687,6 +743,90 @@ textarea.field {
 
 .groups legend {
   margin-bottom: 4px;
+}
+
+.reminder-only {
+  display: grid;
+  gap: 8px;
+}
+
+.reminder-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.reminder-label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.reminder-row .switch {
+  margin-left: auto;
+}
+
+.reminder-info {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.9375rem;
+}
+
+.reminder-info .link {
+  justify-self: start;
+  min-height: 40px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* A switch drawn over the checkbox, so it keeps the keyboard, the label and screen readers. */
+.switch {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--primary);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+  }
 }
 
 .custom-reminder {

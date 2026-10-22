@@ -5,12 +5,12 @@
 import type { McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { fromEvent, fromOverrides, toBusyEvent, toEvent, toException } from '../../../src/lib/mappers.ts'
-import { isSeriesDate } from '../../../src/lib/recurrence.ts'
+import { isSeriesDate, reminderEndTime } from '../../../src/lib/recurrence.ts'
 import type { CalendarEvent, EventException, EventOverrides, IsoDate } from '../../../src/types.ts'
 import { addDays, weekdayShortDay } from '../../../src/utils/isoDays.ts'
 import { agenda, eventSummary, nextDays, nowIn, timeText, type AgendaEvent } from './agenda.ts'
 import { APP_URL, DEFAULT_TIMEZONE, ToolError, type Context, type Me } from './context.ts'
-import { dateRange, dayOverrides, eventFields, MAX_RANGE_DAYS, type EventFields } from './input.ts'
+import { dateRange, dayOverrides, eventFields, MAX_RANGE_DAYS, parseClock, type EventFields } from './input.ts'
 import { CONFIRM_FIRST, data, done, tool } from './tools.ts'
 
 const id = () => z.guid()
@@ -54,6 +54,13 @@ const MORE_EVENT_FIELDS = {
     .nullable()
     .optional()
     .describe('Recordatorio: minutos antes del inicio (0 al empezar, 15, 60, 1440 = un día…; como mucho 43200). null = sin aviso. Si no lo piden, no pongas.'),
+  recordatorio: z
+    .boolean()
+    .optional()
+    .describe(
+      'true para algo que solo necesita el aviso (tomar una pastilla, sacar la basura): lleva solo la hora de inicio (sin hora_fin), ' +
+        'avisa al empezar si no se pide otro aviso, y no sale en Semana ni Mes ni cuenta como ocupado. Úsalo si la persona habla de «recuérdame…».',
+    ),
 }
 
 export function registerCalendarTools(server: McpServer, ctx: Context) {
@@ -185,7 +192,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
       description:
         `Lo que hay cada día entre «desde» y «hasta» (como mucho ${MAX_RANGE_DAYS} días), con las repeticiones ya puestas en su día ` +
         'y los cambios de un solo día aplicados (los cancelados no salen). Lo de las carpetas compartidas en modo ocupado sale como ' +
-        '«Ocupado», sin detalles. Filtra por persona (dueña o participante) o por grupo. Para cambiar o cancelar un solo día de algo ' +
+        '«Ocupado», sin detalles; los recordatorios (solo un aviso, p. ej. una pastilla) salen con recordatorio: true y no ocupan tiempo. Filtra por persona (dueña o participante) o por grupo. Para cambiar o cancelar un solo día de algo ' +
         'que se repite, usa su evento_id y fecha_serie.',
       input: z.object({
         desde: date().describe('Primer día, AAAA-MM-DD.'),
@@ -336,6 +343,9 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
     },
     async (input) => {
       const { event, exception } = await repeatingDay(ctx, input.evento_id, input.fecha)
+      // A «Recordatorio» ends 15 minutes after it starts, that day too.
+      const start = event.reminderOnly && input.hora_inicio ? parseClock(input.hora_inicio) : null
+      if (start) input = { ...input, hora_fin: reminderEndTime(start), todo_el_dia: false }
       const current: Required<EventOverrides> = {
         title: event.title,
         notes: event.notes,
@@ -438,6 +448,7 @@ async function loadAgenda(ctx: Context, from: IsoDate, to: IsoDate, groupIds: st
       ownerId: ownerOf.get(e.id)!,
       participants: participants.get(e.id) ?? [],
       editable: editableIds.has(e.calendarId),
+      reminderOnly: e.reminderOnly,
       timing: e,
       exceptions: exceptions.filter((x) => x.eventId === e.id),
     }))
@@ -456,6 +467,7 @@ async function loadAgenda(ctx: Context, from: IsoDate, to: IsoDate, groupIds: st
         ownerId: b.ownerId,
         participants: [],
         editable: false,
+        reminderOnly: false,
         timing: b,
         exceptions: b.exceptions,
       })

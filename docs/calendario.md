@@ -170,6 +170,12 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
   07:00 y las 22:00, calculados en la app, y las tareas pendientes. Lógica en `src/lib/planText.ts`.
   Decidido con Luis el 21 oct 2026; más adelante, quizá llamar a la IA desde la app.
 - **Evento:** crear y editar rápido, duplicar un día, aviso (recordatorio, ver `docs/notificaciones.md`), elegir carpeta, participantes ("Con quién": miembros activos del grupo actual, sin el dueño de la carpeta) y grupos extra, icono ⓘ y aviso de "está editando".
+  - **Recordatorio** (interruptor bajo el título, con una ⓘ que explica qué hace): para lo que solo necesita el aviso, como
+    tomar una pastilla. Lleva solo la hora del aviso (se guarda con fin = inicio + 15 min, `reminderEndTime()`), avisa al
+    empezar si no se elige otro aviso y nunca va sin aviso. Sale pequeño en Hoy (con la campana) y no sale en Semana ni en Mes,
+    ni como «Ocupado» (`busy_events` lo excluye), ni cuenta en «Planificar con IA». Lo ve quien vería el evento; se repite,
+    se cambia o cancela un día y avisa como cualquier otro. Columna `events.reminder_only`. Decidido con Luis el 22 oct 2026;
+    sin «Hecho» por ahora.
   - En un evento que se repite, editar o borrar pregunta "solo este día" (excepción) o "toda la serie".
   - Si no hay carpeta, "Nueva carpeta…" en el propio formulario crea una privada (nombre y color); compartirla llega con "Mis carpetas".
 

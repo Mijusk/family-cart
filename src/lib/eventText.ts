@@ -83,6 +83,7 @@ const FIELD_LABELS: Record<string, string> = {
   calendar_id: 'la carpeta',
   timezone: 'la zona horaria',
   reminder_minutes: 'el aviso',
+  reminder_only: 'si es un recordatorio',
 }
 
 /** What a history entry did, without the author: "cambió el título y la fecha". */

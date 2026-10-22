@@ -85,6 +85,8 @@ const availableFolders = computed(() =>
 const activeFolders = computed(() => new Set(availableFolders.value.filter((c) => folders.value.has(c.id)).map((c) => c.id)))
 
 function shows(o: ReturnType<typeof calendar.occurrencesOn>[number]): boolean {
+  // A «Recordatorio» is there for its notification, not to take room in the week.
+  if (o.reminderOnly) return false
   const who = calendar.peopleOf(o)
   if (!who.some((id) => memberPeople.value.has(id))) return false
   if (people.value.size && !who.some((id) => people.value.has(id))) return false

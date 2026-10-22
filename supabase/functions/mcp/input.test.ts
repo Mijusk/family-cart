@@ -76,6 +76,32 @@ describe('eventFields: creating', () => {
   })
 })
 
+describe('eventFields: recordatorio', () => {
+  it('ends 15 minutes after the start and reminds when it starts', () => {
+    expect(ok(eventFields({ titulo: 'Pastilla', fecha: '2026-11-04', hora_inicio: '9:00', recordatorio: true, repeticion: 'daily' }))).toMatchObject({
+      reminderOnly: true,
+      allDay: false,
+      startTime: '09:00',
+      endTime: '09:15',
+      reminderMinutes: 0,
+    })
+  })
+
+  it('keeps another reminder if asked for, but never none', () => {
+    expect(ok(eventFields({ titulo: 'Pastilla', fecha: '2026-11-04', hora_inicio: '21:00', recordatorio: true, aviso_minutos: 15 })).reminderMinutes).toBe(15)
+    expect(error(eventFields({ titulo: 'Pastilla', fecha: '2026-11-04', hora_inicio: '21:00', recordatorio: true, aviso_minutos: null }))).toMatch(/necesita un aviso/)
+  })
+
+  it('needs a time and ignores all day', () => {
+    expect(error(eventFields({ titulo: 'Pastilla', fecha: '2026-11-04', recordatorio: true, todo_el_dia: true }))).toMatch(/hora de inicio/)
+  })
+
+  it('moves the end with the start when editing one', () => {
+    const pill = ok(eventFields({ titulo: 'Pastilla', fecha: '2026-11-04', hora_inicio: '09:00', recordatorio: true }))
+    expect(ok(eventFields({ hora_inicio: '23:50' }, pill))).toMatchObject({ startTime: '23:50', endTime: '00:05', reminderOnly: true })
+  })
+})
+
 describe('eventFields: editing', () => {
   const base: EventFields = {
     ...NEW_EVENT,
