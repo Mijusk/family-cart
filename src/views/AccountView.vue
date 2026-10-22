@@ -4,10 +4,12 @@ import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { signOut } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { disablePush, enablePush, NOTIFICATION_KINDS, pushState, type PushState } from '@/lib/push'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import { PERSON_COLORS } from '@/utils/colors'
+import { longDate } from '@/utils/date'
 import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
 import type { NotificationKind } from '@/types'
@@ -92,6 +94,44 @@ async function toggleKind(kind: NotificationKind) {
     toast.show(friendlyError(e))
   } finally {
     savingKinds.value = false
+  }
+}
+
+// ── AI apps connected with this account (docs/ia.md) ─────────
+
+/** The connector's address, to paste in Claude (Ajustes → Conectores). */
+const connectorUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mcp`
+const grants = ref<{ clientId: string; name: string; since: string }[] | null>(null)
+const revoking = ref<string | null>(null)
+
+async function loadGrants() {
+  const { data, error } = await supabase.auth.oauth.listGrants()
+  // Without the OAuth server (a local database without it, say) the section just says there are none.
+  grants.value = error ? [] : data.map((g) => ({ clientId: g.client.id, name: g.client.name || 'Una app', since: g.granted_at }))
+}
+void loadGrants()
+
+async function revoke(clientId: string, name: string) {
+  if (revoking.value) return
+  revoking.value = clientId
+  try {
+    const { error } = await supabase.auth.oauth.revokeGrant({ clientId })
+    if (error) throw error
+    grants.value = grants.value?.filter((g) => g.clientId !== clientId) ?? null
+    toast.show(`${name} ya no puede usar tu Family App`)
+  } catch (e) {
+    toast.show(friendlyError(e))
+  } finally {
+    revoking.value = null
+  }
+}
+
+async function copyConnectorUrl() {
+  try {
+    await navigator.clipboard.writeText(connectorUrl)
+    toast.show('Dirección copiada')
+  } catch {
+    toast.show('No se pudo copiar. Mantén pulsada la dirección para copiarla.')
   }
 }
 
@@ -196,6 +236,30 @@ async function logOut() {
     </div>
     <p class="muted note">Vale para todos tus dispositivos.</p>
 
+    <h2 class="section-title"><span>Conectado con IA</span></h2>
+    <div v-if="grants" class="panel ai">
+      <ul v-if="grants.length" class="grants">
+        <li v-for="g in grants" :key="g.clientId">
+          <div>
+            <strong>{{ g.name }}</strong>
+            <span class="muted"> · desde el {{ longDate(g.since) }}</span>
+          </div>
+          <button type="button" class="btn btn-ghost" :disabled="revoking === g.clientId" @click="revoke(g.clientId, g.name)">
+            {{ revoking === g.clientId ? 'Quitando…' : 'Quitar acceso' }}
+          </button>
+        </li>
+      </ul>
+      <p v-else class="muted">Ninguna app de IA tiene acceso a tu Family App.</p>
+      <p class="muted small">
+        Para usarla desde Claude: en Claude, Ajustes → Conectores → Añadir conector personalizado, con esta dirección:
+      </p>
+      <button type="button" class="connector-url" @click="copyConnectorUrl">
+        <span>{{ connectorUrl }}</span>
+        <AppIcon name="copy" :size="18" />
+      </button>
+    </div>
+    <p class="muted note">Ven y cambian lo mismo que tú, pero no pueden borrar nada ni cambiar tus grupos.</p>
+
     <div class="logout">
       <button type="button" class="btn btn-ghost btn-block" :disabled="leaving" @click="logOut">
         <AppIcon name="logout" :size="20" />
@@ -263,6 +327,46 @@ async function logOut() {
 
 .kinds {
   flex-direction: column;
+}
+
+.ai {
+  flex-direction: column;
+}
+
+.grants {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grants li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9375rem;
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.connector-url {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-family: ui-monospace, monospace;
+  font-size: 0.8125rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+  user-select: text;
 }
 
 .logout {

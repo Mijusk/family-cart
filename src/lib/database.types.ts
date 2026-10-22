@@ -348,13 +348,13 @@ isOneToOne: false
                   ]
                 },"people": {
                   Row: {
-                    "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": string[],"updated_at": string,"updated_by": string | null,"user_id": string | null
+                    "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": (string)[],"updated_at": string,"updated_by": string | null,"user_id": string | null
                   }
                   Insert: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: string[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Update: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: string[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -485,13 +485,13 @@ isOneToOne: false
                   ]
                 },"tasks": {
                   Row: {
-                    "assignees": string[],"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"done_at": string | null,"done_by": string | null,"due_date": string | null,"id": string,"list_id": string,"notes": string | null,"position": number,"title": string,"updated_at": string,"updated_by": string | null
+                    "assignees": (string)[],"created_at": string,"created_by": string | null,"deleted_at": string | null,"deleted_by": string | null,"deletion_batch": string | null,"done_at": string | null,"done_by": string | null,"due_date": string | null,"id": string,"list_id": string,"notes": string | null,"position": number,"title": string,"updated_at": string,"updated_by": string | null
                   }
                   Insert: {
-                    "assignees"?: string[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id": string,"notes"?: string | null,"position": number,"title": string,"updated_at"?: string,"updated_by"?: string | null
+                    "assignees"?: (string)[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id": string,"notes"?: string | null,"position": number,"title": string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Update: {
-                    "assignees"?: string[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id"?: string,"notes"?: string | null,"position"?: number,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
+                    "assignees"?: (string)[],"created_at"?: string,"created_by"?: string | null,"deleted_at"?: string | null,"deleted_by"?: string | null,"deletion_batch"?: string | null,"done_at"?: string | null,"done_by"?: string | null,"due_date"?: string | null,"id"?: string,"list_id"?: string,"notes"?: string | null,"position"?: number,"title"?: string,"updated_at"?: string,"updated_by"?: string | null
                   }
                   Relationships: [
                     {
@@ -604,6 +604,9 @@ isOneToOne: false
 "cancel_trip":
 { Args: { "trip_id": string }; Returns: undefined
                            },
+"check_api_request":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "claim_profile":
 { Args: { "code": string }; Returns: string
                            },
@@ -692,6 +695,9 @@ isOneToOne: false
 "is_live_task_list":
 { Args: { "lid": string }; Returns: boolean
                            },
+"is_oauth_client":
+{ Args: Record<PropertyKey, never>; Returns: boolean
+                           },
 "is_series_date":
 { Args: { "d": string,"e": Database["public"]['Tables']["events"]['Row'] }; Returns: boolean
                            },
@@ -735,7 +741,7 @@ isOneToOne: false
 { Args: { "cid": string }; Returns: undefined
                            },
 "people_see_task_list":
-{ Args: { "lid": string,"pids": string[] }; Returns: boolean
+{ Args: { "lid": string,"pids": (string)[] }; Returns: boolean
                            },
 "person_sees_task_list":
 { Args: { "lid": string,"pid": string }; Returns: boolean
@@ -806,7 +812,7 @@ isOneToOne: false
 { Args: { "d": string,"today": string }; Returns: string
                            },
 "task_list_viewers":
-{ Args: { "lid": string,"pids": string[] }; Returns: string[]
+{ Args: { "lid": string,"pids": (string)[] }; Returns: (string)[]
                            }
           }
           Enums: {

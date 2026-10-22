@@ -6,7 +6,8 @@ llama **Family App** (el repo sigue siendo `family-cart`).
 
 **Antes de tocar nada del calendario, lee `docs/calendario.md`**: diseño completo,
 decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`; las
-notificaciones (Web Push), en `docs/notificaciones.md`.
+notificaciones (Web Push), en `docs/notificaciones.md`; el conector para chats de IA (MCP + OAuth),
+en `docs/ia.md`.
 
 ## Stack
 
@@ -35,6 +36,12 @@ notificaciones (Web Push), en `docs/notificaciones.md`.
   `send-notifications`. Cada persona apaga tipos en `people.muted_notifications`.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
+- Apps de IA conectadas (`docs/ia.md`): Supabase Auth hace de servidor OAuth 2.1 (pantalla de permiso
+  `/autorizar`, lista y «Quitar acceso» en Cuenta) y la Edge Function `mcp` es el servidor MCP, con el
+  token de la persona (nunca service role). Sus tokens llevan `client_id` (`is_oauth_client()`): la
+  función *pre-request* `check_api_request()` solo les deja una lista cerrada de tablas y RPCs y exige
+  que su sesión siga viva; Storage y `push_subscriptions` se les cierran con políticas *restrictive*.
+  **Si la función `mcp` empieza a usar otra tabla o RPC, añádela a esa lista** (y su test).
 
 ## Reglas de permisos
 
@@ -53,7 +60,7 @@ notificaciones (Web Push), en `docs/notificaciones.md`.
 
 ```
 npm run dev        # front en localhost:5173
-npm run db:start   # Supabase local (requiere Docker Desktop arrancado)
+npm run db:start   # Supabase local (requiere Docker Desktop arrancado); crea la clave ES256 local si falta
 npm run db:reset   # aplica migraciones + seed.sql
 npm run db:test    # tests de permisos; debe acabar en "N ok, 0 failed"
 npm run db:types   # regenera src/lib/database.types.ts desde la BD local
@@ -103,6 +110,10 @@ Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar
   Luis que ejecute `db:reset`, `db:test`, `db:types` y `build`. Para probar la interfaz sin
   Docker sirve PostgREST (binario estático) sobre ese Postgres, con un proxy de Vite de
   `/rest/v1` y una sesión con JWT firmado a mano en `localStorage`.
+- La Edge Function `mcp` importa de `src/` las funciones puras (`recurrence`, `eventText`, `mappers`,
+  `types`, `text`, `errors`, `utils/isoDays.ts`): en esos ficheros, **imports relativos con `.ts` y sin
+  Vue** (lo vigila `supabase/functions/mcp/imports.test.ts`). Las fechas puras están en `isoDays.ts`;
+  `days.ts` las reexporta y añade el «hoy» reactivo. Se despliega con `--use-api` por eso.
 - Lógica del calendario fuera de los componentes: fechas en `src/utils/days.ts`, repeticiones
   en `src/lib/recurrence.ts` (funciones puras), textos en `src/lib/eventText.ts` (y el texto de
   «Planificar con IA» en `src/lib/planText.ts`), datos en

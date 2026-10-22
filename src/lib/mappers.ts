@@ -23,8 +23,11 @@ import type {
   TaskListShare,
   Trip,
   TripClosedReason,
-} from '@/types'
-import type { Database } from './database.types'
+} from '../types.ts'
+import type { Database } from './database.types.ts'
+
+// Rows to domain types and back. The mcp Edge Function imports this file under Deno, so its
+// imports are relative and keep the .ts extension.
 
 type Tables = Database['public']['Tables']
 export type GroupRow = Tables['groups']['Row']
