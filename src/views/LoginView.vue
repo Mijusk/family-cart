@@ -85,7 +85,7 @@ function backToLogin() {
 <template>
   <div class="onboard">
     <header>
-      <p class="eyebrow">Family App</p>
+      <p class="eyebrow">Family-App</p>
       <h1 class="display-title">
         <template v-if="sentTo">Revisa tu email</template>
         <template v-else-if="mode === 'login'">Entrar</template>

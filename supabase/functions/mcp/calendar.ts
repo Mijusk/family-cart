@@ -64,7 +64,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
     {
       title: 'Quién soy y qué día es',
       description:
-        'Tu persona en Family App, tus grupos (con su zona horaria y secciones) y la fecha y hora actuales en cada zona, ' +
+        'Tu persona en Family-App, tus grupos (con su zona horaria y secciones) y la fecha y hora actuales en cada zona, ' +
         'con los próximos 14 días y su día de la semana. Llámala antes de interpretar «hoy», «mañana» o «el jueves».',
       input: z.object({}),
     },
@@ -226,7 +226,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
     {
       title: 'Crear un evento',
       description:
-        'Crea un evento en el calendario de Family App, como el formulario de la app. Sin carpeta, va a la última usada ' +
+        'Crea un evento en el calendario de Family-App, como el formulario de la app. Sin carpeta, va a la última usada ' +
         '(listar_carpetas la marca como por_defecto). Fechas AAAA-MM-DD y horas HH:MM en 24 h, en la hora local del grupo. ' +
         'Si falta la hora (y no es de todo el día) o no está claro el día o la carpeta, pregunta antes. ' +
         CONFIRM_FIRST,
@@ -263,7 +263,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
       const extra = await addToEvent(ctx, event.id, folder, input.participantes ?? [], input.grupos_extra ?? [])
       return done(
         `Creado: ${eventSummary(event, folder.name)}${extra}\n` +
-          `Ábrelo en Family App: ${eventLink(event.id)}`,
+          `Ábrelo en Family-App: ${eventLink(event.id)}`,
       )
     },
   )
@@ -307,7 +307,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
       if (error) throw error
       if (input.participantes) await setParticipants(ctx, current.event.id, current.participants, input.participantes.filter((p) => p !== folder.ownerId))
       const event = toEvent(row)
-      return done(`Cambiado: ${eventSummary(event, folder.name)}\nÁbrelo en Family App: ${eventLink(event.id)}`)
+      return done(`Cambiado: ${eventSummary(event, folder.name)}\nÁbrelo en Family-App: ${eventLink(event.id)}`)
     },
   )
 
@@ -363,7 +363,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
           ? `El ${day} vuelve a ser como los demás días: ${event.title}, ${timeText(event)}.`
           : `Cambiado solo el ${day}: ${shown.title} · ${weekdayShortDay(shown.startDate)}, ${timeText(shown)}` +
               `${shown.location ? ` · ${shown.location}` : ''}. Los demás días siguen igual.\n` +
-              `Ábrelo en Family App: ${eventLink(event.id, shown.startDate)}`,
+              `Ábrelo en Family-App: ${eventLink(event.id, shown.startDate)}`,
       )
     },
   )

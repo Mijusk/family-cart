@@ -66,12 +66,12 @@ async function retry() {
     <main class="column">
       <!-- Screens that need a group never render without one (e.g. just after leaving the last group). -->
       <div v-if="!canShowRoute" class="onboard" aria-busy="true">
-        <p class="eyebrow">Family App</p>
+        <p class="eyebrow">Family-App</p>
         <p class="muted">Cargando…</p>
       </div>
 
       <div v-else-if="groupStore.status === 'error'" class="onboard" role="alert">
-        <p class="eyebrow">Family App</p>
+        <p class="eyebrow">Family-App</p>
         <template v-if="groupStore.offline">
           <h1 class="display-title">No se pudo conectar</h1>
           <p class="muted">Comprueba la conexión a internet e inténtalo otra vez.</p>

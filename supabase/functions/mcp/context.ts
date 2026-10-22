@@ -74,7 +74,7 @@ async function loadMe(db: Db, userId: string): Promise<Me> {
     .order('created_at', { referencedTable: 'members', ascending: false })
     .maybeSingle()
   if (error) throw error
-  if (!data) throw new ToolError('Esta cuenta aún no tiene perfil en Family App. Ábrela una vez, crea un grupo o únete a uno, y vuelve a probar.')
+  if (!data) throw new ToolError('Esta cuenta aún no tiene perfil en Family-App. Ábrela una vez, crea un grupo o únete a uno, y vuelve a probar.')
   return {
     personId: data.id,
     name: data.display_name,
@@ -110,8 +110,8 @@ export function pickGroup(me: Me, groupId: string | undefined, fits: (g: MyGroup
 
 /** Errors the app never shows (it doesn't offer those choices) but the AI can run into. */
 const TOOL_ERRORS: [RegExp, string][] = [
-  [/not allowed for connected apps/i, 'Las apps conectadas no pueden hacer esto. Hazlo desde Family App.'],
-  [/connected app access revoked/i, 'Se ha quitado el acceso a Family App desde la app (Cuenta → Conectado con IA). Para volver a usarla, conecta otra vez.'],
+  [/not allowed for connected apps/i, 'Las apps conectadas no pueden hacer esto. Hazlo desde Family-App.'],
+  [/connected app access revoked/i, 'Se ha quitado el acceso a Family-App desde la app (Cuenta → Conectado con IA). Para volver a usarla, conecta otra vez.'],
   [/row-level security.*event_participants/i, 'Alguna de esas personas no comparte grupo con la dueña de la carpeta, o no puedes editar el evento.'],
   [/row-level security.*event_shares/i, 'No se puede compartir con ese grupo: la persona dueña de la carpeta tiene que estar en él.'],
   [/row-level security.*"events"/i, 'No puedes crear ni cambiar eventos en esa carpeta.'],
