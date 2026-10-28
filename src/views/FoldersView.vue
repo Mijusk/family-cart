@@ -2,12 +2,13 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import FolderColorPicker from '@/components/FolderColorPicker.vue'
 import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import type { Calendar, ShareLevel } from '@/types'
-import { PERSON_COLORS } from '@/utils/colors'
+import { FOLDER_COLORS } from '@/utils/colors'
 import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
 
@@ -125,7 +126,7 @@ const LEVELS: { value: ShareLevel | null; label: string }[] = [
 // ── New folder ────────────────────────────────────────────────
 
 const adding = ref(false)
-const draft = reactive({ name: '', color: PERSON_COLORS[2] as string })
+const draft = reactive({ name: '', color: FOLDER_COLORS[2] as string })
 
 function add() {
   const name = cleanDisplayName(draft.name)
@@ -196,21 +197,7 @@ function add() {
               Nombre
               <input v-model="editing.name" class="field" maxlength="60" />
             </label>
-            <div class="colors" role="radiogroup" aria-label="Color">
-              <button
-                v-for="color in PERSON_COLORS"
-                :key="color"
-                type="button"
-                class="swatch"
-                role="radio"
-                :aria-checked="editing.color === color"
-                :aria-label="`Color ${color}`"
-                :style="{ background: color }"
-                @click="editing.color = color"
-              >
-                <AppIcon v-if="editing.color === color" name="check" :size="16" />
-              </button>
-            </div>
+            <FolderColorPicker v-model="editing.color" label="Color" />
             <button
               v-if="editing.name !== c.name || editing.color !== c.color"
               type="button"
@@ -249,21 +236,7 @@ function add() {
           Nombre de la carpeta nueva
           <input v-model="draft.name" class="field" maxlength="60" placeholder="Personal, Trabajo, Colegio…" autofocus />
         </label>
-        <div class="colors" role="radiogroup" aria-label="Color de la carpeta nueva">
-          <button
-            v-for="color in PERSON_COLORS"
-            :key="color"
-            type="button"
-            class="swatch"
-            role="radio"
-            :aria-checked="draft.color === color"
-            :aria-label="`Color ${color}`"
-            :style="{ background: color }"
-            @click="draft.color = color"
-          >
-            <AppIcon v-if="draft.color === color" name="check" :size="16" />
-          </button>
-        </div>
+        <FolderColorPicker v-model="draft.color" label="Color de la carpeta nueva" />
         <p v-if="owner.hasAccount && !owner.isMe" class="muted hint">
           Nace compartida en completo con {{ groupStore.group.name }}. {{ owner.name }} podrá cambiarlo.
         </p>
@@ -365,26 +338,6 @@ function add() {
 
 .add {
   padding-top: 16px;
-}
-
-.colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.swatch {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #fff;
-}
-
-.swatch[aria-checked='true'] {
-  outline: 3px solid color-mix(in srgb, var(--text) 35%, transparent);
-  outline-offset: 2px;
 }
 
 .share {

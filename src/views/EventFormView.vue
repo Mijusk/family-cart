@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, RouterLink, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import FolderColorPicker from '@/components/FolderColorPicker.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { REMINDER_PRESETS, reminderLabel } from '@/lib/eventText'
 import { reminderEndTime } from '@/lib/recurrence'
@@ -10,7 +11,7 @@ import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import type { RepeatKind } from '@/types'
-import { PERSON_COLORS } from '@/utils/colors'
+import { FOLDER_COLORS } from '@/utils/colors'
 import { isIsoDate, longDay, today, WEEKDAY_INITIALS, WEEKDAY_NAMES, weekday } from '@/utils/days'
 import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
@@ -66,7 +67,7 @@ const form = reactive({
   reminderHours: 0,
   reminderMins: 0,
   newFolderName: '',
-  newFolderColor: PERSON_COLORS[2] as string,
+  newFolderColor: FOLDER_COLORS[2] as string,
 })
 const ready = ref(false)
 const saving = ref(false)
@@ -466,21 +467,7 @@ function cancel() {
             Nombre de la carpeta
             <input v-model="form.newFolderName" class="field" maxlength="60" placeholder="Personal, Trabajo, Colegio…" />
           </label>
-          <div class="colors" role="radiogroup" aria-label="Color de la carpeta">
-            <button
-              v-for="c in PERSON_COLORS"
-              :key="c"
-              type="button"
-              class="swatch"
-              role="radio"
-              :aria-checked="form.newFolderColor === c"
-              :aria-label="`Color ${c}`"
-              :style="{ background: c }"
-              @click="form.newFolderColor = c"
-            >
-              <AppIcon v-if="form.newFolderColor === c" name="check" :size="16" />
-            </button>
-          </div>
+          <FolderColorPicker v-model="form.newFolderColor" label="Color de la carpeta" />
           <p class="muted hint">Nace privada; para compartirla con un grupo, ve a Mis carpetas.</p>
         </div>
       </template>
@@ -688,26 +675,6 @@ textarea.field {
 
 .new-folder .hint {
   margin-top: 0;
-}
-
-.colors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.swatch {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #fff;
-}
-
-.swatch[aria-checked='true'] {
-  outline: 3px solid color-mix(in srgb, var(--text) 35%, transparent);
-  outline-offset: 2px;
 }
 
 .weekdays {
