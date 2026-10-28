@@ -54,12 +54,45 @@ export function parseHex(text: string): string | null {
   return `#${digits.toLowerCase()}`
 }
 
-/** WCAG contrast of white text on a #rrggbb background. */
-export function whiteContrast(hex: string): number {
+/** WCAG relative luminance of #rrggbb. */
+function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => {
     const c = parseInt(hex.slice(i, i + 2), 16) / 255
     return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
-  })
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return 1.05 / (luminance + 0.05)
+  }) as [number, number, number]
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** WCAG contrast between two #rrggbb colors. */
+export function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** The app's text color (--text), for light folder colors. */
+export const INK = '#1f2d24'
+/** The app's cards (--surface); a folder color this close to it gets an edge. */
+const SURFACE = '#ffffff'
+
+/** White text, unless the color is light enough that dark text reads better. */
+export function textOn(hex: string): string {
+  return contrast(hex, '#ffffff') >= 4.5 || contrast(hex, '#ffffff') >= contrast(hex, INK) ? '#ffffff' : INK
+}
+
+/**
+ * The color, darker, to outline it when it would melt into the white cards: light and washed
+ * out (a bright yellow is light too, but its hue shows). Else null.
+ */
+export function edgeOn(hex: string): string | null {
+  const hsv = hexToHsv(hex)
+  if (contrast(hex, SURFACE) >= 1.5 || hsv.s >= 0.3) return null
+  return hsvToHex({ ...hsv, v: hsv.v * 0.72 })
+}
+
+/**
+ * How to paint something in a folder's color: its text color, and --edge for a 1px inset ring
+ * (`box-shadow: inset 0 0 0 1px var(--edge)`) when the color is too close to the background.
+ */
+export function folderPaint(hex: string): Record<string, string> {
+  return { background: hex, color: textOn(hex), '--edge': edgeOn(hex) ?? 'transparent' }
 }

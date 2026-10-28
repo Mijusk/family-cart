@@ -2,15 +2,13 @@
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import ColorPanel from '@/components/ColorPanel.vue'
-import { FOLDER_COLORS, whiteContrast } from '@/utils/colors'
+import { FOLDER_COLORS, folderPaint } from '@/utils/colors'
 
 const color = defineModel<string>({ required: true })
 defineProps<{ label: string }>()
 
 const isCustom = computed(() => !(FOLDER_COLORS as readonly string[]).includes(color.value))
 const open = ref(false)
-// Events are drawn with white text on the folder color.
-const tooLight = computed(() => isCustom.value && whiteContrast(color.value) < 3)
 
 function pick(c: string) {
   color.value = c
@@ -41,14 +39,13 @@ function pick(c: string) {
       :aria-expanded="open"
       aria-label="Otro color"
       title="Otro color"
-      :style="isCustom ? { background: color } : undefined"
+      :style="isCustom ? folderPaint(color) : undefined"
       @click="open = !open"
     >
       <AppIcon :name="isCustom ? 'check' : 'plus'" :size="16" />
     </button>
   </div>
   <ColorPanel v-if="open" v-model="color" class="custom-panel" />
-  <p v-if="tooLight" class="muted hint light">Es un color muy claro: el texto de los eventos se leerá mal.</p>
 </template>
 
 <style scoped>
@@ -65,6 +62,7 @@ function pick(c: string) {
   height: 36px;
   border-radius: 50%;
   color: #fff;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .swatch[aria-checked='true'] {
@@ -78,10 +76,5 @@ function pick(c: string) {
 
 .custom-panel {
   margin-top: 10px;
-}
-
-.light {
-  margin: 6px 0 0;
-  color: var(--warn);
 }
 </style>

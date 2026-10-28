@@ -9,6 +9,7 @@ import { timeLabel } from '@/lib/eventText'
 import { HOUR_PX, timeline } from '@/lib/timeline'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
+import { folderPaint } from '@/utils/colors'
 import { addDays, isIsoDate, longDay, shortDay, startOfWeek, today } from '@/utils/days'
 
 // "Semana": the chosen group's week, Monday to Sunday. ?semana=YYYY-MM-DD is any day of the week.
@@ -183,7 +184,7 @@ function ownerName(id: string): string {
         @click="folders = toggle(folders, c.id)"
       >
         <AppIcon v-if="activeFolders.has(c.id)" name="check" :size="16" />
-        <span class="swatch folder" :style="{ background: c.color }" />{{ c.name }}
+        <span class="swatch folder" :style="folderPaint(c.color)" />{{ c.name }}
       </button>
     </div>
     <p v-if="filtered" class="center"><button type="button" class="link" @click="clearFilters">Quitar filtros</button></p>
@@ -203,8 +204,8 @@ function ownerName(id: string): string {
         <div v-else class="sheet">
           <ul v-if="d.allDay.length" class="all-day">
             <li v-for="o in d.allDay" :key="o.key">
-              <span v-if="o.busy" class="chip busy" :style="{ background: o.color }">Ocupado · {{ ownerName(o.ownerId) }}</span>
-              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="chip" :style="{ background: o.color }">
+              <span v-if="o.busy" class="chip busy" :style="folderPaint(o.color)">Ocupado · {{ ownerName(o.ownerId) }}</span>
+              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="chip" :style="folderPaint(o.color)">
                 {{ o.title }} · {{ ownerName(o.ownerId) }}
               </RouterLink>
             </li>
@@ -223,7 +224,7 @@ function ownerName(id: string): string {
                   <span
                     v-if="o.busy"
                     class="block busy"
-                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, background: o.color }"
+                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, ...folderPaint(o.color) }"
                   >
                     <strong>Ocupado</strong>
                     <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
@@ -233,7 +234,7 @@ function ownerName(id: string): string {
                     v-else
                     :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }"
                     class="block"
-                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, background: o.color }"
+                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, ...folderPaint(o.color) }"
                   >
                     <strong>{{ o.title }}</strong>
                     <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
@@ -310,12 +311,19 @@ function ownerName(id: string): string {
   border-radius: 50%;
 }
 
+.choice[aria-pressed='true'] .swatch.folder {
+  box-shadow:
+    inset 0 0 0 1px var(--edge, transparent),
+    0 0 0 2px #fff;
+}
+
 .choice[aria-pressed='true'] .swatch {
   box-shadow: 0 0 0 2px #fff;
 }
 
 .swatch.folder {
   border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .state {
@@ -387,6 +395,7 @@ function ownerName(id: string): string {
   padding: 3px 8px;
   border-radius: 6px;
   color: #fff;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
   font-size: 0.8125rem;
   font-weight: 600;
   text-decoration: none;
@@ -448,7 +457,9 @@ function ownerName(id: string): string {
   padding: 4px 7px;
   border-radius: 8px;
   /* A white edge keeps neighbours apart. */
-  box-shadow: 0 0 0 1.5px var(--surface);
+  box-shadow:
+    inset 0 0 0 1px var(--edge, transparent),
+    0 0 0 1.5px var(--surface);
   overflow: hidden;
   color: #fff;
   text-decoration: none;

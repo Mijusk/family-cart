@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FOLDER_COLORS, hexToHsv, hsvToHex, parseHex, whiteContrast } from './colors'
+import { contrast, edgeOn, FOLDER_COLORS, folderPaint, hexToHsv, hsvToHex, INK, parseHex, textOn } from './colors'
 
 describe('hsv', () => {
   it('turns into lowercase hex', () => {
@@ -30,14 +30,34 @@ describe('parseHex', () => {
   })
 })
 
-describe('whiteContrast', () => {
-  it('goes from 1 on white to 21 on black', () => {
-    expect(whiteContrast('#ffffff')).toBeCloseTo(1)
-    expect(whiteContrast('#000000')).toBeCloseTo(21)
+describe('contrast', () => {
+  it('goes from 1 to 21, either way round', () => {
+    expect(contrast('#ffffff', '#ffffff')).toBeCloseTo(1)
+    expect(contrast('#ffffff', '#000000')).toBeCloseTo(21)
+    expect(contrast('#000000', '#ffffff')).toBeCloseTo(21)
   })
 
   it('keeps every folder color readable with white text', () => {
-    for (const c of FOLDER_COLORS) expect(whiteContrast(c), c).toBeGreaterThanOrEqual(4.5)
+    for (const c of FOLDER_COLORS) {
+      expect(contrast(c, '#ffffff'), c).toBeGreaterThanOrEqual(4.5)
+      expect(textOn(c), c).toBe('#ffffff')
+    }
+  })
+})
+
+describe('folderPaint', () => {
+  it('writes dark on light colors', () => {
+    for (const c of ['#ffee00', '#a0e0ff', '#ffffff', '#f2c4d0']) expect(textOn(c), c).toBe(INK)
+  })
+
+  it('outlines only colors that melt into the white cards, a bit darker', () => {
+    for (const c of [...FOLDER_COLORS, '#ffee00', '#a0e0ff']) expect(edgeOn(c), c).toBeNull()
+    const edge = edgeOn('#f4f6f2')!
+    expect(contrast(edge, '#ffffff')).toBeGreaterThan(1.5)
+    // Same hue, give or take the rounding to 8 bits of a nearly grey color.
+    expect(Math.abs(hexToHsv(edge).h - hexToHsv('#f4f6f2').h)).toBeLessThan(15)
+    expect(folderPaint('#ffffff')).toEqual({ background: '#ffffff', color: INK, '--edge': edgeOn('#ffffff') })
+    expect(folderPaint('#3b6fb6')).toEqual({ background: '#3b6fb6', color: '#ffffff', '--edge': 'transparent' })
   })
 
   it('has no repeated folder colors', () => {

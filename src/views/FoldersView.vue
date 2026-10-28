@@ -8,7 +8,7 @@ import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import type { Calendar, ShareLevel } from '@/types'
-import { FOLDER_COLORS } from '@/utils/colors'
+import { FOLDER_COLORS, folderPaint } from '@/utils/colors'
 import { friendlyError } from '@/utils/errors'
 import { cleanDisplayName } from '@/utils/text'
 
@@ -184,7 +184,7 @@ function add() {
       <ul class="folders">
         <li v-for="c in folders" :key="c.id" class="folder">
           <button type="button" class="folder-head" :aria-expanded="editing.id === c.id" @click="toggle(c)">
-            <span class="dot" :style="{ background: c.color }" />
+            <span class="dot" :style="folderPaint(c.color)" />
             <span class="folder-text">
               <span class="name">{{ c.name }}</span>
               <span class="muted summary">{{ shareSummary(c) }}</span>
@@ -306,6 +306,7 @@ function add() {
   height: 14px;
   border-radius: 4px;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .dot.round {

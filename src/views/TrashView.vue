@@ -6,6 +6,7 @@ import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import type { TrashItem } from '@/types'
+import { folderPaint } from '@/utils/colors'
 import { timeAgo } from '@/utils/date'
 import { shortDay } from '@/utils/days'
 import { friendlyError } from '@/utils/errors'
@@ -101,7 +102,7 @@ function deletedLine(item: TrashItem): string {
     <ul v-else class="items">
       <li v-for="item in items" :key="`${item.kind}:${item.id}`" class="item">
         <div class="item-head">
-          <span class="dot" :class="{ folder: item.kind === 'calendar' }" :style="{ background: item.color }" />
+          <span class="dot" :class="{ folder: item.kind === 'calendar' }" :style="folderPaint(item.color)" />
           <span class="item-text">
             <span class="title">{{ item.title }}</span>
             <span class="muted small">{{ detail(item) }}</span>
@@ -165,6 +166,7 @@ function deletedLine(item: TrashItem): string {
   margin-top: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .dot.folder {

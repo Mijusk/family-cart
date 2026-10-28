@@ -9,6 +9,7 @@ import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
+import { folderPaint } from '@/utils/colors'
 import { addDays, isIsoDate, longDay, relativeDay, today } from '@/utils/days'
 
 // "Hoy": what each person of the group has on one day. ?dia=YYYY-MM-DD moves to another day.
@@ -93,7 +94,7 @@ const rows = computed(() => {
         <ul class="rows">
           <li v-for="o in row.items" :key="o.key">
             <span v-if="o.busy" class="occurrence busy">
-              <span class="bar" :style="{ background: o.color }" />
+              <span class="bar" :style="folderPaint(o.color)" />
               <span class="when">{{ timeLabel(o, day) }}</span>
               <span class="what"><span class="title">Ocupado</span></span>
             </span>
@@ -103,7 +104,7 @@ const rows = computed(() => {
               class="occurrence"
               :class="{ reminder: o.reminderOnly }"
             >
-              <span class="bar" :style="{ background: o.color }" />
+              <span class="bar" :style="folderPaint(o.color)" />
               <span class="when">
                 <template v-if="o.reminderOnly"><AppIcon name="bell" :size="14" />{{ o.startTime }}</template>
                 <template v-else>{{ timeLabel(o, day) }}</template>
@@ -201,6 +202,7 @@ a.occurrence:hover {
   width: 4px;
   border-radius: 2px;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 /* A «Recordatorio»: a short line, quieter than what takes time. */

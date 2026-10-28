@@ -8,6 +8,7 @@ import { useSwipe } from '@/composables/swipe'
 import { timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
+import { folderPaint } from '@/utils/colors'
 import {
   addDays,
   addMonths,
@@ -132,7 +133,7 @@ function label(day: string): string {
           >
             <span class="num">{{ dayOfMonth(day) }}</span>
             <span class="dots" aria-hidden="true">
-              <span v-for="o in (cells[day] ?? []).slice(0, 3)" :key="o.key" class="dot" :style="{ background: o.color }" />
+              <span v-for="o in (cells[day] ?? []).slice(0, 3)" :key="o.key" class="dot" :style="folderPaint(o.color)" />
               <span v-if="(cells[day]?.length ?? 0) > 3" class="more">+</span>
             </span>
           </button>
@@ -148,12 +149,12 @@ function label(day: string): string {
           <li v-if="!chosenItems.length" class="nothing muted">Nada puntual este día</li>
           <li v-for="o in chosenItems" :key="o.key">
             <span v-if="o.busy" class="occurrence busy">
-              <span class="bar" :style="{ background: o.color }" />
+              <span class="bar" :style="folderPaint(o.color)" />
               <span class="when">{{ timeLabel(o, selected) }}</span>
               <span class="what"><span class="title">Ocupado</span><span class="muted who">{{ ownerName(o.ownerId) }}</span></span>
             </span>
             <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="occurrence">
-              <span class="bar" :style="{ background: o.color }" />
+              <span class="bar" :style="folderPaint(o.color)" />
               <span class="when">{{ timeLabel(o, selected) }}</span>
               <span class="what"><span class="title">{{ o.title }}</span><span class="muted who">{{ ownerName(o.ownerId) }}</span></span>
             </RouterLink>
@@ -277,6 +278,7 @@ function label(day: string): string {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .more {
@@ -326,6 +328,7 @@ a.occurrence:hover {
   width: 4px;
   border-radius: 2px;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px var(--edge, transparent);
 }
 
 .busy .bar {
