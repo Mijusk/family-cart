@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import ColorPanel from '@/components/ColorPanel.vue'
 import { FOLDER_COLORS, whiteContrast } from '@/utils/colors'
 
 const color = defineModel<string>({ required: true })
 defineProps<{ label: string }>()
 
 const isCustom = computed(() => !(FOLDER_COLORS as readonly string[]).includes(color.value))
+const open = ref(false)
 // Events are drawn with white text on the folder color.
 const tooLight = computed(() => isCustom.value && whiteContrast(color.value) < 3)
 
-function pick(event: Event) {
-  // The database only takes lowercase #rrggbb.
-  color.value = (event.target as HTMLInputElement).value.toLowerCase()
+function pick(c: string) {
+  color.value = c
+  open.value = false
 }
 </script>
 
@@ -27,22 +29,25 @@ function pick(event: Event) {
       :aria-checked="color === c"
       :aria-label="`Color ${c}`"
       :style="{ background: c }"
-      @click="color = c"
+      @click="pick(c)"
     >
       <AppIcon v-if="color === c" name="check" :size="16" />
     </button>
-    <label
+    <button
+      type="button"
       class="swatch custom"
       role="radio"
       :aria-checked="isCustom"
-      :class="{ chosen: isCustom }"
-      :style="isCustom ? { background: color } : undefined"
+      :aria-expanded="open"
+      aria-label="Otro color"
       title="Otro color"
+      :style="isCustom ? { background: color } : undefined"
+      @click="open = !open"
     >
       <AppIcon :name="isCustom ? 'check' : 'plus'" :size="16" />
-      <input type="color" :value="color" aria-label="Elegir otro color" @input="pick" />
-    </label>
+    </button>
   </div>
+  <ColorPanel v-if="open" v-model="color" class="custom-panel" />
   <p v-if="tooLight" class="muted hint light">Es un color muy claro: el texto de los eventos se leerá mal.</p>
 </template>
 
@@ -54,7 +59,6 @@ function pick(event: Event) {
 }
 
 .swatch {
-  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
@@ -69,22 +73,11 @@ function pick(event: Event) {
 }
 
 .custom {
-  cursor: pointer;
   background: conic-gradient(#b83232, #8f6a1f, #5f7a2e, #277a7a, #3b6fb6, #7d4f9a, #b5476f, #b83232);
 }
 
-.custom input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.custom:focus-within {
-  outline: 3px solid color-mix(in srgb, var(--primary) 55%, transparent);
-  outline-offset: 2px;
+.custom-panel {
+  margin-top: 10px;
 }
 
 .light {
