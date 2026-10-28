@@ -1,10 +1,11 @@
 // What the AI sends to the write tools, checked with the same rules as the app's forms
-// (EventFormView, the task screen, the shopping list) before anything is written. Pure functions,
+// (EventFormView, the task screen, the shopping list, Mis carpetas) before anything is written. Pure functions,
 // tested with Vitest (input.test.ts); the database checks again with its constraints and RLS.
 
 import type { CalendarEvent, ClockTime, EventOverrides, IsoDate, RepeatKind } from '../../../src/types.ts'
 import { reminderEndTime } from '../../../src/lib/recurrence.ts'
 import { addDays, daysBetween, isIsoDate, weekday } from '../../../src/utils/isoDays.ts'
+import { FOLDER_COLORS } from '../../../src/utils/colors.ts'
 import { cleanDisplayName } from '../../../src/utils/text.ts'
 
 /** The writable fields of an event, as the app's EventDraft. */
@@ -41,6 +42,8 @@ export interface EventInput {
 }
 
 export type Checked<T> = { ok: true; value: T } | { ok: false; error: string }
+
+type FolderColor = (typeof FOLDER_COLORS)[number]
 
 const fail = (error: string): { ok: false; error: string } => ({ ok: false, error })
 
@@ -336,6 +339,39 @@ export function itemFields(input: ItemInput): Checked<ItemFields> {
   const note = optionalText(input.nota ?? null, ITEM_NOTE_MAX, `La nota de «${name}»`)
   if (!note.ok) return note
   return { ok: true, value: { name, quantity, note: note.value } }
+}
+
+export interface FolderInput {
+  nombre: string
+  color?: string
+  nivel?: 'completo' | 'ocupado'
+  grupo_id?: string
+}
+
+export interface FolderFields {
+  name: string
+  color: FolderColor
+  level: 'full' | 'busy' | null
+}
+
+const FOLDER_NAME_MAX = 60
+/** The color the app's folder form starts with. */
+export const DEFAULT_FOLDER_COLOR: FolderColor = FOLDER_COLORS[2]
+
+/** A new folder, cleaned as Mis carpetas does; the color, one of the palette. */
+export function folderFields(input: FolderInput): Checked<FolderFields> {
+  const name = cleanDisplayName(input.nombre)
+  if (!name) return fail('La carpeta necesita un nombre.')
+  if (name.length > FOLDER_NAME_MAX) return fail(`El nombre de la carpeta puede tener como mucho ${FOLDER_NAME_MAX} caracteres.`)
+  let color = DEFAULT_FOLDER_COLOR
+  if (input.color !== undefined) {
+    const wanted = FOLDER_COLORS.find((c) => c === input.color!.trim().toLowerCase())
+    if (!wanted) return fail(`Ese color no está en la paleta de la app. Usa uno de estos: ${FOLDER_COLORS.join(', ')}.`)
+    color = wanted
+  }
+  if (input.nivel && !input.grupo_id) return fail('Para compartirla en completo o en modo ocupado, di con qué grupo.')
+  const level = input.nivel === 'ocupado' ? 'busy' : input.nivel === 'completo' ? 'full' : null
+  return { ok: true, value: { name, color, level } }
 }
 
 /** The longest range ver_eventos returns at once. */

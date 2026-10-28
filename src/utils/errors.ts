@@ -27,6 +27,10 @@ export function friendlyError(error: unknown): string {
   if (/event not found|calendar not found/i.test(message)) return 'Ese evento o carpeta ya no existe o no tienes permiso para cambiarlo.'
   if (/row-level security.*calendar_shares/i.test(message))
     return 'No se puede compartir con ese grupo: la persona dueña de la carpeta tiene que estar en él.'
+  if (/calendar name taken/i.test(message)) return 'Esa persona ya tiene una carpeta con ese nombre, y no puedes editarla.'
+  if (/someone else's folder is shared in full/i.test(message))
+    return 'La carpeta de otra persona se comparte en completo con el grupo, para que puedas editarla.'
+  if (/share level without a group|invalid share level/i.test(message)) return 'Para compartir la carpeta, elige un grupo y si es en completo u ocupado.'
   // Tasks
   if (/task list is deleted/i.test(message)) return 'Esa lista está en la papelera. Restáurala primero.'
   if (/task not found|task list not found/i.test(message)) return 'Esa tarea o lista ya no existe o no tienes permiso para cambiarla.'

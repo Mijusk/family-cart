@@ -9,11 +9,17 @@ como si lo hiciera la persona en la app, con su propia cuenta.
 1. **Qué puede hacer:** ver el calendario, las tareas y la compra; crear y cambiar eventos (el evento
    entero, o un solo día de algo que se repite: cambiarlo o cancelarlo); crear, cambiar y marcar
    tareas; añadir productos a la compra. **Nada se borra** desde la IA (ni eventos, ni tareas, ni
-   productos), ni se tocan grupos, personas o carpetas.
+   productos), ni se tocan grupos o personas. Las carpetas solo se crean (`crear_carpeta`), no se
+   renombran, recolorean, comparten después ni borran.
 2. **Confirma antes:** cada herramienta que escribe le dice a la IA que resuma lo que va a hacer (con el
    día de la semana y la fecha) y espere un «sí». Claude, además, pide permiso por herramienta.
 3. **Carpetas:** las mismas que en el formulario, también las de otras personas que el usuario edita
-   como admin (p. ej. el Colegio de Pablo). Sin carpeta, la última usada.
+   como admin (p. ej. el Colegio de Pablo). Sin carpeta, la última usada. `crear_carpeta` hace una
+   nueva con las reglas de Mis carpetas, por la RPC `create_calendar_from_app` (la única vía: sin
+   insert en `calendars` ni `calendar_shares`): la mía o la de un perfil que gestiono nace privada salvo
+   que se pida grupo (completo u ocupado); la de otra persona con cuenta, solo como admin y compartida en
+   completo con ese grupo. Si el dueño ya tiene una con ese nombre (también en la papelera), devuelve esa
+   sin cambiarla; color de `FOLDER_COLORS`.
 4. **El token se limita en la base de datos**, no solo con RLS (ver §3).
 5. **Textos:** pantalla «*Claude* quiere acceder a tu Family-App» (con el nombre que da la app) y en
    Cuenta la sección «Conectado con IA», con «Quitar acceso».
@@ -67,6 +73,7 @@ Claude ── POST /functions/v1/mcp (sin token) ──▶ 401 + WWW-Authenticat
 | --- | --- |
 | `quien_soy` | Persona, grupos (zona horaria, secciones), fecha y hora de ahora en cada zona y los próximos 14 días con su día de la semana. |
 | `listar_carpetas` | Carpetas en las que puede crear (`editable_calendar_ids`), de quién son, con quién se comparten, y la de por defecto. |
+| `crear_carpeta` | Carpeta nueva (mía, de un perfil que gestiono o, como admin, de otro miembro), privada o compartida si se pide; si ya existe con ese nombre, devuelve esa. |
 | `listar_personas` | Personas de sus grupos (también sin cuenta), con su `persona_id`. |
 | `ver_eventos` | Del día «desde» al «hasta» (máx. 62 días), expandido por día: repeticiones, cancelados fuera, cambiados con sus datos, modo ocupado como «Ocupado» (`busy_events`). Filtro por persona o grupo. |
 | `crear_evento` | Como el formulario: valida, carpeta por defecto la última usada, fin antes que inicio = cruza medianoche, sin fin dura 1 h, participantes, aviso. Devuelve «Dentista · mar 4 nov, 17:30–18:30 · carpeta Médico» y el enlace. |
@@ -163,7 +170,7 @@ entras como `marta@ejemplo.com` / `demo1234` y Permitir. Luego **List Tools** y 
 
 ## 6. Fuera de esta V1
 
-- Borrar (eventos, tareas, productos), tachar la compra, crear carpetas o listas, compartir.
+- Borrar (eventos, tareas, productos), tachar la compra, crear listas, cambiar o compartir carpetas que ya existen.
 - Cambiar una serie «a partir de este día».
 - Avisar al momento al crear un evento (hoy, como en la app, avisan los recordatorios y los cambios).
 - Límite de peticiones por persona (hoy: los límites de tamaño de §3 y los de Supabase).

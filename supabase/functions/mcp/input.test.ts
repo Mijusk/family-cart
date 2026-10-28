@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateRange, dayOverrides, eventFields, itemFields, NEW_EVENT, parseClock, taskFields, type EventFields } from './input.ts'
+import { dateRange, dayOverrides, eventFields, folderFields, itemFields, NEW_EVENT, parseClock, taskFields, type EventFields } from './input.ts'
 
 const ok = <T>(r: { ok: true; value: T } | { ok: false; error: string }): T => {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error}`)
@@ -189,5 +189,24 @@ describe('dateRange', () => {
     expect(ok(dateRange('2026-11-01', '2027-01-01'))).toEqual({ from: '2026-11-01', to: '2027-01-01' })
     expect(error(dateRange('2026-11-01', '2027-01-02'))).toMatch(/62 días/)
     expect(error(dateRange('2026-11-04', '2026-11-03'))).toMatch(/anterior/)
+  })
+})
+
+describe('folderFields', () => {
+  it("cleans the name and takes the form's color", () => {
+    expect(ok(folderFields({ nombre: '  iglesia   evangélica ' }))).toEqual({ name: 'Iglesia evangélica', color: '#3b6fb6', level: null })
+  })
+  it('takes a color of the palette only', () => {
+    expect(ok(folderFields({ nombre: 'Trabajo', color: ' #A8522F ' })).color).toBe('#a8522f')
+    expect(error(folderFields({ nombre: 'Trabajo', color: '#ffee00' }))).toMatch(/paleta/)
+  })
+  it('shares only with a group', () => {
+    expect(ok(folderFields({ nombre: 'Trabajo', nivel: 'ocupado', grupo_id: 'g' })).level).toBe('busy')
+    expect(ok(folderFields({ nombre: 'Trabajo', nivel: 'completo', grupo_id: 'g' })).level).toBe('full')
+    expect(error(folderFields({ nombre: 'Trabajo', nivel: 'completo' }))).toMatch(/qué grupo/)
+  })
+  it('checks the name', () => {
+    expect(error(folderFields({ nombre: '   ' }))).toMatch(/nombre/)
+    expect(error(folderFields({ nombre: 'x'.repeat(61) }))).toMatch(/60/)
   })
 })

@@ -619,6 +619,11 @@ isOneToOne: false
 "create_calendar_for":
 { Args: { "color": string,"group_id": string,"name": string,"owner_id": string }; Returns: string
                            },
+"create_calendar_from_app":
+{ Args: { "color"?: string,"group_id"?: string,"level"?: string,"name": string,"owner_id": string }; Returns: {
+              "calendar_color": string,"calendar_id": string,"calendar_name": string,"created": boolean,"in_trash": boolean
+            }[]
+                           },
 "create_claim_code":
 { Args: { "pid": string }; Returns: string
                            },

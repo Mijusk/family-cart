@@ -7,10 +7,11 @@ import { z } from 'zod'
 import { fromEvent, fromOverrides, toBusyEvent, toEvent, toException } from '../../../src/lib/mappers.ts'
 import { isSeriesDate, reminderEndTime } from '../../../src/lib/recurrence.ts'
 import type { CalendarEvent, EventException, EventOverrides, IsoDate } from '../../../src/types.ts'
+import { FOLDER_COLORS } from '../../../src/utils/colors.ts'
 import { addDays, weekdayShortDay } from '../../../src/utils/isoDays.ts'
 import { agenda, eventSummary, nextDays, nowIn, timeText, type AgendaEvent } from './agenda.ts'
 import { APP_URL, DEFAULT_TIMEZONE, ToolError, type Context, type Me } from './context.ts'
-import { dateRange, dayOverrides, eventFields, MAX_RANGE_DAYS, parseClock, type EventFields } from './input.ts'
+import { dateRange, dayOverrides, DEFAULT_FOLDER_COLOR, eventFields, folderFields, MAX_RANGE_DAYS, parseClock, type EventFields } from './input.ts'
 import { CONFIRM_FIRST, data, done, tool } from './tools.ts'
 
 const id = () => z.guid()
@@ -138,6 +139,62 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
             }
           }),
       })
+    },
+  )
+
+  tool(
+    server,
+    'crear_carpeta',
+    'create',
+    {
+      title: 'Crear una carpeta',
+      description:
+        'Crea una carpeta del calendario, como Mis carpetas: para ti, para un perfil sin cuenta que gestionas (p. ej. un hijo) o, ' +
+        'si eres admin del grupo, para otra persona (entonces se comparte en completo con ese grupo). Las tuyas nacen privadas ' +
+        'salvo que la persona pida compartirlas. Si ya hay una con ese nombre, no se crea otra: devuelve esa. ' +
+        'Úsala solo si ninguna de listar_carpetas encaja. ' +
+        CONFIRM_FIRST,
+      input: z.object({
+        nombre: z.string().max(200).describe('Nombre corto («Trabajo», «Colegio», «Natación»).'),
+        persona_id: id().optional().describe('De quién es (de listar_personas). Sin ella, tuya.'),
+        color: z.string().max(10).optional().describe(`Uno de la paleta de la app: ${FOLDER_COLORS.join(', ')}. Sin él, ${DEFAULT_FOLDER_COLOR}.`),
+        grupo_id: id().optional().describe('Grupo con el que compartirla (de quien_soy). Solo si la persona lo pide, o si es de otra persona con cuenta.'),
+        nivel: z
+          .enum(['completo', 'ocupado'])
+          .optional()
+          .describe('Con grupo_id: completo (ven los eventos) u ocupado (solo ven «Ocupado»). Sin él, completo.'),
+      }),
+    },
+    async (input) => {
+      const me = await ctx.me()
+      const fields = folderFields(input)
+      if (!fields.ok) throw new ToolError(fields.error)
+      if (input.grupo_id && !me.groups.some((g) => g.id === input.grupo_id))
+        throw new ToolError('No estás en ese grupo. Usa quien_soy para ver tus grupos.')
+      const owner = input.persona_id ?? me.personId
+      const { data: rows, error } = await ctx.db.rpc('create_calendar_from_app', {
+        owner_id: owner,
+        name: fields.value.name,
+        color: fields.value.color,
+        ...(input.grupo_id && { group_id: input.grupo_id }),
+        ...(fields.value.level && { level: fields.value.level }),
+      })
+      if (error) throw error
+      const folder = rows[0]!
+      const name = await ctx.names([owner])
+      const whose = owner === me.personId ? '' : ` de ${name(owner)}`
+      const group = me.groups.find((g) => g.id === input.grupo_id)
+      const shared = !folder.created
+        ? ''
+        : group
+          ? `, compartida con ${group.name}${fields.value.level === 'busy' ? ' en modo ocupado' : ''}`
+          : ', privada'
+      const text = folder.created
+        ? `Creada la carpeta «${folder.calendar_name}»${whose}${shared}. Su carpeta_id es ${folder.calendar_id}.`
+        : folder.in_trash
+          ? `Ya hay una carpeta «${folder.calendar_name}»${whose}, pero está en la papelera: restáurala en la app antes de usarla.`
+          : `Ya había una carpeta «${folder.calendar_name}»${whose}; no se ha creado otra ni se ha cambiado. Su carpeta_id es ${folder.calendar_id}.`
+      return done(`${text}\nÁbrela en Family-App: ${APP_URL}/calendario/carpetas`)
     },
   )
 
@@ -500,7 +557,7 @@ async function editableFolder(ctx: Context, me: Me, folderId: string | undefined
   if (editable.error) throw editable.error
   const mine = folders.data.filter((c) => editable.data.includes(c.id))
   const id = folderId ?? defaultFolder(me, mine)
-  if (!id) throw new ToolError('No tienes ninguna carpeta en la que crear eventos. Crea una en la app: Calendario → Mis carpetas.')
+  if (!id) throw new ToolError('No tienes ninguna carpeta en la que crear eventos. Crea una con crear_carpeta o en la app: Calendario → Mis carpetas.')
   const folder = mine.find((c) => c.id === id)
   if (!folder) throw new ToolError('No puedes añadir eventos a esa carpeta. Usa listar_carpetas para ver en cuáles sí.')
   return { id: folder.id, name: folder.name, ownerId: folder.owner_id }

@@ -565,6 +565,78 @@ select tests.check('ai: does not see devices (Realtime goes by RLS)', (select co
 select tests.expect_error('ai: cannot upload photos',
   $$insert into storage.objects (bucket_id, name) values ('item-photos', '00000000-0000-4000-8000-000000000001/x.jpg')$$, 'row-level security');
 
+-- Creating folders: only through create_calendar_from_app, with the app's rules.
+select tests.api('POST', 'rpc/create_calendar_from_app');
+select tests.expect_ok('ai folders: may create them through the RPC', $$select public.check_api_request()$$);
+select tests.api('POST', 'calendars');
+select tests.expect_error('ai folders: cannot insert them directly', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'calendar_shares');
+select tests.expect_error('ai folders: cannot share folders directly', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('PATCH', 'calendars');
+select tests.expect_error('ai folders: cannot rename or recolor', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/delete_calendar');
+select tests.expect_error('ai folders: cannot delete them', $$select public.check_api_request()$$, 'not allowed for connected apps');
+
+select calendar_id as ai_yoga from create_calendar_from_app(my_person_id(), '  Yoga   en casa ') \gset
+select tests.check('ai folders: mine, private, with the form''s color',
+  (select c.name = 'Yoga en casa' and c.color = '#3b6fb6' and c.owner_id = my_person_id() and c.created_by = my_person_id()
+     and not exists (select 1 from calendar_shares s where s.calendar_id = c.id)
+     from calendars c where c.id = :'ai_yoga'));
+select calendar_id as ai_church from create_calendar_from_app(my_person_id(), 'Iglesia', '#7d4f9a', '00000000-0000-4000-8000-000000000001', 'busy') \gset
+select tests.check('ai folders: mine, shared as asked',
+  (select level = 'busy' and shared_by = my_person_id() from calendar_shares
+    where calendar_id = :'ai_church' and group_id = '00000000-0000-4000-8000-000000000001'));
+select tests.check('ai folders: the same name again gives the one there is',
+  (select calendar_id = :'ai_yoga' and not created and not in_trash from create_calendar_from_app(my_person_id(), 'yóga EN casa')));
+select tests.check('ai folders: no second one made',
+  (select count(*) from calendars where owner_id = my_person_id() and normalize_name(name) = 'yoga en casa') = 1);
+select tests.check('ai folders: an existing folder is not shared or changed',
+  (select calendar_id = '00000000-0000-4000-8000-0000000000e1' and not created
+     from create_calendar_from_app(my_person_id(), 'trabajo', null, '00000000-0000-4000-8000-000000000001', 'busy'))
+  and (select array_agg(level) from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e1') = '{full}');
+select delete_calendar(:'ai_yoga');
+select tests.check('ai folders: one in the trash is not made again',
+  (select calendar_id = :'ai_yoga' and not created and in_trash from create_calendar_from_app(my_person_id(), 'Yoga en casa')));
+select tests.expect_error('ai folders: a level needs a group',
+  $$select create_calendar_from_app(my_person_id(), 'x', null, null, 'busy')$$, 'without a group');
+select tests.expect_error('ai folders: only full or busy',
+  $$select create_calendar_from_app(my_person_id(), 'x', null, '00000000-0000-4000-8000-000000000001', 'all')$$, 'invalid share level');
+select tests.expect_error('ai folders: only with my groups',
+  $$select create_calendar_from_app(my_person_id(), 'x', null, '00000000-0000-4000-8000-000000000002')$$, 'not a member');
+
+-- A profile without account (Pablo): private and mine to edit, as in Mis carpetas; shared if asked.
+select calendar_id as ai_swim from create_calendar_from_app('00000000-0000-4000-8000-0000000000d2', 'Natación') \gset
+select tests.check('ai folders: admin makes one for a profile, private',
+  (select c.owner_id = '00000000-0000-4000-8000-0000000000d2' and can_edit_calendar(c.id)
+     and not exists (select 1 from calendar_shares s where s.calendar_id = c.id)
+     from calendars c where c.id = :'ai_swim'));
+select calendar_id as ai_football from create_calendar_from_app('00000000-0000-4000-8000-0000000000d2', 'Fútbol', null, '00000000-0000-4000-8000-000000000001') \gset
+select tests.check('ai folders: and shared with the group if asked',
+  (select array_agg(level) from calendar_shares where calendar_id = :'ai_football') = '{full}');
+
+-- Someone with an account (Daniel): only shared in full with a group I administer.
+select tests.expect_error('ai folders: someone else''s needs a group',
+  $$select create_calendar_from_app((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'x')$$, 'not an admin');
+select tests.expect_error('ai folders: someone else''s is not busy',
+  $$select create_calendar_from_app((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'x', null, '00000000-0000-4000-8000-000000000001', 'busy')$$, 'shared in full');
+select calendar_id as ai_work from create_calendar_from_app((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'Turnos', '#a8522f', '00000000-0000-4000-8000-000000000001') \gset
+select tests.check('ai folders: admin makes one for Daniel, shared in full',
+  (select c.owner_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2') and can_edit_calendar(c.id)
+     and (select array_agg(level) from calendar_shares s where s.calendar_id = c.id) = '{full}'
+     from calendars c where c.id = :'ai_work'));
+select tests.expect_error('ai folders: someone''s private folder is not shared through a «duplicate»',
+  $$select create_calendar_from_app((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), 'diario', null, '00000000-0000-4000-8000-000000000001')$$, 'name taken');
+reset role;
+select tests.check('ai folders: Daniel''s Diario stays private',
+  not exists (select 1 from calendar_shares where calendar_id = '00000000-0000-4000-8000-0000000000e7'));
+set role authenticated;
+
+select tests.as_user('daniel@ejemplo.com');
+select tests.expect_error('ai folders: a member cannot make one for a profile',
+  $$select create_calendar_from_app('00000000-0000-4000-8000-0000000000d2', 'x', null, '00000000-0000-4000-8000-000000000001')$$, 'not an admin');
+select tests.expect_error('ai folders: nor for another member',
+  $$select create_calendar_from_app((select id from people where user_id = '00000000-0000-4000-8000-0000000000c1'), 'x', null, '00000000-0000-4000-8000-000000000001')$$, 'not an admin');
+
 select tests.as_app('marta@ejemplo.com', '00000000-0000-4000-8000-0000000000a2');
 select tests.api('GET', 'events');
 select tests.expect_error('ai: a revoked app (its session gone) is stopped at once', $$select public.check_api_request()$$, 'access revoked');
