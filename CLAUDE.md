@@ -22,7 +22,12 @@ en `docs/ia.md`.
   niño; se reclama con `claim_code`) → `members` (persona en grupo: `role` admin/member,
   `status` pending/active, `left_at`; nunca se borran) → `groups` (`timezone`,
   `shopping_enabled`, `tasks_enabled`, `calendar_enabled`; al menos una activa).
-- Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial.
+- Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial. Carpetas de la
+  lista en `shopping_folders` («Casa», «Coche»…): son del grupo (cualquier miembro las crea, renombra y
+  borra; al borrar una, lo suyo pasa a «General», que es `items.folder_id` null). La de por defecto es la
+  última en la que añadí, `members.last_shopping_folder_id`, que ponen el trigger de `items` y `merge_item`.
+  Un mismo producto en dos carpetas son dos líneas. La carpeta abierta va en la URL (`?carpeta=`,
+  `src/composables/shoppingFolder.ts`) y el modo compra enseña la misma.
 - Calendario: `calendars` (carpetas de una persona) → `events` (repetición en columnas
   simples; `reminder_only` = «Recordatorio», solo su aviso: fuera de Semana, Mes y `busy_events`) + `event_exceptions`, `event_participants`. Se comparte con grupos vía
   `calendar_shares` (`full`/`busy`) y `event_shares`. El modo ocupado se lee solo con la RPC

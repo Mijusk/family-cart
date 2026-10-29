@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
-import { useListStore } from '@/stores/list'
+import { GENERAL_FOLDER, useListStore } from '@/stores/list'
 import type { Item } from '@/types'
 import { timeAgo } from '@/utils/date'
 import AppIcon from './AppIcon.vue'
@@ -16,10 +16,11 @@ const emit = defineEmits<{ edit: []; close: [] }>()
 const list = useListStore()
 const groupStore = useGroupStore()
 
-const draft = ref<{ name: string; quantity: number; note: string; photo: Blob | string | null }>({
+const draft = ref<{ name: string; quantity: number; note: string; folderId: string | null; photo: Blob | string | null }>({
   name: '',
   quantity: 1,
   note: '',
+  folderId: null,
   photo: null,
 })
 
@@ -31,6 +32,7 @@ watch(
       name: props.item.name,
       quantity: props.item.quantity,
       note: props.item.note ?? '',
+      folderId: props.item.folderId,
       photo: props.item.photoPath,
     }
   },
@@ -67,6 +69,10 @@ function remove() {
         <input v-model="draft.name" class="field" aria-label="Nombre" required />
       </div>
       <input v-model="draft.note" class="field" placeholder="Nota (opcional)" aria-label="Nota" maxlength="120" />
+      <select v-if="list.folders.length" v-model="draft.folderId" class="field" aria-label="Carpeta">
+        <option :value="null">{{ GENERAL_FOLDER }}</option>
+        <option v-for="folder in list.sortedFolders" :key="folder.id" :value="folder.id">{{ folder.name }}</option>
+      </select>
       <div class="edit-row">
         <QuantityStepper v-model="draft.quantity" />
         <button type="button" class="icon-btn delete" aria-label="Borrar producto" @click="remove">

@@ -2,11 +2,13 @@
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
 import { useListStore, type Suggestion } from '@/stores/list'
-import type { Product } from '@/types'
 import AppIcon from './AppIcon.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import QuantityChip from './QuantityChip.vue'
 import QuantityStepper from './QuantityStepper.vue'
+
+/** The folder new things go to (null: «General»). */
+const props = defineProps<{ folderId: string | null }>()
 
 const list = useListStore()
 const groupStore = useGroupStore()
@@ -17,15 +19,16 @@ const note = ref('')
 const photo = ref<Blob | string | null>(null)
 const showNote = ref(false)
 const suggestionsOpen = ref(false)
-const focused = ref(false)
 const highlighted = ref(-1)
 const nameInput = useTemplateRef('nameInput')
 
-const suggestions = computed<Suggestion[]>(() => (suggestionsOpen.value ? list.suggest(name.value) : []))
-const duplicate = computed(() => list.findPendingDuplicate(name.value))
+const suggestions = computed<Suggestion[]>(() => (suggestionsOpen.value ? list.suggest(name.value, props.folderId) : []))
+const duplicate = computed(() => list.findPendingDuplicate(name.value, props.folderId))
 const canSubmit = computed(() => name.value.trim().length > 0)
-/** With the field empty and focused: the usual products, one tap each. */
-const usual = computed<Product[]>(() => (focused.value && !name.value.trim() ? list.usualProducts() : []))
+/** Without folders it reads as before; with them, it says where things go. */
+const placeholder = computed(() =>
+  list.folders.length ? `¿Qué falta? · ${list.folderName(props.folderId)}` : '¿Qué falta en casa?',
+)
 
 watch(name, () => {
   highlighted.value = -1
@@ -56,17 +59,13 @@ function pick(suggestion: Suggestion) {
   }
   // The quantity last bought, unless it was already changed here.
   const amount = quantity.value > 1 ? quantity.value : product.lastQuantity
-  list.addItem({ name: product.displayName, quantity: amount, note: note.value, photo: newPhoto() })
+  list.addItem({ name: product.displayName, folderId: props.folderId, quantity: amount, note: note.value, photo: newPhoto() })
   reset()
-}
-
-function addUsual(product: Product) {
-  list.addItem({ name: product.displayName, quantity: product.lastQuantity })
 }
 
 function addSeparately() {
   if (!canSubmit.value) return
-  list.addItem({ name: name.value, quantity: quantity.value, note: note.value, photo: newPhoto() })
+  list.addItem({ name: name.value, folderId: props.folderId, quantity: quantity.value, note: note.value, photo: newPhoto() })
   reset()
 }
 
@@ -108,15 +107,15 @@ function onKeydown(event: KeyboardEvent) {
           ref="nameInput"
           v-model="name"
           class="field name"
-          placeholder="¿Qué falta en casa?"
+          :placeholder="placeholder"
           enterkeyhint="done"
           role="combobox"
           aria-autocomplete="list"
           aria-controls="new-item-suggestions"
           :aria-expanded="suggestions.length > 0"
           @input="suggestionsOpen = true"
-          @focus="suggestionsOpen = focused = true"
-          @blur="suggestionsOpen = focused = false"
+          @focus="suggestionsOpen = true"
+          @blur="suggestionsOpen = false"
           @keydown="onKeydown"
         />
         <ul v-if="suggestions.length" id="new-item-suggestions" class="suggestions" role="listbox">
@@ -136,21 +135,6 @@ function onKeydown(event: KeyboardEvent) {
           </li>
         </ul>
       </div>
-    </div>
-
-    <div v-if="usual.length" class="usual" aria-label="Lo de siempre">
-      <!-- mousedown.prevent keeps focus in the input, so the chips stay for the next tap -->
-      <button
-        v-for="product in usual"
-        :key="product.id"
-        type="button"
-        class="chip"
-        @mousedown.prevent
-        @click="addUsual(product)"
-      >
-        <AppIcon name="plus" :size="14" />
-        {{ product.displayName }}<span v-if="product.lastQuantity > 1" class="chip-qty">×{{ product.lastQuantity }}</span>
-      </button>
     </div>
 
     <input
@@ -272,40 +256,6 @@ function onKeydown(event: KeyboardEvent) {
   background: var(--warn-soft);
   padding: 2px 8px;
   border-radius: 999px;
-}
-
-.usual {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 36px;
-  padding: 0 12px 0 8px;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  background: var(--bg);
-  font-weight: 500;
-  font-size: 0.9375rem;
-}
-
-.chip:active {
-  background: var(--primary-soft);
-}
-
-@media (hover: hover) {
-  .chip:hover {
-    background: var(--primary-soft);
-  }
-}
-
-.chip-qty {
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
 }
 
 .controls {

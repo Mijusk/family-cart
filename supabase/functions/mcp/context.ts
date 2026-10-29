@@ -13,6 +13,8 @@ export interface MyGroup {
   timezone: string
   /** My member row in it (the shopping list's added_by). */
   memberId: string
+  /** The shopping folder I last added to (null: «General»), the default as in the app. */
+  lastShoppingFolderId: string | null
   role: 'admin' | 'member'
   calendar: boolean
   tasks: boolean
@@ -67,7 +69,7 @@ async function loadMe(db: Db, userId: string): Promise<Me> {
   const { data, error } = await db
     .from('people')
     .select(
-      'id, display_name, last_calendar_id, members!members_person_id_fkey(id, group_id, role, status, created_at, left_at, groups(name, timezone, calendar_enabled, tasks_enabled, shopping_enabled))',
+      'id, display_name, last_calendar_id, members!members_person_id_fkey(id, group_id, role, status, created_at, left_at, last_shopping_folder_id, groups(name, timezone, calendar_enabled, tasks_enabled, shopping_enabled))',
     )
     .eq('user_id', userId)
     .is('members.left_at', null)
@@ -86,6 +88,7 @@ async function loadMe(db: Db, userId: string): Promise<Me> {
         name: m.groups!.name,
         timezone: m.groups!.timezone || DEFAULT_TIMEZONE,
         memberId: m.id,
+        lastShoppingFolderId: m.last_shopping_folder_id,
         role: m.role as MyGroup['role'],
         calendar: m.groups!.calendar_enabled,
         tasks: m.groups!.tasks_enabled,
@@ -117,6 +120,7 @@ const TOOL_ERRORS: [RegExp, string][] = [
   [/row-level security.*"events"/i, 'No puedes crear ni cambiar eventos en esa carpeta.'],
   [/row-level security.*event_exceptions/i, 'No puedes cambiar ese evento.'],
   [/row-level security.*"items"/i, 'No puedes añadir a la lista de la compra de ese grupo.'],
+  [/items_folder_in_group/i, 'Esa carpeta no es de la lista de la compra de ese grupo: usa las de ver_compra.'],
   [/invalid input syntax for type uuid/i, 'Ese identificador no es válido: usa los que dan las otras herramientas.'],
 ]
 

@@ -49,6 +49,8 @@ export interface Member {
   createdAt: string
   /** Set when they left or were removed; kept so the history still shows their name. */
   leftAt: string | null
+  /** The shopping folder they last added something to (null: «General»), their default. */
+  lastShoppingFolderId: string | null
 }
 
 /** A group the signed-in person is in, or has asked to join. */
@@ -72,9 +74,20 @@ export interface Product {
   timesUsed: number
 }
 
+/** A folder of the group's shopping list («Casa», «Coche»…); items without one are «General». */
+export interface ShoppingFolder {
+  id: string
+  groupId: string
+  name: string
+  createdBy: string | null
+  createdAt: string
+}
+
 export interface Item {
   id: string
   groupId: string
+  /** Null: «General». */
+  folderId: string | null
   name: string
   quantity: number
   note: string | null

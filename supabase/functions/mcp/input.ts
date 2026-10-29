@@ -341,6 +341,18 @@ export function itemFields(input: ItemInput): Checked<ItemFields> {
   return { ok: true, value: { name, quantity, note: note.value } }
 }
 
+const SHOPPING_FOLDER_NAME_MAX = 40
+
+/** A shopping folder's name, cleaned as the app does. */
+export function shoppingFolderName(raw: string): Checked<string> {
+  const name = cleanDisplayName(raw)
+  if (!name) return fail('La carpeta necesita un nombre.')
+  if (name.length > SHOPPING_FOLDER_NAME_MAX) {
+    return fail(`El nombre de la carpeta puede tener como mucho ${SHOPPING_FOLDER_NAME_MAX} caracteres.`)
+  }
+  return { ok: true, value: name }
+}
+
 export interface FolderInput {
   nombre: string
   color?: string

@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { dateRange, dayOverrides, eventFields, folderFields, itemFields, NEW_EVENT, parseClock, taskFields, type EventFields } from './input.ts'
+import {
+  dateRange,
+  dayOverrides,
+  eventFields,
+  folderFields,
+  itemFields,
+  NEW_EVENT,
+  parseClock,
+  shoppingFolderName,
+  taskFields,
+  type EventFields,
+} from './input.ts'
 
 const ok = <T>(r: { ok: true; value: T } | { ok: false; error: string }): T => {
   if (!r.ok) throw new Error(`expected ok, got: ${r.error}`)
@@ -180,6 +191,14 @@ describe('itemFields', () => {
     expect(error(itemFields({ nombre: 'Huevos', cantidad: 1.5 }))).toMatch(/de 1 a 999/)
     expect(error(itemFields({ nombre: ' ' }))).toMatch(/nombre/)
     expect(error(itemFields({ nombre: 'Huevos', nota: 'x'.repeat(121) }))).toMatch(/120/)
+  })
+})
+
+describe('shoppingFolderName', () => {
+  it('cleans the name and checks its length', () => {
+    expect(ok(shoppingFolderName('  coche   familiar '))).toBe('Coche familiar')
+    expect(error(shoppingFolderName(' '))).toMatch(/nombre/)
+    expect(error(shoppingFolderName('x'.repeat(41)))).toMatch(/40/)
   })
 })
 

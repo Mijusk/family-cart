@@ -115,6 +115,12 @@ from (values
 left join public.trips t on t.id = ('00000000-0000-4000-8000-0000000000' || v.trip)::uuid
 order by v.added_ago desc;
 
+-- A folder of Marta's in the list; the rest stays in «General».
+insert into public.shopping_folders (id, group_id, name, created_by) values
+  ('00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-000000000001', 'Droguería', '00000000-0000-4000-8000-0000000000a1');
+update public.items set folder_id = '00000000-0000-4000-8000-0000000000aa'
+ where name = 'Detergente lavadora' and status = 'pending';
+
 -- ── Calendar ─────────────────────────────────────────────────────────────────
 -- Dates are relative to the current week (Monday = date_trunc('week', …)).
 

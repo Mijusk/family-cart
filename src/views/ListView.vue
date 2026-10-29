@@ -6,14 +6,36 @@ import AppIcon from '@/components/AppIcon.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import PendingItemRow from '@/components/PendingItemRow.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
+import ShoppingFolderBar from '@/components/ShoppingFolderBar.vue'
+import { ALL_FOLDERS, useFolderView } from '@/composables/shoppingFolder'
 import { useGroupStore } from '@/stores/group'
 import { useListStore } from '@/stores/list'
+import type { Item } from '@/types'
 
 const list = useListStore()
 const groupStore = useGroupStore()
 const router = useRouter()
+const folderView = useFolderView()
+const { view, target } = folderView
 
 const editingId = ref<string | null>(null)
+
+/** What the open folder has to buy; with «Todas», one section per folder that has something. */
+const sections = computed<{ id: string | null; title: string; items: Item[] }[]>(() => {
+  if (view.value !== ALL_FOLDERS) {
+    const items = list.pendingItems.filter((i) => i.folderId === view.value)
+    return items.length ? [{ id: view.value, title: 'Por comprar', items }] : []
+  }
+  return [null, ...list.sortedFolders.map((f) => f.id)]
+    .map((id) => ({
+      id,
+      title: list.folders.length ? list.folderName(id) : 'Por comprar',
+      items: list.pendingItems.filter((i) => i.folderId === id),
+    }))
+    .filter((s) => s.items.length)
+})
+
+const shown = computed(() => sections.value.reduce((n, s) => n + s.items.length, 0))
 
 /** Trips by other members that are happening right now. */
 const othersShopping = computed(() =>
@@ -29,14 +51,15 @@ const othersShopping = computed(() =>
 const othersCart = computed(() => list.inCartItems.filter((i) => i.tripId !== list.myActiveTrip?.id))
 
 const countLabel = computed(() => {
-  const n = list.pendingItems.length
-  if (n === 0) return 'No falta nada'
-  return n === 1 ? '1 cosa por comprar' : `${n} cosas por comprar`
+  const n = shown.value
+  const where = list.folders.length && view.value !== ALL_FOLDERS ? ` en ${list.folderName(view.value)}` : ''
+  if (n === 0) return `No falta nada${where}`
+  return n === 1 ? `1 cosa por comprar${where}` : `${n} cosas por comprar${where}`
 })
 
-// The trip itself starts with the first item put in the cart.
+// The trip itself starts with the first item put in the cart. Shopping mode shows the open folder.
 function goShopping() {
-  router.push({ name: 'shopping' })
+  router.push({ name: 'shopping', query: folderView.query.value })
 }
 </script>
 
@@ -51,7 +74,9 @@ function goShopping() {
       <p class="muted">{{ countLabel }}</p>
     </header>
 
-    <AddItemForm />
+    <ShoppingFolderBar :view="view" @show="folderView.show" />
+
+    <AddItemForm :folder-id="target" />
 
     <p v-for="s in othersShopping" :key="s.trip.id" class="live">
       <span class="pulse" aria-hidden="true" />
@@ -61,14 +86,14 @@ function goShopping() {
       </span>
     </p>
 
-    <template v-if="list.pendingItems.length">
+    <template v-for="section in sections" :key="section.id ?? ''">
       <h2 class="section-title">
-        <span>Por comprar</span>
-        <span>{{ list.pendingItems.length }}</span>
+        <span>{{ section.title }}</span>
+        <span>{{ section.items.length }}</span>
       </h2>
       <ul class="rows">
         <PendingItemRow
-          v-for="item in list.pendingItems"
+          v-for="item in section.items"
           :key="item.id"
           :item="item"
           :editing="editingId === item.id"
@@ -78,9 +103,15 @@ function goShopping() {
       </ul>
     </template>
 
-    <div v-else class="empty">
-      <p class="empty-title">La lista está vacía</p>
-      <p class="muted">Cuando falte algo en casa, apúntalo arriba y aparecerá aquí para toda la familia.</p>
+    <div v-if="!sections.length" class="empty">
+      <template v-if="list.folders.length && view !== ALL_FOLDERS">
+        <p class="empty-title">{{ list.folderName(view) }} está vacía</p>
+        <p class="muted">Lo que apuntes aquí arriba irá a esta carpeta, para toda la familia.</p>
+      </template>
+      <template v-else>
+        <p class="empty-title">La lista está vacía</p>
+        <p class="muted">Cuando falte algo en casa, apúntalo arriba y aparecerá aquí para toda la familia.</p>
+      </template>
     </div>
 
     <template v-if="othersCart.length">

@@ -6,15 +6,17 @@ import {
   fromItem,
   toItem,
   toProduct,
+  toShoppingFolder,
   toTrip,
   type ItemRow,
   type ItemUpdate,
   type ProductRow,
+  type ShoppingFolderRow,
   type TripRow,
 } from '@/lib/mappers'
 import { readSnapshot, saveSnapshot, whenOnline } from '@/lib/offline'
 import { deletePhoto, newPhotoPath, showPhotoLocally, uploadPhoto } from '@/lib/photos'
-import type { Item, Product, Trip } from '@/types'
+import type { Item, Product, ShoppingFolder, Trip } from '@/types'
 import { isNetworkError } from '@/utils/errors'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
@@ -23,6 +25,8 @@ import { useToastStore } from './toast'
 
 export interface NewItem {
   name: string
+  /** Null: «General». */
+  folderId: string | null
   quantity: number
   note?: string | null
   /** Already shrunk (see shrinkPhoto). */
@@ -49,11 +53,16 @@ const HISTORY_DAYS = 60
 const NETWORK_TRIES = 3
 const RETRY_MS = 3_000
 
+/** Shown for items without a folder. */
+export const GENERAL_FOLDER = 'General'
+
 /** What the device keeps of a group's list to open without connection (see lib/offline). */
 interface SavedList {
   items: Item[]
   products: Product[]
   trips: Trip[]
+  /** Missing in copies saved before there were folders. */
+  folders?: ShoppingFolder[]
 }
 
 const byNewest = (a: Item, b: Item) => b.addedAt.localeCompare(a.addedAt)
@@ -79,6 +88,7 @@ export const useListStore = defineStore('list', () => {
   const items = ref<Item[]>([])
   const products = ref<Product[]>([])
   const trips = ref<Trip[]>([])
+  const folders = ref<ShoppingFolder[]>([])
   /** Writes not saved yet: waiting for the connection, or on their way. */
   const pendingWrites = ref(0)
   let channel: RealtimeChannel | null = null
@@ -113,20 +123,34 @@ export const useListStore = defineStore('list', () => {
       .filter((summary) => summary.items.length > 0),
   )
 
+  /** The group's folders, by name. */
+  const sortedFolders = computed(() => [...folders.value].sort((a, b) => a.name.localeCompare(b.name, 'es')))
+
+  /** Where I add by default: the folder I last added something to, while it exists (null: «General»). */
+  const myLastFolderId = computed(() => {
+    const id = groupStore.members.find((m) => m.id === groupStore.currentMemberId)?.lastShoppingFolderId ?? null
+    return id && folders.value.some((f) => f.id === id) ? id : null
+  })
+
+  function folderName(id: string | null): string {
+    return folders.value.find((f) => f.id === id)?.name ?? GENERAL_FOLDER
+  }
+
   function tripById(id: string | null): Trip | undefined {
     return trips.value.find((t) => t.id === id)
   }
 
-  function findPendingDuplicate(name: string): Item | undefined {
+  /** The same product still to buy in that folder: the same thing in another folder is another line. */
+  function findPendingDuplicate(name: string, folderId: string | null): Item | undefined {
     const key = normalizeName(name)
     if (!key) return undefined
-    return pendingItems.value.find((i) => normalizeName(i.name) === key)
+    return pendingItems.value.find((i) => i.folderId === folderId && normalizeName(i.name) === key)
   }
 
-  function suggest(query: string, limit = 5): Suggestion[] {
+  function suggest(query: string, folderId: string | null, limit = 5): Suggestion[] {
     const q = normalizeName(query)
     if (!q) return []
-    const pendingKeys = new Set(pendingItems.value.map((i) => normalizeName(i.name)))
+    const pendingKeys = new Set(pendingItems.value.filter((i) => i.folderId === folderId).map((i) => normalizeName(i.name)))
     return products.value
       .filter((p) => p.normalizedName.includes(q) && p.normalizedName !== q)
       .sort((a, b) => {
@@ -136,15 +160,6 @@ export const useListStore = defineStore('list', () => {
       })
       .slice(0, limit)
       .map((product) => ({ product, pending: pendingKeys.has(product.normalizedName) }))
-  }
-
-  /** The most used products that aren't on the list or in a cart now, to add with one tap. */
-  function usualProducts(limit = 8): Product[] {
-    const taken = new Set([...pendingItems.value, ...inCartItems.value].map((i) => normalizeName(i.name)))
-    return products.value
-      .filter((p) => !taken.has(p.normalizedName))
-      .sort((a, b) => b.timesUsed - a.timesUsed)
-      .slice(0, limit)
   }
 
   // ── Loading & realtime ─────────────────────────────────────
@@ -163,9 +178,11 @@ export const useListStore = defineStore('list', () => {
     groupId.value = gid
     const saved = groupStore.userId ? readSnapshot<SavedList>(groupStore.userId, `list:${gid}`) : null
     if (!saved) return
-    items.value = saved.items
+    // Copies saved before there were folders: everything in «General».
+    items.value = saved.items.map((i) => ({ ...i, folderId: i.folderId ?? null }))
     products.value = saved.products
     trips.value = saved.trips
+    folders.value = saved.folders ?? []
   }
 
   /**
@@ -174,14 +191,19 @@ export const useListStore = defineStore('list', () => {
    */
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   watch(
-    () => [items.value, products.value, trips.value, pendingWrites.value] as const,
+    () => [items.value, products.value, trips.value, folders.value, pendingWrites.value] as const,
     () => {
       clearTimeout(saveTimer)
       saveTimer = setTimeout(() => {
         const gid = groupId.value
         const uid = groupStore.userId
         if (!gid || !uid || pendingWrites.value) return
-        saveSnapshot(uid, `list:${gid}`, { items: items.value, products: products.value, trips: trips.value } satisfies SavedList)
+        saveSnapshot(uid, `list:${gid}`, {
+          items: items.value,
+          products: products.value,
+          trips: trips.value,
+          folders: folders.value,
+        } satisfies SavedList)
       }, 1_000)
     },
     { deep: true },
@@ -195,6 +217,7 @@ export const useListStore = defineStore('list', () => {
     items.value = []
     products.value = []
     trips.value = []
+    folders.value = []
   }
 
   /**
@@ -210,20 +233,23 @@ export const useListStore = defineStore('list', () => {
       const seq = writeSeq
       await writes
       const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString()
-      const [itemsRes, productsRes, tripsRes] = await Promise.all([
+      const [itemsRes, productsRes, tripsRes, foldersRes] = await Promise.all([
         supabase.from('items').select().eq('group_id', gid).or(`status.neq.purchased,purchased_at.gte."${since}"`),
         supabase.from('products').select().eq('group_id', gid),
         supabase.from('trips').select().eq('group_id', gid).or(`finished_at.is.null,finished_at.gte."${since}"`),
+        supabase.from('shopping_folders').select().eq('group_id', gid),
       ])
       // Switched group while loading: this answer belongs to the old one.
       if (groupId.value !== gid) return
       if (itemsRes.error) throw itemsRes.error
       if (productsRes.error) throw productsRes.error
       if (tripsRes.error) throw tripsRes.error
+      if (foldersRes.error) throw foldersRes.error
       if (seq !== writeSeq) continue
       items.value = itemsRes.data.map(toItem)
       products.value = productsRes.data.map(toProduct)
       trips.value = tripsRes.data.map(toTrip)
+      folders.value = foldersRes.data.map(toShoppingFolder)
       return
     }
   }
@@ -248,6 +274,16 @@ export const useListStore = defineStore('list', () => {
       })
       .on<ProductRow>('postgres_changes', { event: '*', schema: 'public', table: 'products', filter }, (p) => {
         if (p.eventType !== 'DELETE') upsert(products, toProduct(p.new))
+      })
+      .on<ShoppingFolderRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shopping_folders', filter }, (p) =>
+        upsert(folders, toShoppingFolder(p.new)),
+      )
+      .on<ShoppingFolderRow>('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shopping_folders', filter }, (p) =>
+        upsert(folders, toShoppingFolder(p.new)),
+      )
+      // As with items, deletes can't be filtered; the items that were in it arrive as updates.
+      .on<ShoppingFolderRow>('postgres_changes', { event: 'DELETE', schema: 'public', table: 'shopping_folders' }, (p) => {
+        if (p.old.id) folders.value = folders.value.filter((f) => f.id !== p.old.id)
       })
       // Catch up on anything missed before the listeners were live: SUBSCRIBED also fires after a
       // reconnect (phone back from background), and the system event when Postgres changes actually start.
@@ -331,6 +367,12 @@ export const useListStore = defineStore('list', () => {
     }
   }
 
+  /** Optimistic copy of what the items trigger does on the server: my default folder follows my adds. */
+  function rememberFolderLocally(folderId: string | null) {
+    const me = groupStore.members.find((m) => m.id === groupStore.currentMemberId)
+    if (me) me.lastShoppingFolderId = folderId
+  }
+
   function findItem(id: string): Item | undefined {
     return items.value.find((i) => i.id === id)
   }
@@ -397,12 +439,19 @@ export const useListStore = defineStore('list', () => {
     const item = findItem(snapshot.id)
     if (!item) return
     const discarded = item.photoPath !== snapshot.photoPath ? item.photoPath : null
-    Object.assign(item, { name: snapshot.name, quantity: snapshot.quantity, note: snapshot.note, photoPath: snapshot.photoPath })
+    Object.assign(item, {
+      name: snapshot.name,
+      quantity: snapshot.quantity,
+      note: snapshot.note,
+      photoPath: snapshot.photoPath,
+      folderId: snapshot.folderId,
+    })
     updateRemote(snapshot.id, {
       name: snapshot.name,
       quantity: snapshot.quantity,
       note: snapshot.note,
       photo_path: snapshot.photoPath,
+      folder_id: snapshot.folderId,
     })
     if (discarded) removePhoto(discarded)
   }
@@ -436,6 +485,7 @@ export const useListStore = defineStore('list', () => {
     const item: Item = {
       id: newId(),
       groupId: groupId.value!,
+      folderId: input.folderId,
       name,
       quantity: Math.max(1, input.quantity),
       note: input.note?.trim() || null,
@@ -449,6 +499,7 @@ export const useListStore = defineStore('list', () => {
     }
     items.value.push(item)
     rememberProductLocally(name, item.quantity)
+    rememberFolderLocally(item.folderId)
     persist(async () => {
       const uploaded = !photo || !photoPath || (await uploadFor(item.id, photoPath, photo, null))
       return supabase.from('items').insert({ ...fromItem(item), photo_path: uploaded ? photoPath : null })
@@ -469,6 +520,7 @@ export const useListStore = defineStore('list', () => {
       item.note = item.note ? `${item.note} · ${extraNote}` : extraNote
     }
     rememberProductLocally(item.name, add)
+    rememberFolderLocally(item.folderId)
     // Queued before the RPC, whose answer then already carries the new photo.
     if (photo) setPhoto(item, photo)
     // The RPC adds on the server, so a concurrent add from another phone isn't lost.
@@ -486,23 +538,32 @@ export const useListStore = defineStore('list', () => {
 
   /** Adds to the list, merging with a pending line of the same product if there is one. */
   function addOrMerge(input: NewItem) {
-    const duplicate = findPendingDuplicate(input.name)
+    const duplicate = findPendingDuplicate(input.name, input.folderId)
     if (duplicate) mergeInto(duplicate.id, input.quantity, input.note, input.photo)
     else addItem(input)
   }
 
-  function updateItem(id: string, changes: Pick<Item, 'name' | 'quantity' | 'note'> & { photo?: PhotoChange }) {
+  function updateItem(
+    id: string,
+    changes: Pick<Item, 'name' | 'quantity' | 'note' | 'folderId'> & { photo?: PhotoChange },
+  ) {
     const item = findItem(id)
     if (!item) return
     const snapshot = { ...item }
     item.name = cleanDisplayName(changes.name) || item.name
     item.quantity = Math.max(1, changes.quantity)
     item.note = changes.note?.trim() || null
+    item.folderId = changes.folderId
     const photoChanged = changes.photo !== undefined && (changes.photo !== null || item.photoPath !== null)
     const fieldsChanged =
-      item.name !== snapshot.name || item.quantity !== snapshot.quantity || item.note !== snapshot.note
+      item.name !== snapshot.name ||
+      item.quantity !== snapshot.quantity ||
+      item.note !== snapshot.note ||
+      item.folderId !== snapshot.folderId
     if (!fieldsChanged && !photoChanged) return
-    if (fieldsChanged) updateRemote(id, { name: item.name, quantity: item.quantity, note: item.note })
+    if (fieldsChanged) {
+      updateRemote(id, { name: item.name, quantity: item.quantity, note: item.note, folder_id: item.folderId })
+    }
     if (photoChanged) setPhoto(item, changes.photo ?? null)
     toast.show(
       'Cambios guardados',
@@ -521,6 +582,69 @@ export const useListStore = defineStore('list', () => {
       () => restoreDeleted(snapshot),
       () => dropIfUnused(id, snapshot.photoPath),
     )
+  }
+
+  // ── Folder actions ─────────────────────────────────────────
+
+  function findFolderByName(name: string, except?: string): ShoppingFolder | undefined {
+    const key = normalizeName(name)
+    return folders.value.find((f) => f.id !== except && normalizeName(f.name) === key)
+  }
+
+  function insertFolder(folder: ShoppingFolder) {
+    persist(() =>
+      supabase
+        .from('shopping_folders')
+        .insert({ id: folder.id, group_id: folder.groupId, name: folder.name, created_by: folder.createdBy }),
+    )
+  }
+
+  /** A new folder for the group; one with the same name (case and accents don't count) is reused. */
+  function createFolder(name: string): ShoppingFolder | null {
+    const clean = cleanDisplayName(name).slice(0, 40)
+    if (!clean) return null
+    const existing = findFolderByName(clean)
+    if (existing) return existing
+    const folder: ShoppingFolder = {
+      id: newId(),
+      groupId: groupId.value!,
+      name: clean,
+      createdBy: groupStore.currentMemberId,
+      createdAt: new Date().toISOString(),
+    }
+    folders.value.push(folder)
+    insertFolder(folder)
+    return folder
+  }
+
+  /** False if another folder already has that name. */
+  function renameFolder(id: string, name: string): boolean {
+    const folder = folders.value.find((f) => f.id === id)
+    const clean = cleanDisplayName(name).slice(0, 40)
+    if (!folder || !clean) return true
+    if (findFolderByName(clean, id)) return false
+    if (clean === folder.name) return true
+    folder.name = clean
+    persist(() => supabase.from('shopping_folders').update({ name: clean }).eq('id', id))
+    return true
+  }
+
+  /** Its items (also those in carts and the history) go to «General»; undo puts everything back. */
+  function deleteFolder(id: string) {
+    const folder = folders.value.find((f) => f.id === id)
+    if (!folder) return
+    const snapshot = { ...folder }
+    const moved = new Set(items.value.filter((i) => i.folderId === id).map((i) => i.id))
+    for (const item of items.value) if (moved.has(item.id)) item.folderId = null
+    folders.value = folders.value.filter((f) => f.id !== id)
+    // The database clears folder_id in its items and in everyone's default.
+    persist(() => supabase.from('shopping_folders').delete().eq('id', id))
+    toast.show(`Carpeta borrada: ${folder.name}`, () => {
+      folders.value.push(snapshot)
+      insertFolder(snapshot)
+      for (const item of items.value) if (moved.has(item.id)) item.folderId = id
+      if (moved.size) persist(() => supabase.from('items').update({ folder_id: id }).in('id', [...moved]))
+    })
   }
 
   // ── Shopping trip actions ──────────────────────────────────
@@ -570,7 +694,7 @@ export const useListStore = defineStore('list', () => {
   }
 
   /** Shopping mode: something bought that wasn't on the list (or was) goes straight into my cart. */
-  function addToCart(name: string) {
+  function addToCart(name: string, folderId: string | null) {
     const key = normalizeName(name)
     if (!key) return
     const inCart = myCartItems.value.find((i) => normalizeName(i.name) === key)
@@ -578,7 +702,7 @@ export const useListStore = defineStore('list', () => {
       toast.show(`${inCart.name} ya está en el carrito`)
       return
     }
-    const onList = findPendingDuplicate(name)
+    const onList = findPendingDuplicate(name, folderId)
     if (onList) {
       toggleInCart(onList.id)
       toast.show(`Al carrito: ${onList.name}`, () => toggleInCart(onList.id))
@@ -587,7 +711,7 @@ export const useListStore = defineStore('list', () => {
     // The trip first: the queued insert of the item reads it as it is by then, already in the cart.
     startTrip()
     const product = products.value.find((p) => p.normalizedName === key)
-    const item = addItem({ name, quantity: product?.lastQuantity ?? 1 })
+    const item = addItem({ name, folderId, quantity: product?.lastQuantity ?? 1 })
     toggleInCart(item.id)
   }
 
@@ -637,6 +761,10 @@ export const useListStore = defineStore('list', () => {
     items,
     products,
     trips,
+    folders,
+    sortedFolders,
+    myLastFolderId,
+    folderName,
     pendingItems,
     activeTrips,
     myActiveTrip,
@@ -646,7 +774,6 @@ export const useListStore = defineStore('list', () => {
     tripById,
     findPendingDuplicate,
     suggest,
-    usualProducts,
     pendingWrites,
     load,
     openSaved,
@@ -657,6 +784,9 @@ export const useListStore = defineStore('list', () => {
     addOrMerge,
     updateItem,
     deleteItem,
+    createFolder,
+    renameFolder,
+    deleteFolder,
     startTrip,
     toggleInCart,
     markNotFound,

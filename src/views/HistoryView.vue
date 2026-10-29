@@ -25,10 +25,13 @@ const days = computed(() => {
   return groups
 })
 
-const pendingNames = computed(() => new Set(list.pendingItems.map((i) => normalizeName(i.name))))
+/** Products still to buy, by folder and name: the same thing in another folder is another line. */
+const pendingKey = (i: Item) => `${i.folderId ?? ''}:${normalizeName(i.name)}`
+const pendingKeys = computed(() => new Set(list.pendingItems.map(pendingKey)))
 
+/** Back to the folder it was bought from («General» if that folder is gone). */
 function readd(item: Item) {
-  list.addOrMerge({ name: item.name, quantity: item.quantity, note: item.note })
+  list.addOrMerge({ name: item.name, folderId: item.folderId, quantity: item.quantity, note: item.note })
 }
 
 function whoBought(summary: TripSummary) {
@@ -67,7 +70,7 @@ function whoBought(summary: TripSummary) {
             <span class="text">
               <span class="name">{{ item.name }}</span>
               <span v-if="item.note" class="note">{{ item.note }}</span>
-              <span v-if="pendingNames.has(normalizeName(item.name))" class="on-list">Ya en la lista</span>
+              <span v-if="pendingKeys.has(pendingKey(item))" class="on-list">Ya en la lista</span>
             </span>
             <QuantityChip :quantity="item.quantity" muted />
             <button type="button" class="readd" :aria-label="`Volver a añadir ${item.name}`" @click="readd(item)">
