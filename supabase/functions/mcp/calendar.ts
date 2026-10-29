@@ -147,12 +147,12 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
     'crear_carpeta',
     'create',
     {
-      title: 'Crear una carpeta',
+      title: 'Crear una carpeta del calendario',
       description:
         'Crea una carpeta del calendario, como Mis carpetas: para ti, para un perfil sin cuenta que gestionas (p. ej. un hijo) o, ' +
         'si eres admin del grupo, para otra persona (entonces se comparte en completo con ese grupo). Las tuyas nacen privadas ' +
         'salvo que la persona pida compartirlas. Si ya hay una con ese nombre, no se crea otra: devuelve esa. ' +
-        'Úsala solo si ninguna de listar_carpetas encaja. ' +
+        'Úsala solo si ninguna de listar_carpetas encaja. Las carpetas de la compra se crean con crear_carpeta_compra. ' +
         CONFIRM_FIRST,
       input: z.object({
         nombre: z.string().max(200).describe('Nombre corto («Trabajo», «Colegio», «Natación»).'),

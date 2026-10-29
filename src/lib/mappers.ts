@@ -18,6 +18,7 @@ import type {
   Product,
   RepeatKind,
   ShareLevel,
+  ShoppingFolder,
   Task,
   TaskList,
   TaskListShare,
@@ -37,6 +38,7 @@ export type ProductRow = Tables['products']['Row']
 export type TripRow = Tables['trips']['Row']
 export type ItemRow = Tables['items']['Row']
 export type ItemUpdate = Tables['items']['Update']
+export type ShoppingFolderRow = Tables['shopping_folders']['Row']
 export type CalendarRow = Tables['calendars']['Row']
 export type CalendarShareRow = Tables['calendar_shares']['Row']
 export type EventRow = Tables['events']['Row']
@@ -79,6 +81,7 @@ export const toMember = (r: MemberRow, person: Person | undefined): Member => ({
   status: r.status as MemberStatus,
   createdAt: r.created_at,
   leftAt: r.left_at,
+  lastShoppingFolderId: r.last_shopping_folder_id,
 })
 
 export const toProduct = (r: ProductRow): Product => ({
@@ -100,9 +103,18 @@ export const toTrip = (r: TripRow): Trip => ({
   closedReason: r.closed_reason as TripClosedReason | null,
 })
 
+export const toShoppingFolder = (r: ShoppingFolderRow): ShoppingFolder => ({
+  id: r.id,
+  groupId: r.group_id,
+  name: r.name,
+  createdBy: r.created_by,
+  createdAt: r.created_at,
+})
+
 export const toItem = (r: ItemRow): Item => ({
   id: r.id,
   groupId: r.group_id,
+  folderId: r.folder_id,
   name: r.name,
   quantity: r.quantity,
   note: r.note,
@@ -118,6 +130,7 @@ export const toItem = (r: ItemRow): Item => ({
 export const fromItem = (i: Item): Tables['items']['Insert'] => ({
   id: i.id,
   group_id: i.groupId,
+  folder_id: i.folderId,
   name: i.name,
   quantity: i.quantity,
   note: i.note,

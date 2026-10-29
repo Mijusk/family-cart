@@ -20,6 +20,10 @@ como si lo hiciera la persona en la app, con su propia cuenta.
    que se pida grupo (completo u ocupado); la de otra persona con cuenta, solo como admin y compartida en
    completo con ese grupo. Si el dueño ya tiene una con ese nombre (también en la papelera), devuelve esa
    sin cambiarla; color de `FOLDER_COLORS`.
+   **Carpetas de la compra** (29-oct): `crear_carpeta_compra` crea una en la lista del grupo (insert directo
+   en `shopping_folders`; si ya hay una con ese nombre, devuelve esa) y `anadir_compra` añade a la que se
+   diga (`carpeta_id`; null = «General»), por defecto la última en la que añadió la persona, como la app.
+   No se renombran ni se borran desde la IA.
 4. **El token se limita en la base de datos**, no solo con RLS (ver §3).
 5. **Textos:** pantalla «*Claude* quiere acceder a tu Family-App» (con el nombre que da la app) y en
    Cuenta la sección «Conectado con IA», con «Quitar acceso».
@@ -81,7 +85,8 @@ Claude ── POST /functions/v1/mcp (sin token) ──▶ 401 + WWW-Authenticat
 | `editar_evento` | El evento entero (la serie); lo que no se pasa no cambia, `null` borra. Mover el inicio mueve el fin. |
 | `cambiar_dia` / `cancelar_dia` | Un solo día de algo que se repite (excepción `modified` / `cancelled`). |
 | `ver_tareas` / `crear_tarea` / `editar_tarea` / `marcar_tarea` | Listas y tareas pendientes; crear al final; cambiar; hecha con `set_task_done`. |
-| `ver_compra` / `anadir_compra` | La lista de un grupo; añadir hasta 30 productos, sumando a los que ya están. |
+| `ver_compra` / `anadir_compra` | La lista de un grupo con la carpeta de cada cosa, las carpetas y la de por defecto; añadir hasta 30 productos a una carpeta, sumando a los que ya están en ella. |
+| `crear_carpeta_compra` | Carpeta nueva en la lista de la compra de un grupo («Coche»); si ya existe con ese nombre, devuelve esa. |
 
 Las descripciones (en español) le explican a la IA el formato (AAAA-MM-DD, HH:MM en 24 h, hora local),
 que pregunte si falta la hora, el día, la carpeta o la lista, y que confirme antes de escribir.

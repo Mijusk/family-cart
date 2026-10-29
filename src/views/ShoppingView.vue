@@ -4,6 +4,7 @@ import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PhotoThumb from '@/components/PhotoThumb.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
+import { ALL_FOLDERS, useFolderView } from '@/composables/shoppingFolder'
 import { goBack } from '@/router/back'
 import { useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
@@ -12,6 +13,9 @@ import type { Item } from '@/types'
 const list = useListStore()
 const toast = useToastStore()
 const router = useRouter()
+// The folder open in the list (?carpeta=…): only its things to pick; with «Todas», everything.
+const folderView = useFolderView()
+const { view, target } = folderView
 
 // Opening this screen doesn't start a trip: the first item put in the cart (or marked as not
 // found) does, so the family only sees "X está haciendo la compra" once I really am.
@@ -43,7 +47,7 @@ watch(
     const reason = list.tripById(tripId.value)?.closedReason
     if (reason === 'cancelled') {
       toast.show('La compra se canceló desde otro dispositivo')
-      router.push({ name: 'list' })
+      router.push({ name: 'list', query: folderView.query.value })
       return
     }
     toast.show(
@@ -57,8 +61,17 @@ watch(
 
 // Only what wasn't found on this trip is set aside; what someone missed on an earlier one is to pick again.
 const notFoundHere = (i: Item) => i.status === 'not_found' && !!tripId.value && i.tripId === tripId.value
-const toPick = computed(() => list.pendingItems.filter((i) => !notFoundHere(i)))
-const notFound = computed(() => list.pendingItems.filter(notFoundHere))
+const inView = computed(() =>
+  view.value === ALL_FOLDERS ? list.pendingItems : list.pendingItems.filter((i) => i.folderId === view.value),
+)
+const toPick = computed(() => inView.value.filter((i) => !notFoundHere(i)))
+const notFound = computed(() => inView.value.filter(notFoundHere))
+/** Shown under the title when the group has folders. */
+const folderLabel = computed(() =>
+  !list.folders.length ? '' : view.value === ALL_FOLDERS ? 'Todas las carpetas' : list.folderName(view.value),
+)
+/** With «Todas», the folder each thing to pick is in. */
+const showFolder = computed(() => list.folders.length > 0 && view.value === ALL_FOLDERS)
 const cart = computed(() => list.myCartItems)
 
 const total = computed(() => toPick.value.length + notFound.value.length + cart.value.length)
@@ -67,7 +80,7 @@ const progress = computed(() => (total.value ? cart.value.length / total.value :
 const newName = ref('')
 
 function addToCart() {
-  list.addToCart(newName.value)
+  list.addToCart(newName.value, target.value)
   newName.value = ''
 }
 
@@ -85,7 +98,7 @@ function cancel() {
   }
   leaving = true
   list.cancelTrip()
-  router.push({ name: 'list' })
+  router.push({ name: 'list', query: folderView.query.value })
 }
 </script>
 
@@ -96,13 +109,15 @@ function cancel() {
         type="button"
         class="icon-btn"
         :aria-label="cart.length ? 'Volver a la lista (la compra sigue abierta)' : 'Volver a la lista'"
-        @click="goBack({ name: 'list' })"
+        @click="goBack({ name: 'list', query: folderView.query.value })"
       >
         <AppIcon name="back" />
       </button>
       <div class="bar-title">
         <h1>Modo compra</h1>
-        <p class="muted">{{ cart.length }} de {{ total }} en el carrito</p>
+        <p class="muted">
+          <template v-if="folderLabel">{{ folderLabel }} · </template>{{ cart.length }} de {{ total }} en el carrito
+        </p>
       </div>
       <button v-if="list.myActiveTrip" type="button" class="cancel" @click="cancel">Cancelar</button>
       <div class="progress" role="progressbar" :aria-valuenow="cart.length" aria-valuemin="0" :aria-valuemax="total">
@@ -137,6 +152,7 @@ function cancel() {
           <span class="text">
             <span class="name">{{ item.name }}</span>
             <span v-if="item.note" class="note">{{ item.note }}</span>
+            <span v-if="showFolder" class="note">{{ list.folderName(item.folderId) }}</span>
             <span v-if="item.status === 'not_found'" class="missed">No estaba la última vez</span>
           </span>
           <QuantityChip :quantity="item.quantity" />

@@ -537,6 +537,14 @@ select tests.api('PATCH', 'tasks');
 select tests.expect_ok('ai: changes tasks', $$select public.check_api_request()$$);
 select tests.api('POST', 'items');
 select tests.expect_ok('ai: adds to the shopping list', $$select public.check_api_request()$$);
+select tests.api('GET', 'shopping_folders');
+select tests.expect_ok('ai: reads shopping folders', $$select public.check_api_request()$$);
+select tests.api('POST', 'shopping_folders');
+select tests.expect_ok('ai: creates shopping folders', $$select public.check_api_request()$$);
+select tests.api('PATCH', 'shopping_folders');
+select tests.expect_error('ai: cannot rename shopping folders', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('DELETE', 'shopping_folders');
+select tests.expect_error('ai: cannot delete shopping folders', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('DELETE', 'events');
 select tests.expect_error('ai: cannot delete events', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('POST', 'rpc/delete_event');
@@ -654,6 +662,69 @@ select tests.api('PATCH', 'notifications');
 select tests.expect_ok('ai: the service role passes', $$select public.check_api_request()$$);
 reset role;
 select set_config('request.method', '', false), set_config('request.path', '', false);
+set role authenticated;
+
+-- ── Shopping folders ──
+-- The group's own: any member sees, makes, renames and deletes them. My default is the folder I
+-- last added to. Seed: Marta's Droguería (aa) with the pending detergent.
+reset role;
+insert into shopping_folders (id, group_id, name) values ('00000000-0000-4000-8000-0000000000ab', '00000000-0000-4000-8000-000000000002', 'Ajena');
+set role authenticated;
+
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('folders: daniel sees the group''s folder only', (select array_agg(name) from shopping_folders) = array['Droguería']);
+insert into shopping_folders (id, group_id, name, created_by)
+  values ('00000000-0000-4000-8000-0000000000ac', '00000000-0000-4000-8000-000000000001', 'Coche', '00000000-0000-4000-8000-0000000000a2');
+select tests.check('folders: daniel creates one', exists (select 1 from shopping_folders where name = 'Coche'));
+select tests.expect_error('folders: no second one with the same name',
+  $$insert into shopping_folders (group_id, name, created_by) values ('00000000-0000-4000-8000-000000000001', ' COCHE', '00000000-0000-4000-8000-0000000000a2')$$,
+  'shopping_folders_group_name_idx');
+select tests.expect_error('folders: not in someone else''s name',
+  $$insert into shopping_folders (group_id, name, created_by) values ('00000000-0000-4000-8000-000000000001', 'Trabajo', '00000000-0000-4000-8000-0000000000a1')$$,
+  'row-level security');
+select tests.expect_error('folders: not in another group',
+  $$insert into shopping_folders (group_id, name, created_by) values ('00000000-0000-4000-8000-000000000002', 'Trabajo', '00000000-0000-4000-8000-0000000000a2')$$,
+  'row-level security');
+select tests.expect_error('folders: an item can''t go in another group''s folder',
+  $$insert into items (group_id, folder_id, name, added_by) values ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000ab', 'x', '00000000-0000-4000-8000-0000000000a2')$$,
+  'items_folder_in_group');
+insert into items (id, group_id, folder_id, name, added_by)
+  values ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000ac', 'Anticongelante', '00000000-0000-4000-8000-0000000000a2');
+select tests.check('folders: adding makes it my default',
+  (select last_shopping_folder_id = '00000000-0000-4000-8000-0000000000ac' from members where id = '00000000-0000-4000-8000-0000000000a2'));
+select tests.check('folders: not Marta''s default',
+  (select last_shopping_folder_id is null from members where id = '00000000-0000-4000-8000-0000000000a1'));
+insert into items (id, group_id, name, added_by)
+  values ('00000000-0000-4000-8000-0000000000ae', '00000000-0000-4000-8000-000000000001', 'Sal', '00000000-0000-4000-8000-0000000000a2');
+select tests.check('folders: adding to General makes it the default',
+  (select last_shopping_folder_id is null from members where id = '00000000-0000-4000-8000-0000000000a2'));
+select tests.check('folders: merge adds up', (select (merge_item('00000000-0000-4000-8000-0000000000ad', 1)).quantity = 2));
+select tests.check('folders: adding to a line already there counts too',
+  (select last_shopping_folder_id = '00000000-0000-4000-8000-0000000000ac' from members where id = '00000000-0000-4000-8000-0000000000a2'));
+-- Undoing a delete puts the row back as it was: it doesn't change whoever added it first.
+select tests.as_user('marta@ejemplo.com');
+delete from items where id = '00000000-0000-4000-8000-0000000000ae';
+insert into items (id, group_id, name, added_by)
+  values ('00000000-0000-4000-8000-0000000000ae', '00000000-0000-4000-8000-000000000001', 'Sal', '00000000-0000-4000-8000-0000000000a2');
+select tests.check('folders: re-inserting someone else''s line leaves their default',
+  (select last_shopping_folder_id = '00000000-0000-4000-8000-0000000000ac' from members where id = '00000000-0000-4000-8000-0000000000a2'));
+update shopping_folders set name = 'Coche familiar' where id = '00000000-0000-4000-8000-0000000000ac';
+select tests.check('folders: marta renames Daniel''s folder', (select name = 'Coche familiar' from shopping_folders where id = '00000000-0000-4000-8000-0000000000ac'));
+select tests.expect_error('folders: only the name changes',
+  $$update shopping_folders set group_id = '00000000-0000-4000-8000-000000000002' where id = '00000000-0000-4000-8000-0000000000ac'$$, 'permission denied');
+delete from shopping_folders where id = '00000000-0000-4000-8000-0000000000ac';
+select tests.check('folders: deleting sends its items to General',
+  (select folder_id is null from items where id = '00000000-0000-4000-8000-0000000000ad'));
+select tests.check('folders: and clears it as a default',
+  (select last_shopping_folder_id is null from members where id = '00000000-0000-4000-8000-0000000000a2'));
+select tests.as_user('lucia@ejemplo.com');
+select tests.check('folders: pending sees none', (select count(*) from shopping_folders) = 0);
+select tests.expect_error('folders: pending can''t make one',
+  $$insert into shopping_folders (group_id, name, created_by) values ('00000000-0000-4000-8000-000000000001', 'Trabajo', '00000000-0000-4000-8000-0000000000a5')$$,
+  'row-level security');
+reset role;
+delete from items where id in ('00000000-0000-4000-8000-0000000000ad', '00000000-0000-4000-8000-0000000000ae');
+delete from shopping_folders where id = '00000000-0000-4000-8000-0000000000ab';
 set role authenticated;
 
 -- ── Pending request sees nothing of the group ──
