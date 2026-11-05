@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
+import DaySheet from '@/components/DaySheet.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
 import { useSwipe } from '@/composables/swipe'
-import { timeLabel } from '@/lib/eventText'
-import { HOUR_PX, timeline } from '@/lib/timeline'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { folderPaint } from '@/utils/colors'
@@ -102,30 +101,9 @@ function shows(o: ReturnType<typeof calendar.occurrencesOn>[number]): boolean {
 const week = computed(() =>
   days.value.map((day) => {
     const items = calendar.occurrencesOn(day).filter(shows)
-    return { day, items, allDay: items.filter((o) => o.allDay), scale: timeline(items, day) }
+    return { day, items }
   }),
 )
-
-// The current time, as a line across today's scale.
-const now = ref(new Date())
-const clock = setInterval(() => (now.value = new Date()), 60_000)
-onUnmounted(() => clearInterval(clock))
-const nowMinute = computed(() => now.value.getHours() * 60 + now.value.getMinutes())
-const nowLabel = computed(() => `${String(now.value.getHours()).padStart(2, '0')}:${String(now.value.getMinutes()).padStart(2, '0')}`)
-
-/** How much a block has room to say. */
-function fits(height: number): { time: boolean; who: boolean } {
-  return { time: height >= HOUR_PX * 0.75, who: height >= HOUR_PX * 1.25 }
-}
-
-/** The time in a block: as in the lists, without the spaces, so it fits a narrow column. */
-function blockTime(o: Parameters<typeof timeLabel>[0], day: string): string {
-  return timeLabel(o, day).replace(' – ', '–')
-}
-
-function freeLabel(minutes: number): string {
-  return `${minutes / 60} h libres`
-}
 
 const filtered = computed(() => people.value.size > 0 || activeFolders.value.size > 0)
 
@@ -201,54 +179,7 @@ function ownerName(id: string): string {
           <RouterLink :to="{ name: 'calendar', query: { dia: d.day } }">{{ longDay(d.day) }}</RouterLink>
         </h2>
         <p v-if="!d.items.length" class="nothing muted">Nada</p>
-        <div v-else class="sheet">
-          <ul v-if="d.allDay.length" class="all-day">
-            <li v-for="o in d.allDay" :key="o.key">
-              <span v-if="o.busy" class="chip busy" :style="folderPaint(o.color)">Ocupado · {{ ownerName(o.ownerId) }}</span>
-              <RouterLink v-else :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }" class="chip" :style="folderPaint(o.color)">
-                {{ o.title }} · {{ ownerName(o.ownerId) }}
-              </RouterLink>
-            </li>
-          </ul>
-          <div v-if="d.scale.height" class="scale" :style="{ height: `${d.scale.height}px` }">
-            <template v-for="h in d.scale.hours" :key="h.top">
-              <span class="hour" :style="{ top: `${h.top}px` }">{{ h.label }}</span>
-              <span class="hour-line" :style="{ top: `${h.top}px` }" />
-            </template>
-            <span v-for="g in d.scale.gaps" :key="g.top" class="gap muted" :style="{ top: `${g.top}px` }">
-              <span aria-hidden="true">· · ·</span>{{ freeLabel(g.minutes) }}
-            </span>
-            <div class="blocks">
-              <template v-for="b in d.scale.blocks" :key="d.items[b.item]!.key">
-                <template v-for="o in [d.items[b.item]!]" :key="o.key">
-                  <span
-                    v-if="o.busy"
-                    class="block busy"
-                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, ...folderPaint(o.color) }"
-                  >
-                    <strong>Ocupado</strong>
-                    <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
-                    <span v-if="fits(b.height).who">{{ ownerName(o.ownerId) }}</span>
-                  </span>
-                  <RouterLink
-                    v-else
-                    :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }"
-                    class="block"
-                    :style="{ top: `${b.top}px`, height: `${b.height}px`, left: `${(b.column / b.columns) * 100}%`, width: `${100 / b.columns}%`, ...folderPaint(o.color) }"
-                  >
-                    <strong>{{ o.title }}</strong>
-                    <span v-if="fits(b.height).time">{{ blockTime(o, d.day) }}</span>
-                    <span v-if="fits(b.height).who">{{ ownerName(o.ownerId) }}</span>
-                  </RouterLink>
-                </template>
-              </template>
-            </div>
-            <template v-if="d.day === today() && d.scale.at(nowMinute) !== null">
-              <span class="now-label" :style="{ top: `${d.scale.at(nowMinute)}px` }">{{ nowLabel }}</span>
-              <span class="now-line" :style="{ top: `${d.scale.at(nowMinute)}px` }" />
-            </template>
-          </div>
-        </div>
+        <DaySheet v-else :day="d.day" :items="d.items" :owner-name="ownerName" />
       </section>
     </div>
 
@@ -364,162 +295,5 @@ function ownerName(id: string): string {
 .nothing {
   padding: 6px var(--gutter);
   font-size: 0.9375rem;
-}
-
-/* ── Time scale (src/lib/timeline.ts) ── */
-
-.sheet {
-  --axis: 44px;
-  background: var(--surface);
-  border-block: 1px solid var(--line);
-}
-
-@media (min-width: 592px) {
-  .sheet {
-    border-inline: 1px solid var(--line);
-    border-radius: var(--radius);
-  }
-}
-
-.all-day {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 0;
-  padding: 8px var(--gutter) 0 calc(var(--gutter) + var(--axis));
-  list-style: none;
-}
-
-.chip {
-  display: block;
-  padding: 3px 8px;
-  border-radius: 6px;
-  color: #fff;
-  box-shadow: inset 0 0 0 1px var(--edge, transparent);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.scale {
-  position: relative;
-  margin: 0 var(--gutter) 0 calc(var(--gutter) - 6px);
-}
-
-.hour {
-  position: absolute;
-  left: 0;
-  width: calc(var(--axis) - 8px);
-  margin-top: -0.45rem;
-  text-align: right;
-  font-size: 0.6875rem;
-  line-height: 0.9rem;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.hour-line {
-  position: absolute;
-  left: var(--axis);
-  right: 0;
-  border-top: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-}
-
-.gap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: 0.75rem;
-  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bg) 70%, transparent) 0 6px, transparent 6px 12px);
-  border-radius: 6px;
-}
-
-.gap span {
-  letter-spacing: 0.3em;
-}
-
-.blocks {
-  position: absolute;
-  inset: 0 0 0 var(--axis);
-}
-
-.block {
-  position: absolute;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 4px 7px;
-  border-radius: 8px;
-  /* A white edge keeps neighbours apart. */
-  box-shadow:
-    inset 0 0 0 1px var(--edge, transparent),
-    0 0 0 1.5px var(--surface);
-  overflow: hidden;
-  color: #fff;
-  text-decoration: none;
-  line-height: 1.25;
-}
-
-.block strong {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.block span {
-  font-size: 0.75rem;
-  opacity: 0.92;
-  /* One line; in a narrow column the end time gives way first. */
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-variant-numeric: tabular-nums;
-}
-
-.block.busy {
-  opacity: 0.5;
-}
-
-a.block:hover {
-  filter: brightness(1.08);
-}
-
-.now-line {
-  position: absolute;
-  left: calc(var(--axis) - 4px);
-  right: 0;
-  border-top: 2px solid var(--late);
-  pointer-events: none;
-}
-
-.now-line::before {
-  content: '';
-  position: absolute;
-  left: -4px;
-  top: -5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--late);
-}
-
-.now-label {
-  position: absolute;
-  left: 0;
-  width: calc(var(--axis) - 8px);
-  margin-top: -0.45rem;
-  text-align: right;
-  font-size: 0.6875rem;
-  line-height: 0.9rem;
-  font-weight: 700;
-  color: var(--late);
-  background: var(--surface);
-  font-variant-numeric: tabular-nums;
 }
 </style>

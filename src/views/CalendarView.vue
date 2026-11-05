@@ -3,16 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import CalendarTabs from '@/components/CalendarTabs.vue'
+import DaySheet from '@/components/DaySheet.vue'
 import GroupSwitcher from '@/components/GroupSwitcher.vue'
-import PersonAvatar from '@/components/PersonAvatar.vue'
 import { useSwipe } from '@/composables/swipe'
-import { timeLabel } from '@/lib/eventText'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
-import { folderPaint } from '@/utils/colors'
 import { addDays, isIsoDate, longDay, relativeDay, today } from '@/utils/days'
 
-// "Hoy": what each person of the group has on one day. ?dia=YYYY-MM-DD moves to another day.
+// "Hoy": what the group has on one day, as a time scale like each day of Semana. ?dia=YYYY-MM-DD moves to another day.
 
 const groupStore = useGroupStore()
 const calendar = useCalendarStore()
@@ -39,18 +37,22 @@ watch(
   { immediate: true },
 )
 
-/** The active members of the group with something that day, me first, with what they have. */
-const rows = computed(() => {
-  const occurrences = calendar.occurrencesOn(day.value)
-  const members = [...groupStore.activeMembers].sort((a, b) => Number(groupStore.isMe(b.id)) - Number(groupStore.isMe(a.id)))
-  return members
-    .map((member) => ({
-      member,
-      // A «Recordatorio» shows on its own day only (one at 23:50 doesn't run into the next).
-      items: occurrences.filter((o) => calendar.peopleOf(o).includes(member.personId) && (!o.reminderOnly || o.date === day.value)),
-    }))
-    .filter((row) => row.items.length)
-})
+const memberPeople = computed(() => new Set(groupStore.activeMembers.map((m) => m.personId)))
+
+/** What the group's active members have that day, on one time scale as in Semana. */
+const items = computed(() =>
+  calendar
+    .occurrencesOn(day.value)
+    // A «Recordatorio» shows on its own day only (one at 23:50 doesn't run into the next).
+    .filter((o) => calendar.peopleOf(o).some((id) => memberPeople.value.has(id)) && (!o.reminderOnly || o.date === day.value)),
+)
+const timed = computed(() => items.value.filter((o) => !o.reminderOnly))
+const reminders = computed(() => items.value.filter((o) => o.reminderOnly))
+
+function ownerName(id: string): string {
+  const member = groupStore.activeMembers.find((m) => m.personId === id)
+  return member ? (groupStore.isMe(member.id) ? 'Tú' : member.name) : calendar.personName(id, 'Tú')
+}
 </script>
 
 <template>
@@ -85,39 +87,8 @@ const rows = computed(() => {
     </div>
 
     <div v-else ref="swipeArea" class="appear">
-      <p v-if="!rows.length" class="state muted">Nadie tiene nada este día.</p>
-      <section v-for="row in rows" :key="row.member.id" :aria-label="row.member.name">
-        <h2 class="person">
-          <PersonAvatar :name="row.member.name" :color="row.member.color" :size="28" />
-          <span>{{ groupStore.isMe(row.member.id) ? 'Tú' : row.member.name }}</span>
-        </h2>
-        <ul class="rows">
-          <li v-for="o in row.items" :key="o.key">
-            <span v-if="o.busy" class="occurrence busy">
-              <span class="bar" :style="folderPaint(o.color)" />
-              <span class="when">{{ timeLabel(o, day) }}</span>
-              <span class="what"><span class="title">Ocupado</span></span>
-            </span>
-            <RouterLink
-              v-else
-              :to="{ name: 'event', params: { id: o.eventId }, query: { dia: o.seriesDate } }"
-              class="occurrence"
-              :class="{ reminder: o.reminderOnly }"
-            >
-              <span class="bar" :style="folderPaint(o.color)" />
-              <span class="when">
-                <template v-if="o.reminderOnly"><AppIcon name="bell" :size="14" />{{ o.startTime }}</template>
-                <template v-else>{{ timeLabel(o, day) }}</template>
-              </span>
-              <span class="what">
-                <span class="title">{{ o.title }}</span>
-                <span v-if="o.location" class="muted where">{{ o.location }}</span>
-              </span>
-              <AppIcon v-if="o.repeating" name="repeat" :size="16" class="repeat" />
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+      <p v-if="!items.length" class="state muted">Nadie tiene nada este día.</p>
+      <DaySheet v-else class="day-sheet" :day="day" :items="timed" :reminders="reminders" :owner-name="ownerName" />
     </div>
 
     <div class="dock">
@@ -174,91 +145,7 @@ const rows = computed(() => {
   text-align: center;
 }
 
-.person {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 22px var(--gutter) 8px;
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.occurrence {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 56px;
-  padding: 8px var(--gutter);
-  color: inherit;
-  text-decoration: none;
-}
-
-a.occurrence:hover {
-  background: var(--primary-soft);
-}
-
-.bar {
-  align-self: stretch;
-  width: 4px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px var(--edge, transparent);
-}
-
-/* A «Recordatorio»: a short line, quieter than what takes time. */
-.reminder {
-  min-height: 40px;
-}
-
-.reminder .bar {
-  opacity: 0.45;
-}
-
-.reminder .when {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.reminder .title {
-  font-weight: 500;
-  font-size: 0.9375rem;
-}
-
-.busy .bar {
-  opacity: 0.45;
-}
-
-.when {
-  width: 7.5rem;
-  flex-shrink: 0;
-  font-size: 0.875rem;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-2);
-}
-
-.what {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-}
-
-.title {
-  font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.busy .title {
-  font-weight: 500;
-  color: var(--text-2);
-}
-
-.where {
-  font-size: 0.875rem;
-}
-
-.repeat {
-  color: var(--text-2);
-  flex-shrink: 0;
+.day-sheet {
+  margin-top: 12px;
 }
 </style>
