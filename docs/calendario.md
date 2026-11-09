@@ -157,7 +157,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - Crear grupo o unirse con código (queda pendiente de aprobación).
 
 **Calendario**
-- **Hoy:** lo de hoy de cada persona del grupo actual (yo primero), agrupado por persona, con flechas para pasar al día anterior o siguiente. Cada persona ve sus eventos, los que comparte el grupo, aquellos en los que participa y las franjas "Ocupado".
+- **Hoy:** lo del día del grupo actual con la misma escala de horas que cada día de Semana (componente `DaySheet.vue`, compartido), con flechas para pasar al día anterior o siguiente. Cada bloque dice de quién es; se ven los eventos de cada uno, los que comparte el grupo, aquellos en los que participan y las franjas "Ocupado". Los «Recordatorio» van como etiquetas pequeñas con la campana encima de la escala, tras los de todo el día. Pedido por Luis el 5 nov 2026 (antes, lista agrupada por persona).
 - **Semana:** el grupo elegido, con filtros por persona y por carpeta. Al abrirla en la semana actual baja hasta hoy (salvo que hoy ya se vea); al cambiar de semana vuelve a su lunes si la lista estaba más abajo. El nombre de cada día se queda fijo arriba mientras pasan sus eventos, y los días ya pasados salen atenuados. Cada día es una escala de horas, como una agenda (`src/lib/timeline.ts`): la altura sigue al reloj (44 px por hora), de la primera hora con algo a la última; los huecos de 2 h o más sin nada se encogen en una franja «· · · N h libres». Los eventos a la vez van en columnas, como en Google Calendar, con el color de la carpeta; los de todo el día, como etiquetas encima. Lo que viene de la noche anterior empieza arriba y lo que cruza la medianoche llega hasta abajo. Una línea marca la hora actual en hoy. Decidido con Luis el 19 oct 2026 tras probar las líneas de metro; con los horarios de los hijos (más solapes) se revisará.
 - **Mes:** solo eventos puntuales y excepciones.
 - En Hoy, Semana y Mes, deslizar el dedo hacia un lado pasa al día, la semana o el mes siguiente (hacia la izquierda) o anterior (hacia la derecha), como las flechas. El contenido sigue al dedo y entra deslizándose desde el lado (también con las flechas); sin animación si el móvil pide reducir el movimiento.
@@ -172,7 +172,7 @@ El modo ocupado se lee con la función `busy_events(gid)`: horas, repetición y 
 - **Evento:** crear y editar rápido, duplicar un día, aviso (recordatorio, ver `docs/notificaciones.md`), elegir carpeta, participantes ("Con quién": miembros activos del grupo actual, sin el dueño de la carpeta) y grupos extra, icono ⓘ y aviso de "está editando".
   - **Recordatorio** (interruptor bajo el título, con una ⓘ que explica qué hace): para lo que solo necesita el aviso, como
     tomar una pastilla. Lleva solo la hora del aviso (se guarda con fin = inicio + 15 min, `reminderEndTime()`), avisa al
-    empezar si no se elige otro aviso y nunca va sin aviso. Sale pequeño en Hoy (con la campana) y no sale en Semana ni en Mes,
+    empezar si no se elige otro aviso y nunca va sin aviso. Sale pequeño en Hoy (etiqueta con la campana sobre la escala) y no sale en Semana ni en Mes,
     ni como «Ocupado» (`busy_events` lo excluye), ni cuenta en «Planificar con IA». Lo ve quien vería el evento; se repite,
     se cambia o cancela un día y avisa como cualquier otro. Columna `events.reminder_only`. Decidido con Luis el 22 oct 2026;
     sin «Hecho» por ahora.
