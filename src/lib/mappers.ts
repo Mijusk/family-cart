@@ -9,6 +9,8 @@ import type {
   Group,
   HistoryAction,
   HistoryEntry,
+  InboxKind,
+  InboxNotification,
   Item,
   Member,
   MemberRole,
@@ -45,6 +47,8 @@ export type EventRow = Tables['events']['Row']
 export type EventInsert = Tables['events']['Insert']
 export type EventExceptionRow = Tables['event_exceptions']['Row']
 export type EventHistoryRow = Tables['event_history']['Row']
+/** The columns of the queue a person can read (the bell's list). */
+export type InboxRow = Pick<Tables['notifications']['Row'], 'id' | 'kind' | 'title' | 'body' | 'url' | 'created_at'>
 type Functions = Database['public']['Functions']
 export type BusyEventRow = Functions['busy_events']['Returns'][number]
 
@@ -66,6 +70,18 @@ export const toPerson = (r: PersonRow): Person => ({
   hasAccount: r.user_id !== null,
   lastCalendarId: r.last_calendar_id,
   mutedNotifications: r.muted_notifications as NotificationKind[],
+  // A copy saved on the device by an older version has neither.
+  notificationsSeenAt: r.notifications_seen_at ?? null,
+  breathingReminderTime: r.breathing_reminder_time?.slice(0, 5) ?? null,
+})
+
+export const toInboxNotification = (r: InboxRow): InboxNotification => ({
+  id: r.id,
+  kind: r.kind as InboxKind,
+  title: r.title,
+  body: r.body,
+  url: r.url,
+  createdAt: r.created_at,
 })
 
 /** A member row plus its person; an unknown person (not loaded yet) shows as "Alguien". */

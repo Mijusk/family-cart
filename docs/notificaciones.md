@@ -95,3 +95,25 @@ en Vault, así que los avisos solo se quedan en la cola; los tests lo cubren.
 - Varios recordatorios por evento, o recordatorios personales distintos del evento.
 - Avisos de la compra.
 - App nativa (Capacitor): cambiaría el envío a FCM/APNs, no la cola.
+
+## 5. La campana: últimos avisos (12-nov)
+
+- En el header (`AppHeader.vue`), con un número rojo con los no leídos. Abre `/avisos`
+  (`NotificationsView.vue`): los de los últimos 30 días, por día, y al tocar uno abre su pantalla.
+- Cada persona lee las suyas de `notifications` (política «see my notifications»; solo `id`,
+  `person_id`, `kind`, `title`, `body`, `url`, `created_at`). Salen aunque el dispositivo no tenga
+  los avisos push activados. Las apps de IA no las leen (`check_api_request`).
+- No leídos: los posteriores a `people.notifications_seen_at`, que mueve la RPC
+  `mark_notifications_seen()` al abrir la lista (vale para todos los dispositivos).
+- La cola guarda 30 días (antes 7); la función sigue enviando solo los de menos de 1 hora.
+- La lista se recarga al volver a la app y cuando llega un push con la app abierta (`sw.js` avisa
+  a la ventana con `postMessage`).
+
+## 6. Recordatorio para respirar (12-nov)
+
+- `people.breathing_reminder_time` (hora local, `null` = ninguno), solo con la RPC
+  `set_breathing_reminder(at)`; se elige en Respiración (`docs/respiracion.md`).
+- `enqueue_breathing_reminders(at)`, desde `dispatch_notifications()` cada minuto: tipo
+  `breathing_reminder`, «Un momento para respirar», a `/respiracion`, en la zona del grupo más
+  antiguo de la persona (`Europe/Madrid` sin grupo). Ventana de 15 minutos y `dedupe_key` por día.
+- No sale en «Qué te avisa» de Cuenta: ya es opcional y se quita desde Respiración.

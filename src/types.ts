@@ -31,9 +31,26 @@ export interface Person {
   lastCalendarId: string | null
   /** Kinds of notification this person turned off, on every device. */
   mutedNotifications: NotificationKind[]
+  /** Until when this person has looked at the bell's list; newer notifications are unread. */
+  notificationsSeenAt: string | null
+  /** Daily reminder to breathe, local "HH:MM"; null = none. */
+  breathingReminderTime: string | null
 }
 
 export type NotificationKind = 'event_reminder' | 'event_changed' | 'task_assigned' | 'task_due' | 'join_request' | 'member_approved'
+
+/** What the bell's list shows: the kinds above plus the reminder to breathe (set in Respiración). */
+export type InboxKind = NotificationKind | 'breathing_reminder'
+
+export interface InboxNotification {
+  id: string
+  kind: InboxKind
+  title: string
+  body: string
+  /** Where tapping it goes, inside the app. */
+  url: string
+  createdAt: string
+}
 
 /** A person inside a group. Name and color come from the person. */
 export interface Member {

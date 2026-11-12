@@ -6,7 +6,7 @@ llama **Family-App** (el repo sigue siendo `family-cart`).
 
 **Antes de tocar nada del calendario, lee `docs/calendario.md`**: diseño completo,
 decisiones tomadas con Luis y plan de PRs (§12). Las tareas, en `docs/tareas.md`; las
-notificaciones (Web Push), en `docs/notificaciones.md`; el conector para chats de IA (MCP + OAuth),
+notificaciones (Web Push), en `docs/notificaciones.md`; la sección Respiración, en `docs/respiracion.md`; el conector para chats de IA (MCP + OAuth),
 en `docs/ia.md`.
 
 ## Stack
@@ -38,7 +38,11 @@ en `docs/ia.md`.
   grupos vía `task_list_shares`; sin grupos es privada. Borrado suave como en el calendario.
 - Notificaciones: `push_subscriptions` (dispositivos) y la cola `notifications`, que llenan
   triggers y pg_cron (`events.reminder_minutes`, tareas con fecha) y vacía la Edge Function
-  `send-notifications`. Cada persona apaga tipos en `people.muted_notifications`.
+  `send-notifications`. Cada persona apaga tipos en `people.muted_notifications`. La campana del header
+  lista los suyos (30 días; no leídos desde `people.notifications_seen_at`).
+- Respiración (`docs/respiracion.md`), en el menú del header: ejercicios guiados sin retenciones
+  (`src/lib/breathing.ts`), ajustes en el dispositivo y recordatorio diario opcional
+  (`people.breathing_reminder_time`, RPC `set_breathing_reminder`).
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 - Apps de IA conectadas (`docs/ia.md`): Supabase Auth hace de servidor OAuth 2.1 (pantalla de permiso

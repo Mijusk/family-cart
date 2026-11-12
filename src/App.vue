@@ -1,16 +1,22 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import AppHeader from '@/components/AppHeader.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import OfflineBanner from '@/components/OfflineBanner.vue'
 import UndoToast from '@/components/UndoToast.vue'
 import { useOnResume } from '@/composables/resume'
 import { sectionRedirect } from '@/router'
 import { useGroupStore } from '@/stores/group'
+import { useInboxStore } from '@/stores/inbox'
 
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
+const inbox = useInboxStore()
+
+/** The greeting, the bell and the menu go with the tab bar. */
+const withChrome = computed(() => groupStore.status === 'ready' && !route.meta.hideNav)
 
 const canShowRoute = computed(() => {
   if (route.meta.anyone) return groupStore.status !== 'loading'
@@ -45,10 +51,29 @@ watch(
   },
 )
 
+// The bell's list, once signed in (and for each account signed in after).
+watch(
+  () => groupStore.status === 'ready' && groupStore.userId,
+  (signedIn) => {
+    if (signedIn) void inbox.load()
+  },
+  { immediate: true },
+)
+
+// A notification arriving with the app open (public/sw.js says so) goes onto the list.
+function onWorkerMessage(e: MessageEvent) {
+  if (e.data?.type === 'notification' && groupStore.status === 'ready') void inbox.load()
+}
+onMounted(() => navigator.serviceWorker?.addEventListener('message', onWorkerMessage))
+onUnmounted(() => navigator.serviceWorker?.removeEventListener('message', onWorkerMessage))
+
 // Back from the background or online again: the data on screen updates in place.
 useOnResume(() => {
   if (groupStore.status === 'error' && groupStore.offline) void retry()
-  else void groupStore.catchUp()
+  else {
+    void groupStore.catchUp()
+    if (groupStore.status === 'ready') void inbox.load()
+  }
 })
 
 async function retry() {
@@ -63,7 +88,8 @@ async function retry() {
   <!-- Without the tab bar, --nav-height drops to 0 so docked buttons and toasts sit at the bottom edge. -->
   <div class="app" :class="{ 'no-nav': route.meta.hideNav || groupStore.status !== 'ready' }">
     <OfflineBanner v-if="groupStore.status === 'ready'" />
-    <main class="column">
+    <main class="column" :class="{ 'with-header': withChrome }">
+      <AppHeader v-if="withChrome" />
       <!-- Screens that need a group never render without one (e.g. just after leaving the last group). -->
       <div v-if="!canShowRoute" class="onboard" aria-busy="true">
         <p class="eyebrow">Family-App</p>
@@ -86,7 +112,7 @@ async function retry() {
 
       <RouterView v-else />
     </main>
-    <BottomNav v-if="groupStore.status === 'ready' && !route.meta.hideNav" />
+    <BottomNav v-if="withChrome" />
     <UndoToast />
   </div>
 </template>

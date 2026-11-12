@@ -33,6 +33,13 @@ const paths = {
   bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 21h4"/>',
   spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M19 15.5v4M17 17.5h4"/>',
   logout: '<path d="M14 4h4.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H14M10 16l-4-4 4-4M6 12h10"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  wind: '<path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 15h15a3 3 0 1 1-3 3"/><path d="M3 12h7"/>',
+  leaf: '<path d="M5 19c0-8 5-14 15-14 0 10-6 15-13 15"/><path d="M5 19c3-4 6-6.5 10-8.5"/>',
+  mountain: '<path d="m2.5 19.5 6.5-11 4 6.5 2.5-3.5 6 8z"/><path d="m7.2 11.5 1.8 1.5 1.6-1.6"/>',
+  voice: '<rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"/>',
+  play: '<path d="M7.5 5v14l11.5-7z"/>',
+  pause: '<path d="M8 5v14M16 5v14"/>',
 } as const
 
 export type IconName = keyof typeof paths

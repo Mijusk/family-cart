@@ -329,7 +329,7 @@ select save_push_subscription('https://push.example.test/daniel-phone', 'p256dh-
 select tests.check('push: daniel saves his device', (select count(*) from push_subscriptions) = 1);
 select tests.expect_error('push: no direct insert',
   $$insert into push_subscriptions (person_id, endpoint, p256dh, auth) values (my_person_id(), 'https://x.test/y', 'a', 'b')$$, 'permission denied');
-select tests.expect_error('push: the outbox is not readable', $$select * from notifications$$, 'permission denied');
+select tests.expect_error('push: the queue''s bookkeeping is not readable', $$select dedupe_key, sent_at from notifications$$, 'permission denied');
 select tests.expect_error('push: nobody writes to the outbox', $$select notify(my_person_id(), 'task_assigned', 'x', 'y', '/')$$, 'permission denied');
 select tests.expect_error('push: reminders only from the database', $$select enqueue_event_reminders()$$, 'permission denied');
 update tasks set assignees = assignees || (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1') where id = '00000000-0000-4000-8000-000000000024';
@@ -488,6 +488,52 @@ select tests.check('send-notifications: service_role reads and drops devices',
   has_table_privilege('service_role', 'public.push_subscriptions', 'select, delete'));
 set role authenticated;
 
+-- ── The bell: recent notifications ──
+select tests.as_user('marta@ejemplo.com');
+select tests.check('bell: marta reads hers (the task assigned to her)',
+  exists (select 1 from notifications where kind = 'task_assigned' and url = '/tareas/00000000-0000-4000-8000-000000000024'));
+select tests.check('bell: only hers',
+  not exists (select 1 from notifications where person_id <> my_person_id()));
+select tests.expect_error('bell: no writing', $$update notifications set title = 'x'$$, 'permission denied');
+select tests.expect_error('bell: no deleting', $$delete from notifications$$, 'permission denied');
+reset role;
+update people set notifications_seen_at = now() - interval '1 day' where user_id = '00000000-0000-4000-8000-0000000000c1';
+set role authenticated;
+select mark_notifications_seen();
+select tests.check('bell: marking them seen moves her mark to now',
+  (select notifications_seen_at from people where id = my_person_id()) > now() - interval '1 minute');
+select tests.expect_error('bell: nobody else''s mark', $$update people set notifications_seen_at = now() where id = my_person_id()$$, 'permission denied');
+select tests.as_user('daniel@ejemplo.com');
+select tests.check('bell: daniel does not see marta''s',
+  not exists (select 1 from notifications where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c1')));
+
+-- ── Daily reminder to breathe ──
+select set_breathing_reminder('20:30:45');
+select tests.check('breathing: daniel sets his time (to the minute)',
+  (select breathing_reminder_time from people where id = my_person_id()) = '20:30');
+select tests.expect_error('breathing: not by a direct update',
+  $$update people set breathing_reminder_time = '08:00' where id = my_person_id()$$, 'permission denied');
+select tests.expect_error('breathing: reminders only from the database', $$select enqueue_breathing_reminders()$$, 'permission denied');
+reset role;
+select tests.check('breathing: nothing before its time',
+  enqueue_breathing_reminders(((current_date + 3) + time '20:20') at time zone 'Europe/Madrid') = 0);
+select tests.check('breathing: at its time, in the group''s zone',
+  enqueue_breathing_reminders(((current_date + 3) + time '20:30') at time zone 'Europe/Madrid') = 1);
+select enqueue_breathing_reminders(((current_date + 3) + time '20:40') at time zone 'Europe/Madrid');
+select tests.check('breathing: once a day, to him, opening Respiración',
+  (select count(*) from notifications where kind = 'breathing_reminder'
+     and person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2')
+     and url = '/respiracion') = 1
+  and not exists (select 1 from notifications where kind = 'breathing_reminder'
+     and person_id <> (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2')));
+update people set breathing_reminder_time = '23:55' where user_id = '00000000-0000-4000-8000-0000000000c2';
+select tests.check('breathing: 23:55 still goes out just after midnight',
+  enqueue_breathing_reminders(((current_date + 5) + time '00:05') at time zone 'Europe/Madrid') = 1);
+set role authenticated;
+select set_breathing_reminder(null);
+select tests.check('breathing: and he turns it off',
+  (select breathing_reminder_time is null from people where id = my_person_id()));
+
 -- ── Connected AI apps (OAuth tokens): only what the mcp function uses ──
 reset role;
 -- An OAuth session of Marta's, as Supabase Auth leaves it when she allows an app.
@@ -563,6 +609,10 @@ select tests.api('DELETE', 'items');
 select tests.expect_error('ai: cannot remove products', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('GET', 'push_subscriptions');
 select tests.expect_error('ai: cannot read devices through the API', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('GET', 'notifications');
+select tests.expect_error('ai: cannot read the bell''s list', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/set_breathing_reminder');
+select tests.expect_error('ai: cannot set the reminder to breathe', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('GET', 'event_history');
 select tests.expect_error('ai: cannot read the history', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('GET', 'rpc/busy_events');

@@ -360,13 +360,13 @@ isOneToOne: false
                   ]
                 },"people": {
                   Row: {
-                    "claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": (string)[],"updated_at": string,"updated_by": string | null,"user_id": string | null
+                    "breathing_reminder_time": string | null,"claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": (string)[],"notifications_seen_at": string,"updated_at": string,"updated_by": string | null,"user_id": string | null
                   }
                   Insert: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "breathing_reminder_time"?: string | null,"claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Update: {
-                    "claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "breathing_reminder_time"?: string | null,"claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -691,6 +691,9 @@ isOneToOne: false
 "empty_trash":
 { Args: { "max_age"?: string }; Returns: number
                            },
+"enqueue_breathing_reminders":
+{ Args: { "at"?: string }; Returns: number
+                           },
 "enqueue_event_reminders":
 { Args: { "at"?: string }; Returns: number
                            },
@@ -745,6 +748,9 @@ isOneToOne: false
                            },
 "leave_group":
 { Args: { "gid": string }; Returns: undefined
+                           },
+"mark_notifications_seen":
+{ Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "merge_item":
 { Args: { "add_quantity": number,"extra_note"?: string,"item_id": string }; Returns: {
@@ -844,6 +850,9 @@ isOneToOne: false
                            },
 "save_push_subscription":
 { Args: { "auth": string,"endpoint": string,"p256dh": string }; Returns: undefined
+                           },
+"set_breathing_reminder":
+{ Args: { "at": string }; Returns: undefined
                            },
 "set_member_role":
 { Args: { "member_id": string,"new_role": string }; Returns: undefined

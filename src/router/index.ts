@@ -121,6 +121,23 @@ export const router = createRouter({
     },
     { path: '/grupo', name: 'group', component: () => import('@/views/GroupView.vue') },
     {
+      path: '/avisos',
+      name: 'notifications',
+      component: () => import('@/views/NotificationsView.vue'),
+    },
+    {
+      // In the menu (AppMenu): breathing exercises by kind, ?tipo=relax|sport|speech.
+      path: '/respiracion',
+      name: 'breathing',
+      component: () => import('@/views/BreathingView.vue'),
+    },
+    {
+      path: '/respiracion/:id',
+      name: 'breathing-exercise',
+      component: () => import('@/views/BreathingSessionView.vue'),
+      meta: { hideNav: true },
+    },
+    {
       path: '/cuenta',
       name: 'account',
       component: () => import('@/views/AccountView.vue'),
