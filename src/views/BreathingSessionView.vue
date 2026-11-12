@@ -20,6 +20,7 @@ import {
   roundsIn,
   secondsText,
   stepAt,
+  timingAdvice,
   type BreathSettings,
   type Exercise,
 } from '@/lib/breathing'
@@ -73,6 +74,9 @@ function resetTimes() {
   if (!exercise.value) return
   settings.value = { ...settings.value, inhale: exercise.value.inhale, exhale: exercise.value.exhale }
 }
+
+/** The assistant's comment on the times chosen, updated as they change. */
+const advice = computed(() => (exercise.value ? timingAdvice(exercise.value, settings.value) : null))
 
 const outLabel = computed(() => (exercise.value?.visual === 'phrases' ? 'Hablar' : 'Soltar el aire'))
 
@@ -325,6 +329,16 @@ const totalText = computed(() => {
           <button type="button" class="choice" :aria-pressed="settings.phrases === 'short'" @click="settings.phrases = 'short'">Cortas</button>
           <button type="button" class="choice" :aria-pressed="settings.phrases === 'long'" @click="settings.phrases = 'long'">Un poco más largas</button>
         </div>
+      </div>
+
+      <div v-if="advice" class="assistant" :class="advice.tone" aria-live="polite">
+        <span class="assistant-icon"><AppIcon name="spark" :size="20" /></span>
+        <Transition name="advice" mode="out-in">
+          <div :key="advice.title + (advice.extra ?? '')" class="assistant-text">
+            <p><strong>{{ advice.title }}.</strong> {{ advice.text }}</p>
+            <p v-if="advice.extra" class="assistant-extra">{{ advice.extra }}</p>
+          </div>
+        </Transition>
       </div>
 
       <p class="muted small">
@@ -615,6 +629,69 @@ const totalText = computed(() => {
 .small {
   margin: 0;
   font-size: 0.875rem;
+}
+
+/* The assistant: a speech bubble that comments on the times as they change. */
+.assistant {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: var(--tone-soft);
+}
+
+.assistant.care {
+  background: var(--qty-soft);
+}
+
+.assistant-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--tone);
+}
+
+.assistant.care .assistant-icon {
+  color: var(--qty-ink);
+}
+
+.assistant-text {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.assistant-text p {
+  margin: 0;
+}
+
+.assistant-extra {
+  color: var(--text-2);
+  font-size: 0.875rem;
+}
+
+.assistant-text strong {
+  color: var(--tone);
+}
+
+.assistant.care .assistant-text strong {
+  color: var(--qty-ink);
+}
+
+.advice-enter-active,
+.advice-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.advice-enter-from,
+.advice-leave-to {
+  opacity: 0;
 }
 
 .link {
