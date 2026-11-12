@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
-import AppIcon from './AppIcon.vue'
 
-// Switches between the calendar's views (Hoy, Semana, Mes), with a way to the folders and to
-// "Planificar con IA".
+// Switches between the calendar's views (Hoy, Semana, Mes). The folders and «Planificar con IA»
+// are in the side menu (AppMenu), so they don't take room here.
 
 const tabs = [
   { name: 'calendar', label: 'Hoy' },
@@ -18,10 +17,6 @@ const tabs = [
       {{ tab.label }}
     </RouterLink>
   </nav>
-  <p class="more">
-    <RouterLink :to="{ name: 'plan' }"><AppIcon name="spark" :size="16" /> Planificar con IA</RouterLink>
-    <RouterLink :to="{ name: 'folders' }"><AppIcon name="folder" :size="16" /> Mis carpetas</RouterLink>
-  </p>
 </template>
 
 <style scoped>
@@ -46,24 +41,7 @@ const tabs = [
   text-decoration: none;
 }
 
-.more {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  column-gap: 16px;
-  margin: -4px var(--gutter) 8px;
-}
 
-.more a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  color: var(--text-2);
-  font-size: 0.875rem;
-  font-weight: 600;
-  text-decoration: none;
-}
 
 .tab.active {
   background: var(--primary);

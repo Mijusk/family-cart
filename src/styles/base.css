@@ -257,8 +257,9 @@ a {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height) + var(--safe-bottom));
+  bottom: calc(var(--nav-offset, var(--nav-height)) + var(--safe-bottom));
   padding: 12px var(--gutter);
+  transition: bottom 0.25s ease;
   background: linear-gradient(to top, var(--bg) 70%, transparent);
   z-index: 10;
 }
@@ -391,6 +392,30 @@ a {
 }
 
 /* Eyebrow on the left, a way to a section's inner screen on the right (Historial, Mis listas). */
+/* A tab's title with the group next to it, small, so the screen goes to the content. */
+.title-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.page-title {
+  flex-shrink: 0;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.75rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.title-row + .header-row,
+.title-row + .muted {
+  margin-top: 2px;
+}
+
 .header-row {
   display: flex;
   align-items: center;

@@ -66,12 +66,14 @@ function goShopping() {
 <template>
   <div class="page">
     <header class="page-header">
+      <div class="title-row">
+        <h1 class="page-title">Compra</h1>
+        <GroupSwitcher variant="pill" />
+      </div>
       <div class="header-row">
-        <p class="eyebrow">Compra</p>
+        <p class="muted">{{ countLabel }}</p>
         <RouterLink :to="{ name: 'history' }" class="header-link"><AppIcon name="history" :size="16" /> Historial</RouterLink>
       </div>
-      <GroupSwitcher />
-      <p class="muted">{{ countLabel }}</p>
     </header>
 
     <ShoppingFolderBar :view="view" @show="folderView.show" />

@@ -178,8 +178,10 @@ async function leave() {
 <template>
   <div class="page">
     <header class="page-header">
-      <p class="eyebrow">Grupo</p>
-      <GroupSwitcher />
+      <div class="title-row">
+        <h1 class="page-title">Grupo</h1>
+        <GroupSwitcher variant="pill" />
+      </div>
       <p class="muted">{{ membersLabel }} · desde el {{ longDate(groupStore.group.createdAt) }}</p>
     </header>
 

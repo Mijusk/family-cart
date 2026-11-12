@@ -91,8 +91,10 @@ function label(day: string): string {
 <template>
   <div class="page swipe-page">
     <header class="page-header">
-      <p class="eyebrow">Calendario</p>
-      <GroupSwitcher />
+      <div class="title-row">
+        <h1 class="page-title">Calendario</h1>
+        <GroupSwitcher variant="pill" />
+      </div>
     </header>
 
     <CalendarTabs />
