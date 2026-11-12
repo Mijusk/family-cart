@@ -80,16 +80,24 @@ self.addEventListener('push', (event) => {
     data = { body: event.data ? event.data.text() : '' }
   }
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Family-App', {
-      body: data.body || '',
-      icon: '/icons/icon-192.png',
-      badge: '/icons/badge-96.png',
-      tag: data.tag,
-      lang: 'es',
-      data: { url: data.url || '/' },
-    }),
+    Promise.all([
+      showIt(data),
+      // An open app puts it on the bell's list straight away.
+      self.clients.matchAll({ type: 'window' }).then((windows) => windows.forEach((w) => w.postMessage({ type: 'notification' }))),
+    ]),
   )
 })
+
+function showIt(data) {
+  return self.registration.showNotification(data.title || 'Family-App', {
+    body: data.body || '',
+    icon: '/icons/icon-192.png',
+    badge: '/icons/badge-96.png',
+    tag: data.tag,
+    lang: 'es',
+    data: { url: data.url || '/' },
+  })
+}
 
 // Tapping it opens the app there: in a window already open if there is one.
 self.addEventListener('notificationclick', (event) => {

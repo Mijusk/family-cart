@@ -123,6 +123,11 @@ a {
   padding: 28px var(--gutter) 18px;
 }
 
+/* Under the greeting (AppHeader), the screen's own header needs less room above. */
+.with-header .page-header {
+  padding-top: 10px;
+}
+
 .eyebrow {
   font-size: 0.8125rem;
   font-weight: 600;
@@ -423,4 +428,24 @@ a {
 
 .back-link:hover {
   color: var(--primary);
+}
+
+/* ── Respiración: one tone per kind of exercise ─────────── */
+
+.tone-relax {
+  --tone: var(--primary);
+  --tone-soft: var(--primary-soft);
+  --tone-bright: #8fbf9f;
+}
+
+.tone-sport {
+  --tone: var(--qty-ink);
+  --tone-soft: var(--qty-soft);
+  --tone-bright: #e6be6a;
+}
+
+.tone-speech {
+  --tone: var(--warn);
+  --tone-soft: var(--warn-soft);
+  --tone-bright: #b59abb;
 }
