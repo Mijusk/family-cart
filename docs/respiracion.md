@@ -30,6 +30,19 @@ subir montañas), pero la ve todo el mundo (decisión de Luis, 12-nov).
   segundo plano y mantiene la pantalla encendida donde el navegador deja (Wake Lock).
 - Siempre a la vista: «Si notas mareo, ahogo o malestar, para y respira con normalidad».
 
+## 2b. El asistente de tiempos (pedido de Luis, 12-nov)
+
+Al cambiar los segundos, una burbuja bajo los ajustes dice para qué sirve esa combinación
+(`timingAdvice()` en `src/lib/breathing.ts`, con tests):
+- Relajarse: según las respiraciones por minuto (más de 12 «ritmo ágil», 9–12 «a diario», 6–8
+  «relajarte mucho», menos de 6 «muy lento») y si se suelta más rápido de lo que se toma («activa
+  más que relaja»).
+- Deporte: el ritmo de cada paso (rápido, de paseo, lento) y, en «Recuperar», si aún jadeas o ya
+  vuelves a la calma.
+- Hablar: lo largo de la frase o de la salida de aire.
+- En amarillo, sin alarmar, lo que es fácil pasarse: soltar el aire 7 s o más, frases de 5,5 s o
+  más. Nunca anima a alargar: los tiempos por defecto nunca salen en amarillo.
+
 ## 3. Ejercicios
 
 | Sección | Ejercicio | Dibujo | Tiempos |

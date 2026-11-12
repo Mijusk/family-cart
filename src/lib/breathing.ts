@@ -447,3 +447,167 @@ export function phraseFor(list: string[], round: number, start = 0): string {
 export function secondsText(n: number): string {
   return `${String(n).replace('.', ',')} s`
 }
+
+// ── The assistant: what the chosen times are good for ──────────────────────
+
+/** good: fine as it is; info: worth knowing; care: easy to overdo, said gently. */
+export type AdviceTone = 'good' | 'info' | 'care'
+
+export interface Advice {
+  tone: AdviceTone
+  title: string
+  text: string
+}
+
+/** Breaths a minute with these times (one round: in, out and the rest after a sentence). */
+export function breathsPerMinute(e: Exercise, s: Pick<BreathSettings, 'inhale' | 'exhale'>): number {
+  return 60 / roundLength(roundOf(e, s))
+}
+
+/**
+ * A comment on the times chosen, as they change: what that combination is good for, and a gentle
+ * warning when it asks too much (long breaths out, sentences that run out of air). Never pushes
+ * to make them longer: the guide asks for comfort over seconds.
+ */
+export function timingAdvice(e: Exercise, s: Pick<BreathSettings, 'inhale' | 'exhale'>): Advice {
+  const perMinute = Math.round(breathsPerMinute(e, s))
+  const outFaster = s.exhale < s.inhale
+
+  if (e.visual === 'phrases') {
+    if (s.exhale >= 5.5) {
+      return {
+        tone: 'care',
+        title: 'Frases largas',
+        text: 'Es justo cuando más fácil es quedarse sin aire. Con nódulos, mejor parar a respirar antes de apurarlo: si llegas justa, baja el tiempo.',
+      }
+    }
+    if (s.inhale >= 4.5) {
+      return {
+        tone: 'info',
+        title: 'Mucho rato tomando aire',
+        text: 'Para hablar no hace falta llenarse: una toma tranquila de 2 o 3 segundos basta y la voz sale más suelta.',
+      }
+    }
+    if (s.exhale <= 3) {
+      return {
+        tone: 'good',
+        title: 'Para empezar',
+        text: 'Frases muy cortas: te sobra aire y la voz no se cansa. Perfecto para los primeros días o si hoy notas la voz cansada.',
+      }
+    }
+    return {
+      tone: 'good',
+      title: 'Como al hablar en casa',
+      text: 'Una frase corta o media con una toma de aire: lo que más se usa en una conversación normal.',
+    }
+  }
+
+  if (e.visual === 'bar' || e.visual === 'count') {
+    if (s.exhale >= 6.5) {
+      return {
+        tone: 'care',
+        title: 'Salida muy larga',
+        text: 'Sostener el aire tanto rato es exigente. No compitas por durar más: importa que salga igual de principio a fin, sin apretar.',
+      }
+    }
+    if (s.exhale <= 3) {
+      return {
+        tone: 'info',
+        title: 'Salida corta',
+        text: 'Buena para empezar o para días de voz cansada. Cuando te resulte fácil, prueba medio segundo más.',
+      }
+    }
+    return {
+      tone: 'good',
+      title: 'Duración cómoda',
+      text: 'Lo justo para practicar un aire continuo sin quedarte vacía: así se aprende a administrarlo al hablar.',
+    }
+  }
+
+  if (e.visual === 'steps') {
+    const perStep = s.exhale / (e.exhaleSteps ?? 4)
+    if (outFaster) {
+      return {
+        tone: 'care',
+        title: 'Sueltas más rápido que tomas',
+        text: 'Al hacer esfuerzo conviene lo contrario: soltar el aire más despacio, con los labios fruncidos, para no ahogarte en la subida.',
+      }
+    }
+    if (perStep < 0.75) {
+      return {
+        tone: 'info',
+        title: 'Paso rápido',
+        text: 'Para caminar ligero o subir con energía. Si te cuesta seguirlo o te falta el aire, alarga los tiempos y baja el ritmo.',
+      }
+    }
+    if (perStep > 1.25) {
+      return {
+        tone: 'good',
+        title: 'Paso lento',
+        text: 'Ideal para cuestas empinadas, para el principio de una subida o para volver a coger el ritmo después de parar.',
+      }
+    }
+    return {
+      tone: 'good',
+      title: 'Paso de paseo',
+      text: 'Un paso por segundo, más o menos: cómodo para caminar un rato largo sin que te falte el aire.',
+    }
+  }
+
+  // Getting your breath back after an effort: short is fine, the point is breathing out slowly.
+  if (e.category === 'sport' && !outFaster && s.exhale < 7) {
+    return perMinute >= 9
+      ? {
+          tone: 'good',
+          title: 'Justo después del esfuerzo',
+          text: `Unas ${perMinute} respiraciones por minuto: lo cómodo cuando aún jadeas. Según te calmes, puedes alargar un poco.`,
+        }
+      : {
+          tone: 'good',
+          title: 'Para terminar de recuperarte',
+          text: `Unas ${perMinute} respiraciones por minuto: ritmo lento, para cuando ya has cogido aire y quieres volver a la calma.`,
+        }
+  }
+
+  // Circle and pursed lips: relaxing.
+  if (outFaster) {
+    return {
+      tone: 'info',
+      title: 'Activa más que relaja',
+      text: 'Sueltas el aire más rápido de lo que lo tomas. Para calmarte, suéltalo igual de largo o un poco más.',
+    }
+  }
+  if (s.exhale >= 7 || s.exhale / s.inhale >= 2.5) {
+    return {
+      tone: 'care',
+      title: 'Relaja mucho, sin forzar',
+      text: 'Soltar el aire tanto rato calma mucho, pero no hace falta llegar al máximo. Si notas que te falta el aire o te mareas, acórtalo.',
+    }
+  }
+  if (perMinute < 6) {
+    return {
+      tone: 'care',
+      title: 'Muy lento',
+      text: `Unas ${perMinute} respiraciones por minuto: relaja mucho, pero no es para todos. Si te resulta incómodo, vuelve a tiempos más cortos.`,
+    }
+  }
+  if (perMinute <= 8) {
+    return {
+      tone: 'good',
+      title: 'Para relajarte mucho',
+      text: `Unas ${perMinute} respiraciones por minuto: un ritmo lento que baja las pulsaciones. Muy bueno antes de dormir o después de un día largo.`,
+    }
+  }
+  if (perMinute <= 12) {
+    return {
+      tone: 'good',
+      title: 'Para relajarte a diario',
+      text: `Unas ${perMinute} respiraciones por minuto: tranquilo y sin esfuerzo. Bueno para practicar cada día o cuando estás nerviosa.`,
+    }
+  }
+  return {
+    tone: 'info',
+    title: 'Ritmo ágil',
+    text: `Unas ${perMinute} respiraciones por minuto, casi como respirar normal: sirve para aprender la técnica o recuperar el aliento. Para relajarte más, alarga poco a poco.`,
+  }
+}
