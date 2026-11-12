@@ -21,7 +21,8 @@ const toast = useToastStore()
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--nav-height) + var(--safe-bottom) + 88px);
+  bottom: calc(var(--nav-offset, var(--nav-height)) + var(--safe-bottom) + 88px);
+  transition: bottom 0.25s ease;
   z-index: 40;
   padding: 0 var(--gutter);
   pointer-events: none;

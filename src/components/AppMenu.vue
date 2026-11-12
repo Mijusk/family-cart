@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import AppIcon, { type IconName } from './AppIcon.vue'
@@ -12,7 +12,24 @@ const groupStore = useGroupStore()
 const route = useRoute()
 const panel = ref<HTMLElement | null>(null)
 
-const links: { to: string; label: string; hint: string; icon: IconName }[] = [
+interface MenuLink {
+  to: string
+  label: string
+  hint: string
+  icon: IconName
+}
+
+/** The calendar's extras, when the group uses the calendar; they used to sit under Hoy/Semana/Mes. */
+const calendarLinks = computed<MenuLink[]>(() =>
+  groupStore.group.calendarEnabled
+    ? [
+        { to: '/calendario/planificar', label: 'Planificar con IA', hint: 'Prepara la semana con tu chat de IA', icon: 'spark' },
+        { to: '/calendario/carpetas', label: 'Mis carpetas', hint: 'Las carpetas del calendario y con quién las compartes', icon: 'folder' },
+      ]
+    : [],
+)
+
+const links: MenuLink[] = [
   { to: '/respiracion', label: 'Respiración', hint: 'Ejercicios guiados para relajarte, el deporte y el habla', icon: 'wind' },
   { to: '/avisos', label: 'Avisos', hint: 'Lo último que te ha llegado', icon: 'bell' },
   { to: '/cuenta', label: 'Cuenta', hint: 'Tu nombre, tu color y qué te avisa', icon: 'user' },
@@ -60,6 +77,21 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
               <AppIcon name="close" />
             </button>
           </div>
+          <template v-if="calendarLinks.length">
+            <p class="menu-group">Calendario</p>
+            <ul class="menu-links">
+              <li v-for="link in calendarLinks" :key="link.to">
+                <RouterLink :to="link.to" class="menu-link" :class="{ active: route.path.startsWith(link.to) }">
+                  <span class="menu-icon"><AppIcon :name="link.icon" /></span>
+                  <span class="menu-text">
+                    <span class="menu-label">{{ link.label }}</span>
+                    <span class="menu-hint">{{ link.hint }}</span>
+                  </span>
+                </RouterLink>
+              </li>
+            </ul>
+            <p class="menu-group">Más</p>
+          </template>
           <ul class="menu-links">
             <li v-for="link in links" :key="link.to">
               <RouterLink :to="link.to" class="menu-link" :class="{ active: route.path.startsWith(link.to) }">
@@ -134,6 +166,19 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
   margin: 12px 8px 0 0;
   padding: 0;
   list-style: none;
+}
+
+.menu-group {
+  margin: 16px 8px 0 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.menu-group + .menu-links {
+  margin-top: 6px;
 }
 
 .menu-link {

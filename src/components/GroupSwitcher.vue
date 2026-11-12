@@ -4,8 +4,11 @@ import { useRouter } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import AppIcon from './AppIcon.vue'
 
-/** title: the big group name at the top of a screen; eyebrow: the small label above another title. */
-withDefaults(defineProps<{ variant?: 'title' | 'eyebrow' }>(), { variant: 'title' })
+/**
+ * title: the big group name at the top of a screen; eyebrow: the small label above another title;
+ * pill: small, next to a tab's title (in a .title-row, which places the menu).
+ */
+withDefaults(defineProps<{ variant?: 'title' | 'eyebrow' | 'pill' }>(), { variant: 'title' })
 
 const groupStore = useGroupStore()
 const router = useRouter()
@@ -51,7 +54,7 @@ function addGroup() {
         @click="open = !open"
       >
         <span class="name">{{ groupStore.group.name }}</span>
-        <AppIcon name="chevron" :size="variant === 'title' ? 22 : 14" class="chevron" :class="{ flipped: open }" />
+        <AppIcon name="chevron" :size="variant === 'title' ? 22 : variant === 'pill' ? 16 : 14" class="chevron" :class="{ flipped: open }" />
       </button>
     </component>
 
@@ -138,6 +141,34 @@ function addGroup() {
 
 .eyebrow .trigger {
   min-height: 32px;
+}
+
+/* Next to the tab's title: the menu opens under the whole row, from the left. */
+.switcher.pill {
+  position: static;
+  min-width: 0;
+}
+
+.pill .heading {
+  min-width: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.pill .trigger {
+  min-height: 36px;
+  margin-left: 0;
+  padding: 0 10px 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.pill .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu {

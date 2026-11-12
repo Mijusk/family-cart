@@ -139,12 +139,14 @@ function move(id: string, beforeId: string | null, afterId: string | null) {
 <template>
   <div class="page">
     <header class="page-header">
+      <div class="title-row">
+        <h1 class="page-title">Tareas</h1>
+        <GroupSwitcher variant="pill" />
+      </div>
       <div class="header-row">
-        <p class="eyebrow">Tareas</p>
+        <p class="muted">{{ countLabel }}</p>
         <RouterLink :to="{ name: 'task-lists' }" class="header-link"><AppIcon name="list" :size="16" /> Mis listas</RouterLink>
       </div>
-      <GroupSwitcher />
-      <p class="muted">{{ countLabel }}</p>
     </header>
 
     <p v-if="store.status === 'loading'" class="state muted">Cargando…</p>

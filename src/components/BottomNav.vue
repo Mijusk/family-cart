@@ -6,6 +6,9 @@ import { lastCalendarView, lastTasksView } from '@/router/back'
 import { useListStore } from '@/stores/list'
 import AppIcon, { type IconName } from './AppIcon.vue'
 
+/** Slid out of sight while scrolling down (App.vue decides). */
+defineProps<{ hidden?: boolean }>()
+
 const list = useListStore()
 const route = useRoute()
 
@@ -36,7 +39,7 @@ const badges = computed<Record<string, number>>(() => ({
 </script>
 
 <template>
-  <nav class="nav" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
+  <nav class="nav" :class="{ hidden }" aria-label="Secciones" :style="{ '--tabs': tabs.length }">
     <RouterLink v-for="tab in tabs" :key="tab.to" :to="tab.link ?? tab.to" class="tab" :class="{ active: isActive(tab) }">
       <span class="icon">
         <AppIcon :name="tab.icon" :size="24" />
@@ -60,6 +63,17 @@ const badges = computed<Record<string, number>>(() => ({
   padding-bottom: var(--safe-bottom);
   background: var(--surface);
   border-top: 1px solid var(--line);
+  transition: transform 0.25s ease;
+}
+
+.nav.hidden {
+  transform: translateY(100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav {
+    transition: none;
+  }
 }
 
 .tab {
