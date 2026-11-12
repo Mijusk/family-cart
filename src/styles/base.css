@@ -259,9 +259,22 @@ a {
   right: 0;
   bottom: calc(var(--nav-offset, var(--nav-height)) + var(--safe-bottom));
   padding: 12px var(--gutter);
-  transition: bottom 0.25s ease;
+  transition:
+    bottom 0.25s ease,
+    transform 0.25s ease;
   background: linear-gradient(to top, var(--bg) 70%, transparent);
   z-index: 10;
+}
+
+/* While scrolling down the tab bar slides away (App.vue), and the button above it goes with it. */
+.nav-hidden .dock {
+  transform: translateY(calc(100% + var(--safe-bottom)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock {
+    transition: none;
+  }
 }
 
 .dock > * {

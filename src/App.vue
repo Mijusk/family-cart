@@ -51,8 +51,8 @@ watch(
   },
 )
 
-// The tab bar slides away while scrolling down, to leave the screen to the content, and comes
-// back when scrolling up, near the top or the bottom, and on every change of screen (back
+// The tab bar (and the page's button above it, .dock) slides away while scrolling down, to leave
+// the screen to the content, and comes back when scrolling up, near the top or the bottom, and on every change of screen (back
 // button included), so it is never left hidden. Only the person's own scrolling hides it: a view
 // that scrolls by itself (Semana opening on today) leaves it in place.
 const navHidden = ref(false)
