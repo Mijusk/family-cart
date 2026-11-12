@@ -125,17 +125,22 @@ describe('timing', () => {
 describe('timingAdvice', () => {
   const advice = (id: string, inhale: number, exhale: number) => timingAdvice(exerciseById(id)!, { inhale, exhale })
 
-  it('never says anything for the defaults that sounds like a warning', () => {
+  it('never warns about the defaults', () => {
     for (const e of EXERCISES) expect(timingAdvice(e, e).tone).not.toBe('care')
   })
 
   it('relaxing: by breaths a minute and how long you breathe out', () => {
     expect(advice('tranquila', 3, 4).title).toBe('Para relajarte a diario')
     expect(advice('desconectar', 4, 6).title).toBe('Para relajarte mucho')
-    expect(advice('tranquila', 2, 2)).toMatchObject({ tone: 'info', title: 'Ritmo ágil' })
+    expect(advice('tranquila', 2, 2)).toMatchObject({ tone: 'info', title: 'Ritmo corto' })
     expect(advice('tranquila', 4, 3)).toMatchObject({ tone: 'info', title: 'Activa más que relaja' })
     expect(advice('tranquila', 3, 8)).toMatchObject({ tone: 'care', title: 'Relaja mucho, sin forzar' })
     expect(advice('tranquila', 6, 6.5)).toMatchObject({ tone: 'care', title: 'Muy lento' })
+  })
+
+  it('relaxing: the same time in and out gets a second remark', () => {
+    expect(advice('tranquila', 3, 3).extra).toMatch(/mismo tiempo/)
+    expect(advice('tranquila', 3, 4).extra).toBeUndefined()
   })
 
   it('walking: by the pace of each step', () => {
@@ -146,16 +151,19 @@ describe('timingAdvice', () => {
   })
 
   it('getting your breath back: by how much you still need it', () => {
-    expect(advice('recuperar', 2, 4).title).toBe('Justo después del esfuerzo')
-    expect(advice('recuperar', 3, 5).title).toBe('Para terminar de recuperarte')
+    expect(advice('recuperar', 1.5, 3).title).toBe('Justo después del esfuerzo')
+    expect(advice('recuperar', 2, 4).title).toBe('Para recuperarte')
+    expect(advice('recuperar', 4, 6).title).toBe('Ya es para relajarse')
   })
 
-  it('speech: warns gently about long sentences and long breaths out', () => {
+  it('speech: by how long the air has to last, gently past 6,5 s', () => {
     expect(advice('frases', 3, 3).title).toBe('Para empezar')
-    expect(advice('frases', 3, 6)).toMatchObject({ tone: 'care', title: 'Frases largas' })
-    expect(advice('frases', 5, 4).title).toBe('Mucho rato tomando aire')
-    expect(advice('sss', 3, 7).tone).toBe('care')
-    expect(advice('contar', 3, 2.5).title).toBe('Salida corta')
+    expect(advice('frases', 3, 4).title).toBe('Como al hablar en casa')
+    expect(advice('frases', 3, 6)).toMatchObject({ tone: 'info', title: 'Tramo largo' })
+    expect(advice('frases', 3, 7)).toMatchObject({ tone: 'care', title: 'Muy largo con un solo aire' })
+    expect(advice('sss', 3, 2.5).text).toMatch(/la «sss»/)
+    expect(advice('contar', 3, 4).text).toMatch(/contar/)
+    expect(advice('frases', 5, 4).extra).toMatch(/2 o 3 segundos/)
   })
 
   it('counts the rest after a sentence in the breaths a minute', () => {

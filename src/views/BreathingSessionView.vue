@@ -334,9 +334,10 @@ const totalText = computed(() => {
       <div v-if="advice" class="assistant" :class="advice.tone" aria-live="polite">
         <span class="assistant-icon"><AppIcon name="spark" :size="20" /></span>
         <Transition name="advice" mode="out-in">
-          <p :key="advice.title" class="assistant-text">
-            <strong>{{ advice.title }}.</strong> {{ advice.text }}
-          </p>
+          <div :key="advice.title + (advice.extra ?? '')" class="assistant-text">
+            <p><strong>{{ advice.title }}.</strong> {{ advice.text }}</p>
+            <p v-if="advice.extra" class="assistant-extra">{{ advice.extra }}</p>
+          </div>
         </Transition>
       </div>
 
@@ -660,9 +661,19 @@ const totalText = computed(() => {
 }
 
 .assistant-text {
-  margin: 0;
+  display: grid;
+  gap: 6px;
   font-size: 0.9375rem;
   line-height: 1.4;
+}
+
+.assistant-text p {
+  margin: 0;
+}
+
+.assistant-extra {
+  color: var(--text-2);
+  font-size: 0.875rem;
 }
 
 .assistant-text strong {
