@@ -15,6 +15,7 @@ import {
   roundsIn,
   secondsText,
   stepAt,
+  timingHints,
   EXHALE_RANGE,
   INHALE_RANGE,
 } from './breathing'
@@ -117,5 +118,48 @@ describe('timing', () => {
   it('writes seconds the Spanish way', () => {
     expect(secondsText(3)).toBe('3 s')
     expect(secondsText(2.5)).toBe('2,5 s')
+  })
+})
+
+describe('timing hints', () => {
+  const texts = (id: string, inhale: number, exhale: number) => timingHints(exerciseById(id)!, { inhale, exhale })
+
+  it('every exercise has a calm hint with its default times', () => {
+    for (const e of EXERCISES) {
+      const hints = timingHints(e, e)
+      expect(hints.length).toBeGreaterThan(0)
+      expect(hints.every((h) => h.tone === 'info')).toBe(true)
+    }
+  })
+
+  it('relax: short, calm and slow, with breaths a minute', () => {
+    expect(texts('tranquila', 2, 2.5)[0]!.text).toMatch(/^Ritmo corto, unas 13 /)
+    expect(texts('tranquila', 3, 4)[0]!.text).toMatch(/^Ritmo tranquilo, unas 9 /)
+    expect(texts('desconectar', 4, 6)[0]!.text).toMatch(/^Ritmo lento, unas 6 .*dormir/)
+  })
+
+  it('very long or breathing out faster than in: a nudge to change them', () => {
+    expect(texts('desconectar', 6, 8)).toEqual([expect.objectContaining({ tone: 'care', text: expect.stringMatching(/^Muy lenta/) })])
+    expect(texts('caminar', 5, 7.5)[0]!.tone).toBe('care')
+    expect(texts('tranquila', 4, 3)[0]).toMatchObject({ tone: 'care', text: expect.stringMatching(/más deprisa/) })
+  })
+
+  it('relax with the same time in and out says so', () => {
+    expect(texts('tranquila', 3, 3).map((h) => h.text)[1]).toMatch(/mismo tiempo/)
+  })
+
+  it('sport: walking by pace, recovering apart', () => {
+    expect(texts('cuestas', 2, 2.5)[0]!.text).toMatch(/^Ritmo rápido/)
+    expect(texts('caminar', 2, 4)[0]!.text).toMatch(/^Ritmo cómodo/)
+    expect(texts('caminar', 3.5, 5.5)[0]!.text).toMatch(/^Ritmo lento/)
+    expect(texts('recuperar', 2, 4)[0]!.text).toMatch(/^Buena para recuperarte/)
+  })
+
+  it('speech looks at how long the air lasts, and warns past 6,5 s', () => {
+    expect(texts('frases', 3, 2.5)[0]!.text).toMatch(/^Poco aire para hablar/)
+    expect(texts('sss', 3, 4)[0]!.text).toMatch(/^Un tramo cómodo para la «sss»/)
+    expect(texts('contar', 3, 6)[0]!.text).toMatch(/^Un tramo largo para contar/)
+    expect(texts('frases', 3, 7)[0]!.tone).toBe('care')
+    expect(texts('frases', 5, 4).map((h) => h.text)[1]).toMatch(/conversación/)
   })
 })

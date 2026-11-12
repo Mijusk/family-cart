@@ -52,7 +52,31 @@ vocal para nódulos (beber agua, no carraspear ni gritar, frases cortas, pausas 
 guías de respiración con labios fruncidos al caminar y subir (inspirar 2 pasos, espirar 4) de
 servicios de rehabilitación respiratoria.
 
-## 4. Fuera de esta V1
+## 4. Qué te dicen los tiempos (asistente)
+
+Lo pidió Luis (12-nov): al cambiar los segundos, debajo aparece qué tal le va esa combinación
+(`timingHints()` en `src/lib/breathing.ts`, con tests). Una o dos frases, sin alarmar; las que
+invitan a cambiar los tiempos van en ámbar suave (`care`), nunca en rojo. Las reglas, con los textos
+propuestos por Claude (Luis los revisa en el PR):
+
+- **Relajarse y Deporte** miran la respiración entera (tomar + soltar) y cuántas salen por minuto:
+  - Soltar más corto que tomar → «así el cuerpo se activa más que se relaja» (`care`).
+  - 12 s o más → «muy lenta: relaja mucho pero cuesta; si te mareas, baja los tiempos» (`care`).
+  - Relajarse: menos de 5 s «ritmo corto, para empezar»; 5–9 s «tranquilo, para el día a día»;
+    9–12 s «lento, el que más relaja, ideal antes de dormir». Igual tomar que soltar: «equilibrado,
+    para centrarte; alarga el soltar para relajarte más».
+  - Caminar y cuestas: menos de 5 s «rápido, para lo más empinado»; 5–8,5 s «cómodo para caminar o
+    subir»; más «lento, para pasear en llano».
+  - Recuperar el aliento: corto «normal al principio»; 5–9 s «bueno para recuperarte»; más «ya es
+    de relajarse».
+- **Hablar** mira cuánto tiene que durar el aire hablando (o con la «sss», o contando): hasta 3 s
+  «poco, para empezar o con la voz cansada»; hasta 5 s «cómodo, como una frase del día a día»; hasta
+  6,5 s «largo, entrena frases más largas»; más «muy largo: con nódulos no conviene apurar el aire»
+  (`care`). Tomar aire 4,5 s o más: «en una conversación no hay tiempo; practica también con 2–3 s».
+
+Los tiempos de siempre de cada ejercicio dan siempre un consejo `info` (lo vigila un test).
+
+## 5. Fuera de esta V1
 
 - Sonido o vibración en cada fase.
 - Historial de sesiones o rachas.

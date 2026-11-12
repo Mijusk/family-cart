@@ -20,6 +20,7 @@ import {
   roundsIn,
   secondsText,
   stepAt,
+  timingHints,
   type BreathSettings,
   type Exercise,
 } from '@/lib/breathing'
@@ -73,6 +74,9 @@ function resetTimes() {
   if (!exercise.value) return
   settings.value = { ...settings.value, inhale: exercise.value.inhale, exhale: exercise.value.exhale }
 }
+
+/** What the chosen times are good for, updated as they change. */
+const hints = computed(() => (exercise.value ? timingHints(exercise.value, settings.value) : []))
 
 const outLabel = computed(() => (exercise.value?.visual === 'phrases' ? 'Hablar' : 'Soltar el aire'))
 
@@ -317,6 +321,13 @@ const totalText = computed(() => {
             <AppIcon name="plus" />
           </button>
         </div>
+      </div>
+
+      <div class="hints" aria-live="polite">
+        <p v-for="h in hints" :key="h.text" class="hint" :class="h.tone">
+          <AppIcon name="spark" :size="18" />
+          <span>{{ h.text }}</span>
+        </p>
       </div>
 
       <div v-if="exercise.visual === 'phrases'" class="setting">
@@ -610,6 +621,39 @@ const totalText = computed(() => {
   text-align: center;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.hints {
+  display: grid;
+  gap: 8px;
+}
+
+.hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--tone-soft);
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.hint :deep(svg) {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--tone);
+}
+
+/* A nudge to change the times: the soft amber of the app, never red. */
+.hint.care {
+  background: var(--qty-soft);
+}
+
+.hint.care :deep(svg) {
+  color: var(--qty-ink);
 }
 
 .small {

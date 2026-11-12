@@ -443,6 +443,144 @@ export function phraseFor(list: string[], round: number, start = 0): string {
   return list[(start + round) % list.length]!
 }
 
+// ── What the chosen times are good for ─────────────────────────────────────
+
+export interface TimingHint {
+  /** `care`: a nudge to lower the times or change them (never alarming). */
+  tone: 'info' | 'care'
+  text: string
+}
+
+/** Above this, a round is long for anyone: it relaxes a lot, but it is hard to keep up. */
+const VERY_SLOW = 12
+
+/**
+ * The small assistant under the times: what this combination is good for, said as the person
+ * changes it. Relax and sport look at the whole breath (seconds in + out, breaths a minute) and at
+ * whether breathing out is longer than in; speech looks at how long the air has to last while
+ * speaking. Up to two hints, the main one first. Design notes: docs/respiracion.md §4.
+ */
+export function timingHints(e: Exercise, s: Pick<BreathSettings, 'inhale' | 'exhale'>): TimingHint[] {
+  const { inhale, exhale } = s
+  if (e.category === 'speech') return speechHints(e, inhale, exhale)
+
+  const cycle = inhale + exhale
+  const perMinute = Math.round(60 / cycle)
+  const hints: TimingHint[] = []
+
+  if (exhale < inhale) {
+    hints.push({
+      tone: 'care',
+      text: 'Sueltas el aire más deprisa de lo que lo tomas: así el cuerpo se activa más que se relaja. Para calmarte, que soltar dure un poco más que tomar aire.',
+    })
+  } else if (cycle >= VERY_SLOW) {
+    hints.push({
+      tone: 'care',
+      text: `Muy lenta, unas ${perMinute} respiraciones por minuto: relaja mucho, pero cuesta mantenerla. Si te entran ganas de tomar aire antes de tiempo o notas mareo, baja los tiempos: aquí no se trata de aguantar.`,
+    })
+  } else if (e.category === 'relax') {
+    hints.push(relaxHint(cycle, perMinute))
+    if (exhale === inhale) {
+      hints.push({ tone: 'info', text: 'Tomas y sueltas el mismo tiempo: equilibrado, bueno para centrarte. Para relajarte más, alarga un poco el soltar.' })
+    }
+  } else if (e.visual === 'steps') {
+    hints.push(walkingHint(cycle))
+  } else {
+    hints.push(recoverHint(cycle))
+  }
+  return hints
+}
+
+function relaxHint(cycle: number, perMinute: number): TimingHint {
+  if (cycle < 5) {
+    return {
+      tone: 'info',
+      text: `Ritmo corto, unas ${perMinute} respiraciones por minuto: parecido a como respiras sin pensar. Va bien para empezar o para un par de minutos rápidos; para relajarte más, ve alargando poco a poco el soltar.`,
+    }
+  }
+  if (cycle < 9) {
+    return {
+      tone: 'info',
+      text: `Ritmo tranquilo, unas ${perMinute} respiraciones por minuto: bueno para el día a día y para bajar la tensión sin esfuerzo.`,
+    }
+  }
+  return {
+    tone: 'info',
+    text: `Ritmo lento, unas ${perMinute} respiraciones por minuto: el que más relaja. Ideal antes de dormir o después de un día largo.`,
+  }
+}
+
+function walkingHint(cycle: number): TimingHint {
+  if (cycle < 5) {
+    return {
+      tone: 'info',
+      text: 'Ritmo rápido: va bien cuando más aprieta el esfuerzo, como en lo más empinado de una cuesta. Si puedes, alarga un poco el soltar.',
+    }
+  }
+  if (cycle < 8.5) {
+    return {
+      tone: 'info',
+      text: 'Ritmo cómodo para caminar o subir a buen paso: el aire entra corto y sale largo, que es lo que más ayuda a no ahogarse.',
+    }
+  }
+  return {
+    tone: 'info',
+    text: 'Ritmo lento para ir andando: va bien paseando suave o en llano. Subiendo, seguramente te pida tiempos más cortos.',
+  }
+}
+
+function recoverHint(cycle: number): TimingHint {
+  if (cycle < 5) {
+    return {
+      tone: 'info',
+      text: 'Respiración corta: normal al principio, cuando aún te falta el aire. Según te vayas calmando, alarga poco a poco el soltar.',
+    }
+  }
+  if (cycle < 9) {
+    return {
+      tone: 'info',
+      text: 'Buena para recuperarte: aire corto por la nariz y largo por los labios fruncidos. Cuando respires bien, puedes seguir.',
+    }
+  }
+  return {
+    tone: 'info',
+    text: 'Esto ya es una respiración lenta, de relajarse. Si todavía te falta el aire, mejor tiempos más cortos.',
+  }
+}
+
+function speechHints(e: Exercise, inhale: number, exhale: number): TimingHint[] {
+  const what = e.visual === 'bar' ? 'la «sss»' : e.visual === 'count' ? 'contar' : 'hablar'
+  const hints: TimingHint[] = []
+  if (exhale <= 3) {
+    hints.push({
+      tone: 'info',
+      text: `Poco aire para ${what}: va bien para empezar o los días en que la voz está cansada. Equivale a una frase muy corta.`,
+    })
+  } else if (exhale <= 5) {
+    hints.push({
+      tone: 'info',
+      text: `Un tramo cómodo para ${what}, como el de una frase corta del día a día. Es el que más se usa al hablar.`,
+    })
+  } else if (exhale <= 6.5) {
+    hints.push({
+      tone: 'info',
+      text: `Un tramo largo para ${what}: entrena a que el aire te llegue a frases más largas. Para antes de quedarte justa de aire.`,
+    })
+  } else {
+    hints.push({
+      tone: 'care',
+      text: `Muy largo para ${what} con un solo aire: con nódulos no conviene apurar el aire hasta el final. Mejor tramos más cortos y tomar aire más a menudo.`,
+    })
+  }
+  if (inhale >= 4.5) {
+    hints.push({
+      tone: 'info',
+      text: 'En una conversación casi nunca hay tiempo para tomar aire tanto rato: practica también con 2 o 3 segundos.',
+    })
+  }
+  return hints
+}
+
 /** «3 s», «2,5 s». */
 export function secondsText(n: number): string {
   return `${String(n).replace('.', ',')} s`
