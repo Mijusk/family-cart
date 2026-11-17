@@ -363,7 +363,7 @@ export const routineById = (id: string): Routine | undefined => ROUTINES.find((r
 export const HOLD_CHOICES = [10, 15, 20, 30] as const
 export const DEFAULT_HOLD = 15
 /** Seconds between stretches to change position, seeing the next one. */
-export const CHANGE_SECONDS = 5
+export const CHANGE_SECONDS = 3
 /** «Prepárate» before the first one. */
 export const LEAD_IN = 3
 

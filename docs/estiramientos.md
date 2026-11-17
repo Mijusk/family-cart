@@ -24,7 +24,7 @@ dibujo de cada postura. Para todo el mundo, como Respiración (`docs/respiracion
   estira. Solo entran números y colores fijos, así que `StretchFigure.vue` lo pinta con `v-html`.
 - `src/lib/stretching.ts`: las rutinas, sus estiramientos (texto y postura), los consejos y la
   seguridad, y el tiempo de la sesión: «Prepárate» 3 s, cada estiramiento lo que se elija (10, 15, 20
-  o 30 s; la sentadilla sumo, el doble) y 5 s para cambiar de postura viendo el siguiente.
+  o 30 s; la sentadilla sumo, el doble) y 3 s para cambiar de postura viendo el siguiente.
   `momentAt()`, `nextStart()` (Saltar) y `previousStart()` (Anterior) son funciones puras con tests.
 - `StretchingView.vue` (`/estiramientos`): la rutina, todos sus dibujos (tocar uno empieza desde ahí,
   `?desde=N`), consejos e «Importante».

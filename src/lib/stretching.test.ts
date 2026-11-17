@@ -73,31 +73,31 @@ describe('the session', () => {
     expect(plan[1]).toEqual({ kind: 'hold', index: 0, start: LEAD_IN, seconds: 15 })
     expect(plan[2]).toEqual({ kind: 'change', index: 1, start: LEAD_IN + 15, seconds: CHANGE_SECONDS })
     expect(plan).toHaveLength(36)
-    // 3 + 17 × 15 + 30 + 17 × 5
-    expect(planLength(plan)).toBe(3 + 17 * 15 + 30 + 17 * 5)
+    // 3 + 17 × 15 + 30 + 17 × 3
+    expect(planLength(plan)).toBe(3 + 17 * 15 + 30 + 17 * 3)
   })
 
   it('says where it is and how many seconds are left', () => {
     expect(momentAt(plan, 0)).toMatchObject({ segment: { kind: 'ready' }, secondsLeft: 3 })
     expect(momentAt(plan, 3)).toMatchObject({ segment: { kind: 'hold', index: 0 }, secondsLeft: 15, progress: 0 })
     expect(momentAt(plan, 17.9)).toMatchObject({ segment: { kind: 'hold', index: 0 }, secondsLeft: 1 })
-    expect(momentAt(plan, 18)).toMatchObject({ segment: { kind: 'change', index: 1 }, secondsLeft: 5 })
+    expect(momentAt(plan, 18)).toMatchObject({ segment: { kind: 'change', index: 1 }, secondsLeft: 3 })
     expect(momentAt(plan, planLength(plan) - 0.1)).toMatchObject({ segment: { kind: 'hold', index: 17 } })
     expect(momentAt(plan, planLength(plan))).toBeNull()
   })
 
   it('«Saltar» goes to holding the next stretch, and past the last one ends', () => {
     expect(nextStart(plan, 1)).toBe(3)
-    expect(nextStart(plan, 5)).toBe(23)
-    expect(nextStart(plan, 19)).toBe(23)
+    expect(nextStart(plan, 5)).toBe(21)
+    expect(nextStart(plan, 19)).toBe(21)
     expect(nextStart(plan, planLength(plan) - 1)).toBeNull()
     expect(nextStart(plan, planLength(plan) + 1)).toBeNull()
   })
 
   it('«Anterior» restarts the stretch, or goes to the one before if it has just begun', () => {
     expect(previousStart(plan, 10)).toBe(3)
-    expect(previousStart(plan, 24)).toBe(3)
-    expect(previousStart(plan, 30)).toBe(23)
+    expect(previousStart(plan, 22)).toBe(3)
+    expect(previousStart(plan, 30)).toBe(21)
     expect(previousStart(plan, 20)).toBe(3)
     expect(previousStart(plan, 1)).toBe(3)
     expect(previousStart(plan, planLength(plan) + 5)).toBe(plan[35]!.start)
