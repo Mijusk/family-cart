@@ -38,6 +38,7 @@ const paths = {
   leaf: '<path d="M5 19c0-8 5-14 15-14 0 10-6 15-13 15"/><path d="M5 19c3-4 6-6.5 10-8.5"/>',
   mountain: '<path d="m2.5 19.5 6.5-11 4 6.5 2.5-3.5 6 8z"/><path d="m7.2 11.5 1.8 1.5 1.6-1.6"/>',
   voice: '<rect x="9" y="3" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"/>',
+  stretch: '<circle cx="12" cy="4.5" r="2"/><path d="M4.5 8.5 12 10l7.5-1.5M12 10v5l-4 5.5M12 15l4 5.5"/>',
   play: '<path d="M7.5 5v14l11.5-7z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
 } as const

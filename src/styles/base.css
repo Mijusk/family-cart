@@ -482,6 +482,13 @@ a {
   --tone-bright: #e6be6a;
 }
 
+/* Estiramientos */
+.tone-stretch {
+  --tone: var(--primary);
+  --tone-soft: var(--primary-soft);
+  --tone-bright: #8fbf9f;
+}
+
 .tone-speech {
   --tone: var(--warn);
   --tone-soft: var(--warn-soft);

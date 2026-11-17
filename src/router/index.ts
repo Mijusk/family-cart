@@ -138,6 +138,19 @@ export const router = createRouter({
       meta: { hideNav: true },
     },
     {
+      // In the menu (AppMenu): the routines and their stretches. Design notes: docs/estiramientos.md.
+      path: '/estiramientos',
+      name: 'stretching',
+      component: () => import('@/views/StretchingView.vue'),
+    },
+    {
+      // Following a routine, full screen; ?desde=N starts at the N-th stretch (from 1).
+      path: '/estiramientos/:id',
+      name: 'stretching-routine',
+      component: () => import('@/views/StretchingSessionView.vue'),
+      meta: { hideNav: true },
+    },
+    {
       path: '/cuenta',
       name: 'account',
       component: () => import('@/views/AccountView.vue'),
