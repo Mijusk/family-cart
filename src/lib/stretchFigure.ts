@@ -49,7 +49,11 @@ export interface Pose {
   legsOverBody?: boolean
   /** Flip it left to right: the same stretch on the other side. */
   mirror?: boolean
+  /** What is under the figure: a mat (default), just the floor, or a chair seen from the front or the side. */
+  scene?: Scene
 }
+
+export type Scene = 'mat' | 'floor' | 'chair-front' | 'chair-side'
 
 export const FLOOR = 140
 
@@ -67,6 +71,9 @@ export const FIGURE_COLORS = {
   matEdge: '#e6be6a',
   arrow: '#d9a441',
   board: '#eef3ea',
+  floor: '#d9e1d3',
+  chair: '#c9a77c',
+  chairDark: '#a9865a',
 } as const
 
 const C = FIGURE_COLORS
@@ -150,6 +157,33 @@ function arrowSvg([from, via, to]: Arrow): string {
   )
 }
 
+/** The mat, the floor or the chair, drawn behind the figure. */
+function sceneSvg(scene: Scene): string {
+  const floor = `<rect x="12" y="${FLOOR}" width="176" height="4" rx="2" fill="${C.floor}"/>`
+  switch (scene) {
+    case 'floor':
+      return floor
+    case 'chair-front':
+      return (
+        floor +
+        line([80, 118], [80, FLOOR], 4, C.chairDark) +
+        line([120, 118], [120, FLOOR], 4, C.chairDark) +
+        `<rect x="79" y="58" width="42" height="52" rx="8" fill="${C.chair}"/>` +
+        `<rect x="72" y="110" width="56" height="9" rx="4" fill="${C.chairDark}"/>`
+      )
+    case 'chair-side':
+      return (
+        floor +
+        line([82, 118], [82, FLOOR], 4, C.chairDark) +
+        line([118, 118], [118, FLOOR], 4, C.chairDark) +
+        `<rect x="74" y="60" width="9" height="56" rx="4" fill="${C.chair}"/>` +
+        `<rect x="74" y="110" width="50" height="9" rx="4" fill="${C.chairDark}"/>`
+      )
+    default:
+      return `<rect x="12" y="${FLOOR}" width="176" height="7" rx="3.5" fill="${C.mat}" stroke="${C.matEdge}" stroke-width="1.5"/>`
+  }
+}
+
 /** The whole drawing, board and mat included, as an SVG document. */
 export function figureSvg(p: Pose, title = ''): string {
   const out: string[] = []
@@ -158,7 +192,7 @@ export function figureSvg(p: Pose, title = ''): string {
   const shoulders = p.shoulders ?? 13
   const waist = p.waist ?? 10
 
-  out.push(`<rect x="12" y="${FLOOR}" width="176" height="7" rx="3.5" fill="${C.mat}" stroke="${C.matEdge}" stroke-width="1.5"/>`)
+  out.push(sceneSvg(p.scene ?? 'mat'))
   p.arms.filter(far).forEach((a) => out.push(armSvg(a)))
   p.legs.filter(far).forEach((l) => out.push(legSvg(l)))
   out.push(line(p.neck, p.headNeck, 8, C.skinFar))

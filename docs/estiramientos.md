@@ -15,6 +15,10 @@ dibujo de cada postura. Para todo el mundo, como Respiración (`docs/respiracion
    «Siguiente: …».
 4. **Sin migración ni recordatorio** en esta V1.
 
+5. **Dos rutinas más** (Luis, 18-nov): «Pausa en el trabajo», para quien está sentado en la oficina,
+   de 3 minutos como mucho, y «Después de entrenar», de menos de 5. Cada una sale de un vídeo corto
+   (§3b), igual que la primera: se copian las posturas, los dibujos y los textos son propios.
+
 ## 2. Cómo funciona
 
 - `src/lib/stretchFigure.ts` (función pura con tests): dibuja el personaje a partir de sus
@@ -26,7 +30,10 @@ dibujo de cada postura. Para todo el mundo, como Respiración (`docs/respiracion
   seguridad, y el tiempo de la sesión: «Prepárate» 3 s, cada estiramiento lo que se elija (10, 15, 20
   o 30 s; la sentadilla sumo, el doble) y 3 s para cambiar de postura viendo el siguiente.
   `momentAt()`, `nextStart()` (Saltar) y `previousStart()` (Anterior) son funciones puras con tests.
-- `StretchingView.vue` (`/estiramientos`): la rutina, todos sus dibujos (tocar uno empieza desde ahí,
+- Cada rutina tiene su tiempo por defecto (`defaultHold`: 15 s al despertar y después de entrenar,
+  10 s en el trabajo), su dibujo de portada (`cover`) y su frase final. Los dibujos pueden ir sobre
+  la esterilla, el suelo o una silla vista de frente o de lado (`scene`).
+- `StretchingView.vue` (`/estiramientos?rutina=trabajo|entreno`): pestañas por rutina, cada una con todos sus dibujos (tocar uno empieza desde ahí,
   `?desde=N`), consejos e «Importante».
 - `StretchingSessionView.vue` (`/estiramientos/:id`, sin barra): el tiempo de cada estiramiento se
   guarda en el dispositivo (`localStorage`). Se pausa sola si la app pasa a segundo plano y mantiene
@@ -52,8 +59,37 @@ dibujo de cada postura. Para todo el mundo, como Respiración (`docs/respiracion
 En el vídeo, «cuello hacia delante» se hace con las manos en la nuca; aquí se dibuja con las manos
 en las rodillas y el texto dice que se pueden apoyar en la nuca sin tirar.
 
+## 3b. Las rutinas del 18-nov
+
+**Pausa en el trabajo** (10 s cada uno, unos 2 min 56 s). Sale del vídeo «Estiramientos en el
+puesto de trabajo» de Mutua Montañesa (2:40), quitando lo que es calentamiento para trabajo físico
+y separando los dos lados:
+
+| # | Estiramiento | Dibujo |
+|---|---|---|
+| 1–2 | Cuello hacia la derecha / izquierda | en la silla, de frente |
+| 3 | Círculos con los hombros | en la silla, de frente |
+| 4–5 | Hombro derecho / izquierdo (brazo cruzado) | en la silla, de frente |
+| 6–7 | Tríceps derecho / izquierdo | en la silla, de frente |
+| 8 | Muñecas (20 s, a mitad cambia de mano) | en la silla, de lado |
+| 9 | Espalda alta (manos al frente) | en la silla, de lado |
+| 10–11 | De pie: costado izquierdo / derecho | de pie, de frente |
+| 12 | De pie: muslos (20 s, a mitad cambia de pierna) | de pie, de lado |
+
+**Después de entrenar** (15 s cada uno, unos 3 min 36 s). Sale del vídeo «Estiramientos para
+después del entrenamiento» de GymVirtual (3:02), todos de pie:
+
+| # | Estiramiento |
+|---|---|
+| 1–3 | Piernas abiertas: al centro, a la derecha y a la izquierda |
+| 4–5 | Zancada lateral a la derecha / izquierda |
+| 6–7 | Detrás del muslo derecho / izquierdo (pierna delante sobre el talón) |
+| 8 | Espalda colgando |
+| 9–10 | Muslo derecho / izquierdo (talón al glúteo) |
+| 11–12 | Cuello hacia la derecha / izquierda |
+
 ## 4. Fuera de esta V1
 
-- Más rutinas (espalda, oficina, antes de dormir, después del deporte).
+- Más rutinas (espalda, antes de dormir).
 - Recordatorio diario (como el de Respiración, con migración).
 - Sonido o vibración al cambiar de estiramiento.
