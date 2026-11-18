@@ -31,7 +31,7 @@ const calendarLinks = computed<MenuLink[]>(() =>
 
 const links: MenuLink[] = [
   { to: '/respiracion', label: 'Respiración', hint: 'Ejercicios guiados para relajarte, el deporte y el habla', icon: 'wind' },
-  { to: '/estiramientos', label: 'Estiramientos', hint: 'Rutinas guiadas con dibujos, a tu ritmo', icon: 'stretch' },
+  { to: '/estiramientos', label: 'Estiramientos', hint: 'Al despertar, en el trabajo y después de entrenar', icon: 'stretch' },
   { to: '/avisos', label: 'Avisos', hint: 'Lo último que te ha llegado', icon: 'bell' },
   { to: '/cuenta', label: 'Cuenta', hint: 'Tu nombre, tu color y qué te avisa', icon: 'user' },
 ]

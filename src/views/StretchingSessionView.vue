@@ -5,6 +5,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import StretchFigure from '@/components/StretchFigure.vue'
 import {
   HOLD_CHOICES,
+  ROUTINES,
   SAFETY,
   cleanHold,
   durationText,
@@ -25,7 +26,8 @@ const route = useRoute()
 const routine = computed<Routine | undefined>(() => routineById(String(route.params.id)))
 
 function back() {
-  goBack({ name: 'stretching' })
+  const first = routine.value?.id === ROUTINES[0]!.id
+  goBack({ name: 'stretching', query: routine.value && !first ? { rutina: routine.value.id } : {} })
 }
 
 // ── Hold time, per routine, on this device ───────────────────
@@ -35,9 +37,9 @@ const storageKey = (r: Routine) => `family-app:stretching:${r.id}`
 function readHold(r: Routine | undefined): number {
   if (!r) return cleanHold(null)
   try {
-    return cleanHold(JSON.parse(localStorage.getItem(storageKey(r)) ?? 'null'))
+    return cleanHold(JSON.parse(localStorage.getItem(storageKey(r)) ?? 'null'), r.defaultHold)
   } catch {
-    return cleanHold(null)
+    return cleanHold(null, r.defaultHold)
   }
 }
 
@@ -79,6 +81,17 @@ const kind = computed(() => moment.value?.segment.kind ?? null)
 const index = computed(() => moment.value?.segment.index ?? firstIndex.value)
 const stretch = computed(() => routine.value?.stretches[index.value])
 const upNext = computed(() => routine.value?.stretches[index.value + 1])
+
+/** «El último se aguanta el doble», «Los de las muñecas y los muslos duran el doble»… */
+const longText = computed(() => {
+  const list = routine.value?.stretches ?? []
+  const longs = list.filter((s) => s.long)
+  if (!longs.length) return ''
+  if (longs.length === 1 && list[list.length - 1] === longs[0]) return 'El último dura el doble.'
+  const names = longs.map((s) => s.title.replace(/^De pie: /, '').toLowerCase())
+  const joined = names.length > 1 ? `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}` : names[0]
+  return `${names.length > 1 ? 'Los de' : 'El de'} ${joined} ${names.length > 1 ? 'duran' : 'dura'} el doble, para hacer los dos lados.`
+})
 
 function tick(now: number) {
   elapsed.value = (now - startedAt) / 1000
@@ -216,7 +229,7 @@ const counterText = computed(() => {
         </div>
         <p class="muted small">
           {{ routine.stretches.length }} estiramientos, unos {{ durationText(total) }} en total, con unos segundos para
-          cambiar de postura entre uno y otro. El último se aguanta el doble.
+          cambiar de postura entre uno y otro. {{ longText }}
         </p>
         <button type="button" class="btn btn-primary btn-block" @click="start">
           <AppIcon name="play" :size="20" /> Empezar
@@ -225,8 +238,8 @@ const counterText = computed(() => {
     </template>
 
     <section v-else-if="state === 'done'" class="panel done">
-      <StretchFigure class="figure small-figure" :pose="routine.stretches[8]!.pose" />
-      <p class="done-text">¡Bien hecho! Cuerpo despierto. Bebe un poco de agua y a por el día.</p>
+      <StretchFigure class="figure small-figure" :pose="routine.stretches[routine.cover]!.pose" />
+      <p class="done-text">{{ routine.doneText }}</p>
       <div class="actions">
         <button type="button" class="btn btn-ghost" @click="again">Otra vez</button>
         <button type="button" class="btn btn-primary" @click="back">Terminar</button>
