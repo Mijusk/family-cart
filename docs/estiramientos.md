@@ -114,9 +114,9 @@ Cómo está hecho:
   necesita estado.
 - `src/stores/stretching.ts` carga los días. Una rutina terminada sin conexión espera en el
   dispositivo (y ya cuenta en pantalla) y se manda al volver la red.
-- `StreakCard.vue`: llama con los días seguidos (encendida si hoy ya está), la semana L–D (✓ estirado,
+- `StreakFlame.vue`: un fuego con el número de días dentro (naranja si hoy ya está, gris si falta). `StreakCard.vue`: ese fuego grande y «N días seguidos», la semana L–D (✓ estirado,
   escudo = comodín, discontinuo = hoy) y si el comodín de la semana está libre. Arriba en
-  Estiramientos y, más pequeña, al terminar una rutina.
+  Estiramientos y, más pequeña, al terminar una rutina. El fuego pequeño sale también junto a Estiramientos en el menú (con racha > 0).
 
 ## 5. Fuera de esta V1
 
