@@ -3,15 +3,19 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import { useInboxStore } from '@/stores/inbox'
+import { useStretchingStore } from '@/stores/stretching'
 import { firstName, greeting, hourIn } from '@/utils/greeting'
 import AppIcon from './AppIcon.vue'
 import AppMenu from './AppMenu.vue'
 
-// Above every screen with the tab bar: a greeting for the time of day, the bell (the latest
-// notifications) and the menu with the extra sections (Respiración…).
+// Above every screen with the tab bar: a greeting for the time of day, the stretching streak's
+// fire (docs/estiramientos.md §4), the bell (the latest notifications) and the menu with the
+// extra sections (Respiración…).
 
 const groupStore = useGroupStore()
 const inbox = useInboxStore()
+const stretching = useStretchingStore()
+if (stretching.status === 'idle') void stretching.load()
 const menuOpen = ref(false)
 
 // The greeting follows the clock with the app open.
@@ -26,6 +30,11 @@ const bellLabel = computed(() => {
   const n = inbox.unreadCount
   return n ? `Avisos, ${n} ${n === 1 ? 'nuevo' : 'nuevos'}` : 'Avisos'
 })
+const streakLabel = computed(() => {
+  const s = stretching.streak
+  const days = `${s.current} ${s.current === 1 ? 'día' : 'días'}`
+  return `Racha de estiramientos: ${days}${s.doneToday ? ', hoy ya está' : ', hoy te falta'}`
+})
 </script>
 
 <template>
@@ -34,6 +43,16 @@ const bellLabel = computed(() => {
       {{ hello }}<template v-if="name">, <strong>{{ name }}</strong></template>
     </p>
     <div class="actions">
+      <RouterLink
+        v-if="stretching.status === 'ready'"
+        :to="{ name: 'stretching' }"
+        class="streak"
+        :class="{ lit: stretching.streak.doneToday }"
+        :aria-label="streakLabel"
+      >
+        <AppIcon name="flame" :size="20" />
+        <span>{{ stretching.streak.current }}</span>
+      </RouterLink>
       <RouterLink :to="{ name: 'notifications' }" class="icon-btn bell" :aria-label="bellLabel">
         <AppIcon name="bell" />
         <span v-if="inbox.unreadCount" class="badge" aria-hidden="true">{{ inbox.unreadCount > 9 ? '9+' : inbox.unreadCount }}</span>
@@ -74,7 +93,27 @@ const bellLabel = computed(() => {
 
 .actions {
   display: flex;
+  align-items: center;
   flex-shrink: 0;
+}
+
+/* The streak: orange once today's stretching is done, grey while it's still to do. */
+.streak {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 36px;
+  margin-right: 2px;
+  padding: 0 10px 0 7px;
+  border-radius: 999px;
+  color: var(--text-2);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.streak.lit {
+  background: var(--qty-soft);
+  color: #c2581c;
 }
 
 .bell {

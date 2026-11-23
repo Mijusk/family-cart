@@ -452,6 +452,25 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"stretch_sessions": {
+                  Row: {
+                    "created_at": string,"day": string,"id": string,"person_id": string,"routine": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"day": string,"id"?: string,"person_id": string,"routine": string
+                  }
+                  Update: {
+                    "created_at"?: string,"day"?: string,"id"?: string,"person_id"?: string,"routine"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "stretch_sessions_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: false
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"task_list_shares": {
                   Row: {
                     "group_id": string,"list_id": string,"shared_at": string,"shared_by": string | null
@@ -748,6 +767,9 @@ isOneToOne: false
                            },
 "leave_group":
 { Args: { "gid": string }; Returns: undefined
+                           },
+"log_stretch_session":
+{ Args: { "local_day": string,"routine": string }; Returns: undefined
                            },
 "mark_notifications_seen":
 { Args: Record<PropertyKey, never>; Returns: undefined

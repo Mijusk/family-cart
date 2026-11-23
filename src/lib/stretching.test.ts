@@ -26,16 +26,30 @@ describe('routines', () => {
     expect(morning.stretches.filter((s) => s.long).map((s) => s.id)).toEqual(['sumo'])
   })
 
-  it('every routine has a title, tips and stretches with how to do them', () => {
+  it('every routine has a title, tips, a cover and stretches with how to do them; ids unique across all', () => {
     for (const r of ROUTINES) {
       expect(r.title).not.toBe('')
       expect(r.tips.length).toBeGreaterThan(0)
+      expect(r.stretches[r.cover]).toBeDefined()
+      expect(cleanHold(r.defaultHold)).toBe(r.defaultHold)
       for (const s of r.stretches) expect(s.how.length).toBeGreaterThan(20)
     }
+    const ids = ROUTINES.flatMap((r) => r.stretches.map((s) => s.id))
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(ROUTINES.map((r) => r.id)).size).toBe(ROUTINES.length)
+  })
+
+  it('the break at work lasts 3 minutes at most and the one after training under 5, with their default times', () => {
+    const length = (id: string) => {
+      const r = routineById(id)!
+      return planLength(planOf(r.stretches, r.defaultHold))
+    }
+    expect(length('trabajo')).toBeLessThanOrEqual(180)
+    expect(length('entreno')).toBeLessThan(300)
   })
 
   it('every pose draws an SVG inside its board', () => {
-    for (const s of morning.stretches) {
+    for (const s of ROUTINES.flatMap((r) => r.stretches)) {
       const svg = figureSvg(s.pose, s.title)
       expect(svg.startsWith('<svg')).toBe(true)
       expect(svg).toContain(`aria-label="${s.title}"`)
@@ -59,6 +73,7 @@ describe('settings', () => {
     expect(cleanHold({ hold: 12 })).toBe(DEFAULT_HOLD)
     expect(cleanHold(null)).toBe(DEFAULT_HOLD)
     expect(cleanHold('15')).toBe(DEFAULT_HOLD)
+    expect(cleanHold(null, 10)).toBe(10)
   })
 
   it('the long ones are held twice as long', () => {

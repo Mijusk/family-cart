@@ -534,6 +534,21 @@ select set_breathing_reminder(null);
 select tests.check('breathing: and he turns it off',
   (select breathing_reminder_time is null from people where id = my_person_id()));
 
+-- ── Stretching streak: each person writes and reads only their own days ──
+select log_stretch_session('despertar', current_date);
+select log_stretch_session('trabajo', current_date - 1);
+select tests.check('streak: daniel logs today and yesterday',
+  (select count(*) from stretch_sessions where person_id = my_person_id()) = 2);
+select tests.expect_error('streak: not a day long ago', $$select log_stretch_session('despertar', current_date - 5)$$, 'invalid stretch day');
+select tests.expect_error('streak: not a day ahead', $$select log_stretch_session('despertar', current_date + 3)$$, 'invalid stretch day');
+select tests.expect_error('streak: not by a direct insert',
+  $$insert into stretch_sessions (person_id, day, routine) values (my_person_id(), current_date - 10, 'despertar')$$, 'permission denied');
+select tests.expect_error('streak: no changing days', $$update stretch_sessions set day = current_date - 10$$, 'permission denied');
+select tests.expect_error('streak: no deleting', $$delete from stretch_sessions$$, 'permission denied');
+select tests.as_user('marta@ejemplo.com');
+select tests.check('streak: marta does not see daniel''s', not exists (select 1 from stretch_sessions));
+select tests.as_user('daniel@ejemplo.com');
+
 -- ── Connected AI apps (OAuth tokens): only what the mcp function uses ──
 reset role;
 -- An OAuth session of Marta's, as Supabase Auth leaves it when she allows an app.
@@ -613,6 +628,10 @@ select tests.api('GET', 'notifications');
 select tests.expect_error('ai: cannot read the bell''s list', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('POST', 'rpc/set_breathing_reminder');
 select tests.expect_error('ai: cannot set the reminder to breathe', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('POST', 'rpc/log_stretch_session');
+select tests.expect_error('ai: cannot fill in the stretching streak', $$select public.check_api_request()$$, 'not allowed for connected apps');
+select tests.api('GET', 'stretch_sessions');
+select tests.expect_error('ai: cannot read the stretching streak', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('GET', 'event_history');
 select tests.expect_error('ai: cannot read the history', $$select public.check_api_request()$$, 'not allowed for connected apps');
 select tests.api('GET', 'rpc/busy_events');

@@ -1,15 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import StreakCard from '@/components/StreakCard.vue'
 import StretchFigure from '@/components/StretchFigure.vue'
-import { DEFAULT_HOLD, ROUTINES, SAFETY, durationText, planLength, planOf } from '@/lib/stretching'
+import { ROUTINES, SAFETY, durationText, planLength, planOf, routineById } from '@/lib/stretching'
+import { useStretchingStore } from '@/stores/stretching'
 
-// Estiramientos, in the menu: the routines (for now, the morning one), each stretch drawn, tips
-// and what to keep in mind. Following one is StretchingSessionView. Design notes: docs/estiramientos.md.
+// Estiramientos, in the menu: the routines (al despertar, pausa en el trabajo, después de entrenar),
+// each stretch drawn, tips and what to keep in mind. Following one is StretchingSessionView.
+// Design notes: docs/estiramientos.md.
 
-const routine = ROUTINES[0]!
-const duration = computed(() => durationText(planLength(planOf(routine.stretches, DEFAULT_HOLD))))
+const route = useRoute()
+const router = useRouter()
+const stretching = useStretchingStore()
+void stretching.load()
+
+/** The routine on screen goes in the URL (?rutina=), so back and a reload keep it. */
+const routine = computed(() => routineById(String(route.query.rutina ?? '')) ?? ROUTINES[0]!)
+const duration = computed(() => durationText(planLength(planOf(routine.value.stretches, routine.value.defaultHold))))
+
+function pick(id: string) {
+  void router.replace({ query: { ...route.query, rutina: id === ROUTINES[0]!.id ? undefined : id } })
+}
 </script>
 
 <template>
@@ -20,8 +33,25 @@ const duration = computed(() => durationText(planLength(planOf(routine.stretches
       <p class="muted">Rutinas guiadas, con un dibujo de cada estiramiento y el tiempo que toca.</p>
     </header>
 
-    <section class="hero">
-      <StretchFigure class="hero-figure" :pose="routine.stretches[8]!.pose" />
+    <StreakCard v-if="stretching.status === 'ready'" :streak="stretching.streak" />
+
+    <div class="kinds" role="tablist" aria-label="Rutina">
+      <button
+        v-for="r in ROUTINES"
+        :key="r.id"
+        type="button"
+        role="tab"
+        class="kind"
+        :aria-selected="r.id === routine.id"
+        @click="pick(r.id)"
+      >
+        <StretchFigure class="kind-figure" :pose="r.stretches[r.cover]!.pose" />
+        <span class="kind-label">{{ r.label }}</span>
+      </button>
+    </div>
+
+    <section class="hero" role="tabpanel" :aria-label="routine.title">
+      <StretchFigure class="hero-figure" :pose="routine.stretches[routine.cover]!.pose" />
       <div class="hero-text">
         <h2 class="hero-title">{{ routine.title }}</h2>
         <p>{{ routine.intro }}</p>
@@ -68,10 +98,52 @@ const duration = computed(() => durationText(planLength(planOf(routine.stretches
 </template>
 
 <style scoped>
+.kinds {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 var(--gutter);
+}
+
+.streak + .kinds {
+  margin-top: 14px;
+}
+
+.kind {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  padding: 6px 6px 10px;
+  border-radius: 16px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  text-align: center;
+  transition:
+    background-color 0.2s,
+    border-color 0.2s;
+}
+
+.kind-figure {
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.kind[aria-selected='true'] {
+  border-color: var(--tone);
+  background: var(--tone);
+  color: #fff;
+}
+
 .hero {
   display: grid;
   gap: 14px;
-  margin: 0 var(--gutter);
+  margin: 14px var(--gutter) 0;
   padding: 16px;
   border-radius: 20px;
   background: linear-gradient(135deg, var(--tone-soft), color-mix(in srgb, var(--tone-soft) 40%, var(--surface)));
