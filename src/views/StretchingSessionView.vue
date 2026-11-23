@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import StreakCard from '@/components/StreakCard.vue'
 import StretchFigure from '@/components/StretchFigure.vue'
 import {
   HOLD_CHOICES,
@@ -17,12 +18,16 @@ import {
   routineById,
   type Routine,
 } from '@/lib/stretching'
+import { countsForStreak } from '@/lib/streak'
 import { goBack } from '@/router/back'
+import { useStretchingStore } from '@/stores/stretching'
 
 // Following a routine, full screen: each stretch drawn big with its countdown, a few seconds to
 // change between them seeing the next one, and pause, back and skip. The hold time stays on the device.
 
 const route = useRoute()
+const stretching = useStretchingStore()
+void stretching.load()
 const routine = computed<Routine | undefined>(() => routineById(String(route.params.id)))
 
 function back() {
@@ -75,6 +80,10 @@ const state = ref<State>('setup')
 const elapsed = ref(0)
 let startedAt = 0
 let frame = 0
+// Seconds actually followed (not skipped): most of the routine makes the day count for the streak.
+let followed = 0
+let lastFrame = 0
+const counted = ref(false)
 
 const moment = computed(() => (state.value === 'setup' ? null : momentAt(plan.value, elapsed.value)))
 const kind = computed(() => moment.value?.segment.kind ?? null)
@@ -94,6 +103,9 @@ const longText = computed(() => {
 })
 
 function tick(now: number) {
+  const step = (now - lastFrame) / 1000
+  if (step > 0 && step < 1) followed += step
+  lastFrame = now
   elapsed.value = (now - startedAt) / 1000
   if (!momentAt(plan.value, elapsed.value)) {
     finish()
@@ -106,6 +118,7 @@ function runFrom(seconds: number) {
   cancelAnimationFrame(frame)
   elapsed.value = seconds
   startedAt = performance.now() - seconds * 1000
+  lastFrame = performance.now()
   if (state.value === 'running') frame = requestAnimationFrame(tick)
 }
 
@@ -131,6 +144,10 @@ function finish() {
   cancelAnimationFrame(frame)
   state.value = 'done'
   void letSleep()
+  if (!counted.value && routine.value && countsForStreak(followed, total.value)) {
+    counted.value = true
+    void stretching.logSession(routine.value.id)
+  }
 }
 
 function skip() {
@@ -146,6 +163,8 @@ function previous() {
 function again() {
   state.value = 'setup'
   elapsed.value = 0
+  followed = 0
+  counted.value = false
 }
 
 // Hidden (another app, screen off): paused, so it doesn't run on without anyone.
@@ -240,6 +259,8 @@ const counterText = computed(() => {
     <section v-else-if="state === 'done'" class="panel done">
       <StretchFigure class="figure small-figure" :pose="routine.stretches[routine.cover]!.pose" />
       <p class="done-text">{{ routine.doneText }}</p>
+      <StreakCard v-if="counted" class="done-streak" :streak="stretching.streak" compact />
+      <p v-else class="muted small">Para la racha cuenta terminar la rutina, o casi entera.</p>
       <div class="actions">
         <button type="button" class="btn btn-ghost" @click="again">Otra vez</button>
         <button type="button" class="btn btn-primary" @click="back">Terminar</button>
@@ -470,6 +491,10 @@ const counterText = computed(() => {
 
 .done .actions {
   padding: 0;
+}
+
+.done-streak {
+  text-align: left;
 }
 
 .done-text {

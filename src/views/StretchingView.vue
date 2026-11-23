@@ -2,8 +2,10 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import StreakCard from '@/components/StreakCard.vue'
 import StretchFigure from '@/components/StretchFigure.vue'
 import { ROUTINES, SAFETY, durationText, planLength, planOf, routineById } from '@/lib/stretching'
+import { useStretchingStore } from '@/stores/stretching'
 
 // Estiramientos, in the menu: the routines (al despertar, pausa en el trabajo, después de entrenar),
 // each stretch drawn, tips and what to keep in mind. Following one is StretchingSessionView.
@@ -11,6 +13,8 @@ import { ROUTINES, SAFETY, durationText, planLength, planOf, routineById } from 
 
 const route = useRoute()
 const router = useRouter()
+const stretching = useStretchingStore()
+void stretching.load()
 
 /** The routine on screen goes in the URL (?rutina=), so back and a reload keep it. */
 const routine = computed(() => routineById(String(route.query.rutina ?? '')) ?? ROUTINES[0]!)
@@ -28,6 +32,8 @@ function pick(id: string) {
       <h1 class="display-title">Estira el cuerpo</h1>
       <p class="muted">Rutinas guiadas, con un dibujo de cada estiramiento y el tiempo que toca.</p>
     </header>
+
+    <StreakCard v-if="stretching.status === 'ready'" :streak="stretching.streak" />
 
     <div class="kinds" role="tablist" aria-label="Rutina">
       <button
@@ -97,6 +103,10 @@ function pick(id: string) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   padding: 0 var(--gutter);
+}
+
+.streak + .kinds {
+  margin-top: 14px;
 }
 
 .kind {

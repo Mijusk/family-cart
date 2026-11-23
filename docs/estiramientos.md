@@ -88,7 +88,37 @@ después del entrenamiento» de GymVirtual (3:02), todos de pie:
 | 9–10 | Muslo derecho / izquierdo (talón al glúteo) |
 | 11–12 | Cuello hacia la derecha / izquierda |
 
-## 4. Fuera de esta V1
+## 4. Racha (con Luis, 19 y 23-nov)
+
+Para animar a estirar cada día (idealmente cada mañana). Es la base de lo que vendrá después
+(puntos, experiencia y niveles por tareas, pensado para los hijos), que aún no está hecho.
+
+1. **Día cumplido:** terminar una rutina, cualquiera. Vale también «Terminar ahora» si se ha seguido
+   al menos el 80 % del tiempo de la rutina (lo saltado no cuenta). Cuenta el día entero, no solo la
+   mañana. El día es el del dispositivo.
+2. **Hoy sigue abierto:** no haber estirado aún hoy no rompe nada.
+3. **Comodín semanal** (idea de Luis): uno por semana, de lunes a domingo. El primer día que se falla
+   en una semana, si hay racha, lo salva el comodín: la racha sigue pero ese día no suma. Un segundo
+   fallo en la misma semana la deja a 0. Se guarda la mejor racha.
+4. **Por persona, en la base de datos y privada:** cada uno ve solo la suya, igual en todos sus
+   dispositivos.
+
+Cómo está hecho:
+
+- Tabla `stretch_sessions` (persona, día, rutina): una fila por rutina terminada. Se escribe solo con
+  la RPC `log_stretch_session(routine, local_day)`, para uno mismo y con un día de ±1 respecto al de
+  la base de datos (no se pueden rellenar días pasados). Cada uno lee solo las suyas. Las apps de IA
+  conectadas no la ven.
+- La racha, la mejor, el comodín y la semana se calculan en la app a partir de los días
+  (`src/lib/streak.ts`, función pura con tests): no se guarda nada más, así que el comodín no
+  necesita estado.
+- `src/stores/stretching.ts` carga los días. Una rutina terminada sin conexión espera en el
+  dispositivo (y ya cuenta en pantalla) y se manda al volver la red.
+- `StreakCard.vue`: llama con los días seguidos (encendida si hoy ya está), la semana L–D (✓ estirado,
+  escudo = comodín, discontinuo = hoy) y si el comodín de la semana está libre. Arriba en
+  Estiramientos y, más pequeña, al terminar una rutina.
+
+## 5. Fuera de esta V1
 
 - Más rutinas (espalda, antes de dormir).
 - Recordatorio diario (como el de Respiración, con migración).
