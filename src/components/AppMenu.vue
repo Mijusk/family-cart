@@ -2,16 +2,13 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
-import { useStretchingStore } from '@/stores/stretching'
 import AppIcon, { type IconName } from './AppIcon.vue'
 import PersonAvatar from './PersonAvatar.vue'
-import StreakFlame from './StreakFlame.vue'
 
 // The side menu behind the three lines: room for sections that don't fit in the tab bar.
 
 const open = defineModel<boolean>('open', { required: true })
 const groupStore = useGroupStore()
-const stretching = useStretchingStore()
 const route = useRoute()
 const panel = ref<HTMLElement | null>(null)
 
@@ -51,8 +48,6 @@ function onKey(e: KeyboardEvent) {
 let opener: HTMLElement | null = null
 watch(open, async (isOpen) => {
   if (isOpen) {
-    // The stretching streak's fire next to Estiramientos (loaded once).
-    if (stretching.status === 'idle') void stretching.load()
     opener = document.activeElement as HTMLElement | null
     document.addEventListener('keydown', onKey)
     await nextTick()
@@ -106,13 +101,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
                   <span class="menu-label">{{ link.label }}</span>
                   <span class="menu-hint">{{ link.hint }}</span>
                 </span>
-                <StreakFlame
-                  v-if="link.to === '/estiramientos' && stretching.status === 'ready' && stretching.streak.current > 0"
-                  class="menu-streak"
-                  :count="stretching.streak.current"
-                  :lit="stretching.streak.doneToday"
-                  :size="34"
-                />
               </RouterLink>
             </li>
           </ul>
@@ -223,12 +211,6 @@ onUnmounted(() => document.removeEventListener('keydown', onKey))
 .menu-text {
   display: grid;
   gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.menu-streak {
-  margin-left: auto;
 }
 
 .menu-label {

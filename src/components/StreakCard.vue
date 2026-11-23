@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
-import StreakFlame from '@/components/StreakFlame.vue'
 import { daysText, streakMessage, type Streak } from '@/lib/streak'
 import { WEEKDAY_INITIALS, WEEKDAY_NAMES, longDay, today, weekday } from '@/utils/days'
 
@@ -23,11 +22,12 @@ const STATE_TEXT = { done: 'estirado', wildcard: 'salvado por el comodín', miss
 <template>
   <section class="streak" :class="{ compact, lit: streak.doneToday }" aria-label="Racha de estiramientos">
     <div class="head">
-      <StreakFlame :count="streak.current" :lit="streak.doneToday" :size="compact ? 46 : 60" />
+      <span class="flame"><AppIcon name="flame" :size="compact ? 26 : 32" /></span>
       <div class="count">
-        <span class="title">{{ streak.current }} {{ streak.current === 1 ? 'día seguido' : 'días seguidos' }}</span>
-        <span v-if="!compact && streak.best > streak.current" class="best">Tu mejor racha: {{ daysText(streak.best) }}</span>
+        <span class="number">{{ streak.current }}</span>
+        <span class="unit">{{ streak.current === 1 ? 'día seguido' : 'días seguidos' }}</span>
       </div>
+      <span v-if="!compact && streak.best > streak.current" class="best">Mejor: {{ daysText(streak.best) }}</span>
     </div>
 
     <p class="message">{{ message }}</p>
@@ -76,30 +76,55 @@ const STATE_TEXT = { done: 'estirado', wildcard: 'salvado por el comodín', miss
 .head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+}
+
+.flame {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--line);
+  color: var(--text-2);
+  flex: none;
+}
+
+.compact .flame {
+  width: 40px;
+  height: 40px;
+}
+
+.lit .flame {
+  background: var(--qty-soft);
+  color: #d9822b;
 }
 
 .count {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   min-width: 0;
 }
 
-.title {
+.number {
   font-family: var(--font-display);
-  font-size: 1.375rem;
+  font-size: 2rem;
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1;
 }
 
-.compact .title {
-  font-size: 1.125rem;
+.unit {
+  font-weight: 700;
+  color: var(--text-2);
 }
 
 .best {
+  margin-left: auto;
   font-size: 0.8125rem;
   font-weight: 700;
   color: var(--text-2);
+  white-space: nowrap;
 }
 
 .message {
