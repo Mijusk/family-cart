@@ -151,6 +151,12 @@ export const router = createRouter({
       meta: { hideNav: true },
     },
     {
+      // The fire in the header: everyone's stretching streak in the group.
+      path: '/rachas',
+      name: 'streaks',
+      component: () => import('@/views/StreaksView.vue'),
+    },
+    {
       path: '/cuenta',
       name: 'account',
       component: () => import('@/views/AccountView.vue'),

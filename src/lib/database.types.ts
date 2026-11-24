@@ -882,6 +882,9 @@ isOneToOne: false
 "set_task_done":
 { Args: { "done": boolean,"task_id": string }; Returns: undefined
                            },
+"shares_group_with":
+{ Args: { "pid": string }; Returns: boolean
+                           },
 "short_day":
 { Args: { "d": string,"today": string }; Returns: string
                            },

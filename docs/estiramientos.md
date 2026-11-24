@@ -88,7 +88,7 @@ después del entrenamiento» de GymVirtual (3:02), todos de pie:
 | 9–10 | Muslo derecho / izquierdo (talón al glúteo) |
 | 11–12 | Cuello hacia la derecha / izquierda |
 
-## 4. Racha (con Luis, 19 y 23-nov)
+## 4. Racha (con Luis, 19, 23 y 24-nov)
 
 Para animar a estirar cada día (idealmente cada mañana). Es la base de lo que vendrá después
 (puntos, experiencia y niveles por tareas, pensado para los hijos), que aún no está hecho.
@@ -100,15 +100,14 @@ Para animar a estirar cada día (idealmente cada mañana). Es la base de lo que 
 3. **Comodín semanal** (idea de Luis): uno por semana, de lunes a domingo. El primer día que se falla
    en una semana, si hay racha, lo salva el comodín: la racha sigue pero ese día no suma. Un segundo
    fallo en la misma semana la deja a 0. Se guarda la mejor racha.
-4. **Por persona, en la base de datos y privada:** cada uno ve solo la suya, igual en todos sus
-   dispositivos.
+4. **Por persona y en la base de datos,** igual en todos sus dispositivos. Al principio era privada;
+   el 24-nov Luis pidió verla en familia: la ven los que comparten grupo (activos), nadie más.
 
 Cómo está hecho:
 
 - Tabla `stretch_sessions` (persona, día, rutina): una fila por rutina terminada. Se escribe solo con
   la RPC `log_stretch_session(routine, local_day)`, para uno mismo y con un día de ±1 respecto al de
-  la base de datos (no se pueden rellenar días pasados). Cada uno lee solo las suyas. Las apps de IA
-  conectadas no la ven.
+  la base de datos (no se pueden rellenar días pasados). Las apps de IA conectadas no la ven.
 - La racha, la mejor, el comodín y la semana se calculan en la app a partir de los días
   (`src/lib/streak.ts`, función pura con tests): no se guarda nada más, así que el comodín no
   necesita estado.
@@ -118,7 +117,11 @@ Cómo está hecho:
   escudo = comodín, discontinuo = hoy) y si el comodín de la semana está libre. Arriba en
   Estiramientos y, más pequeña, al terminar una rutina.
 - En el header de todas las pantallas, junto a la campana, el fuego con el número de días (naranja
-  si hoy ya está, gris si falta); lleva a Estiramientos (pedido de Luis, 23-nov).
+  si hoy ya está, gris si falta). Al tocarlo abre **Rachas** (`/rachas`, `StreaksView.vue`): cada uno
+  del grupo con cuenta, con su fuego, si hoy ya ha estirado y su semana L–D; el que más días lleva
+  primero, y un botón para ir a estirar (pedidos de Luis, 23 y 24-nov).
+- Lectura: la política de `stretch_sessions` deja ver lo propio y lo de quien comparte un grupo
+  activo conmigo (`shares_group_with`, migración `20261125120000_family_streaks`).
 
 ## 5. Fuera de esta V1
 

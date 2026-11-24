@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useGroupStore } from '@/stores/group'
 import { useInboxStore } from '@/stores/inbox'
@@ -9,13 +9,19 @@ import AppIcon from './AppIcon.vue'
 import AppMenu from './AppMenu.vue'
 
 // Above every screen with the tab bar: a greeting for the time of day, the stretching streak's
-// fire (docs/estiramientos.md §4), the bell (the latest notifications) and the menu with the
+// fire (docs/estiramientos.md §4, opens the family's streaks), the bell (the latest notifications) and the menu with the
 // extra sections (Respiración…).
 
 const groupStore = useGroupStore()
 const inbox = useInboxStore()
 const stretching = useStretchingStore()
-if (stretching.status === 'idle') void stretching.load()
+watch(
+  () => groupStore.me?.id,
+  (id) => {
+    if (id && stretching.status === 'idle') void stretching.load()
+  },
+  { immediate: true },
+)
 const menuOpen = ref(false)
 
 // The greeting follows the clock with the app open.
@@ -45,7 +51,7 @@ const streakLabel = computed(() => {
     <div class="actions">
       <RouterLink
         v-if="stretching.status === 'ready'"
-        :to="{ name: 'stretching' }"
+        :to="{ name: 'streaks' }"
         class="streak"
         :class="{ lit: stretching.streak.doneToday }"
         :aria-label="streakLabel"
