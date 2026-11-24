@@ -46,8 +46,8 @@ en `docs/ia.md`.
 - Estiramientos (`docs/estiramientos.md`), en el mismo menú: rutinas guiadas con dibujos SVG propios
   hechos desde las articulaciones (`src/lib/stretchFigure.ts`; rutinas y tiempos en
   `src/lib/stretching.ts`). El tiempo elegido se guarda en el dispositivo. Racha por persona con
-  comodín semanal: `stretch_sessions` (solo la RPC `log_stretch_session` escribe) y el cálculo en
-  `src/lib/streak.ts`.
+  comodín semanal: `stretch_sessions` (solo la RPC `log_stretch_session` escribe; la leen los del
+  mismo grupo, página Rachas al tocar el fuego del header) y el cálculo en `src/lib/streak.ts`.
 - Cambios de estado delicados van por RPC (`create_group`, `approve_member`,
   `set_member_role`, `claim_profile`…), no por update directo.
 - Apps de IA conectadas (`docs/ia.md`): Supabase Auth hace de servidor OAuth 2.1 (pantalla de permiso

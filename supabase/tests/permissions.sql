@@ -534,7 +534,7 @@ select set_breathing_reminder(null);
 select tests.check('breathing: and he turns it off',
   (select breathing_reminder_time is null from people where id = my_person_id()));
 
--- ── Stretching streak: each person writes and reads only their own days ──
+-- ── Stretching streak: each person writes their own days; the group sees them ──
 select log_stretch_session('despertar', current_date);
 select log_stretch_session('trabajo', current_date - 1);
 select tests.check('streak: daniel logs today and yesterday',
@@ -546,7 +546,12 @@ select tests.expect_error('streak: not by a direct insert',
 select tests.expect_error('streak: no changing days', $$update stretch_sessions set day = current_date - 10$$, 'permission denied');
 select tests.expect_error('streak: no deleting', $$delete from stretch_sessions$$, 'permission denied');
 select tests.as_user('marta@ejemplo.com');
-select tests.check('streak: marta does not see daniel''s', not exists (select 1 from stretch_sessions));
+select tests.check('streak: marta sees daniel''s days (same group)',
+  (select count(*) from stretch_sessions where person_id = (select id from people where user_id = '00000000-0000-4000-8000-0000000000c2')) = 2);
+select tests.expect_error('streak: but cannot log for him',
+  $$insert into stretch_sessions (person_id, day, routine) values ((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'), current_date, 'despertar')$$, 'permission denied');
+select tests.as_user('lucia@ejemplo.com');
+select tests.check('streak: a pending request sees nobody''s', not exists (select 1 from stretch_sessions));
 select tests.as_user('daniel@ejemplo.com');
 
 -- ── Connected AI apps (OAuth tokens): only what the mcp function uses ──
