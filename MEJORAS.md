@@ -25,7 +25,7 @@ se ha comprobado y qué queda.
 | 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | **hecho** |
 | 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | **hecho** |
 | 8 | Autocompletado: un producto nuevo sale dos veces hasta recargar | `stores/list.ts`: id local ≠ id del trigger, `upsert` por id | **hecho** |
-| 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | pendiente |
+| 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | **hecho** |
 | 10 | Rachas: la API corta en 1000 filas; con el tiempo la racha de la familia saldría a 0 | `stores/stretching.ts` | pendiente |
 | 11 | Racha sin conexión: dos envíos a la vez pueden perder una sesión pendiente, y no se reintenta al volver a la app | `stores/stretching.ts` `flush()` | pendiente |
 | 12 | Tocar una notificación con la app abierta la recarga entera: se pierde lo que se estuviera escribiendo y los cambios de la compra en cola | `public/sw.js` `notificationclick` | **hecho** |
@@ -54,6 +54,7 @@ se ha comprobado y qué queda.
 - **13.** Con copia guardada, una página espera 4 s a la red y luego abre la copia (antes, sin límite). Comprobado con un servidor que tarda 15 s: abre en 4,1 s; sin red, en 0,1 s.
 - **12.** Tocar un aviso con la app abierta cambia de pantalla sin recargar (y pregunta si hay algo a medias); si la ventana no contesta, la carga como antes. Comprobado en Chromium simulando el toque en el service worker; falta verlo en un móvil de verdad.
 - **6.** El evento se abre en el día bueno aunque el enlace traiga la fecha movida, o en la próxima vez si no trae ninguna (`nearestSeriesDate`, con tests); comprobado en Chromium. El conector IA enlaza ya la fecha de la serie.
+- **9.** `ver_compra` enseña también lo no encontrado y `anadir_compra` suma a esa línea. `deno check` pasa; se publica al desplegar la función.
 
 ## Decisiones tomadas
 
