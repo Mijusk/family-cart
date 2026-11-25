@@ -76,7 +76,7 @@ se ha comprobado y qué queda.
 - **20.** Las tareas se ordenan también con las flechas sobre el asa, que no pierde el foco. Comprobado en Chromium.
 - **22.** `npm audit` queda en 0: Vite 8.3.8, source-map-js 1.2.2 (solo el lockfile, versiones de hace dos semanas o más). Comprobado en una copia aparte con `npm ci`, tests y build. En tu PC entra con `npm install`.
 - **23.** Misma migración: el job de cada minuto solo mira los eventos que pueden tocar.
-- **16.** Migración nueva `20261126120000_private_claim_codes` (sin aplicar en ningún sitio): el código pasa a una tabla que nadie lee y el aviso de un día movido enlaza la fecha de la serie. Compatible con la app desplegada. Sobre Postgres en WASM: 365 permisos bien, y el paso desde datos existentes conserva los códigos. `database.types.ts` editado a mano con el orden del generador.
+- **16.** Migración nueva `20261126120000_private_claim_codes` (aplicada después, el 25-nov): el código pasa a una tabla que nadie lee y el aviso de un día movido enlaza la fecha de la serie. Compatible con la app desplegada. Sobre Postgres en WASM: 365 permisos bien, y el paso desde datos existentes conserva los códigos. `database.types.ts` editado a mano con el orden del generador.
 - **24.** README al día: qué es la app, secciones, documentos y stores.
 - **25.** Índice de excepciones, descarte rápido de lo que no puede caer ese día y arrays sin proxies: un mes con 330 eventos y 150 excepciones pasa de 270 ms a 26 ms, con los mismos resultados (960 apariciones). Tests de `mayHappenOn`.
 - **26.** Corregido; axe (WCAG AA) sobre 28 rutas a 360 px, sin desbordes. Quedan solo el atenuado de los días pasados (decisión de Luis) y de los días de otro mes.
@@ -94,8 +94,8 @@ se ha comprobado y qué queda.
 - Verificar los permisos con PGlite en vez de Docker, por memoria. CI los pasa con Supabase de verdad en el PR.
 - La interfaz se ha comprobado con la app compilada en Chromium (móvil, 360 y 390 px) y un Supabase simulado: no hay
   Realtime ni base de datos de verdad en esas pruebas.
-- La migración `20261126120000_private_claim_codes` queda escrita y probada, sin aplicar. Va en su propio commit (`48455ce`):
-  si no la quieres ahora, se puede quitar sin tocar lo demás (la app funciona igual con ella y sin ella).
+- La migración `20261126120000_private_claim_codes` quedó escrita y probada; se aplicó en la nube el 25-nov a petición de Luis. Va en su propio commit (`48455ce`):
+  aplicada ya, no se puede quitar sin otra migración que la deshaga.
 - Un cambio de la compra se reintenta sin fin mientras no llegue (antes se deshacía a los 9 s): perder lo marcado en el
   súper es peor que esperar. Se descarta solo al cerrar sesión, y antes pregunta.
 - Al dividir lo que se ve en columnas, un evento de menos de 30 min cuenta como media hora (su bloque ya se pinta así).
@@ -114,13 +114,11 @@ se ha comprobado y qué queda.
 
 ## Pendiente de Luis
 
-1. `20261125120000_family_streaks` ya está aplicada en la nube (comprobado con `supabase migration list` el 25-nov); solo falta
-   `20261126120000_private_claim_codes`.
-2. **Revisar la rama y decir cuándo abrir el PR** (no se ha hecho push).
-3. Tras fusionar: `npx supabase db push` (aplica también `20261126120000_private_claim_codes`) y
-   `npx supabase functions deploy mcp --no-verify-jwt --use-api` (punto 9). En tu PC, `npm install` (Vite) y
-   `npm run db:reset && npm run db:types` para confirmar `database.types.ts`. Ojo: `npm install` quitará `ical.js`, que está
-   en tu `node_modules` pero no en `package.json` (parece de `feat/feed-ics`).
+1. ~~Migraciones~~: aplicadas en la nube las dos (`family_streaks` ya lo estaba; `private_claim_codes`, el 25-nov a petición de Luis,
+   con el CI en verde).
+2. **Revisar y fusionar el PR #44.**
+3. Tras fusionar: `npx supabase functions deploy mcp --no-verify-jwt --use-api` (punto 9). En tu PC, `npm install` (Vite; quitará
+   `ical.js`, que no está en `package.json`) y `npm run db:types` para confirmar `database.types.ts`.
 4. Probar en un móvil de verdad: tocar un aviso con la app abierta, y la lista de la compra con mala cobertura.
 5. Decisiones de producto, sin tocar:
    - Guardar en el dispositivo la cola de la compra, para no perderla si se cierra la app sin red (hoy solo vive con la app abierta).
