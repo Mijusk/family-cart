@@ -84,7 +84,7 @@ Funciones auxiliares: `can_manage_task_list(lid)`, `can_view_task_list(lid)`,
 - **Tareas** (`/tareas`): pestañas "Todas" y una por lista visible en el grupo elegido (las
   compartidas con él y mis privadas). Filtro Todas / Mías. Se añade escribiendo el título: sale al
   momento y el cursor sigue en la caja para escribir la siguiente (si falla al guardar, desaparece
-  con un aviso). Arrastrar
+  con un aviso y el título vuelve a la caja). Arrastrar
   para ordenar (también en el móvil, pulsando y arrastrando). Fecha como etiqueta ("Hoy", "Mañana",
   "jue 23 oct"; atrasada en rojo suave). "Ordenar por fecha". Hechas plegadas abajo.
 - **Tarea** (`/tareas/:id`): título, nota, personas (se marcan varias), fecha, ⓘ con creada y editada por quién y

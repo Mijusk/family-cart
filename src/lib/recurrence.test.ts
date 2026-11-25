@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EventException, EventTiming } from '@/types'
-import { crossesMidnight, isSeriesDate, occurrencesBetween, reminderEndTime, seriesDates } from './recurrence'
+import { addDays } from '@/utils/isoDays'
+import { crossesMidnight, isSeriesDate, mayHappenOn, nearestSeriesDate, occurrencesBetween, reminderEndTime, seriesDates } from './recurrence'
 
 // 2026-10-19 is a Monday.
 function timing(change: Partial<EventTiming> = {}): EventTiming {
@@ -154,5 +155,61 @@ describe('reminderEndTime', () => {
     expect(reminderEndTime('09:00')).toBe('09:15')
     expect(reminderEndTime('21:50')).toBe('22:05')
     expect(reminderEndTime('23:50')).toBe('00:05')
+  })
+})
+
+describe('nearestSeriesDate', () => {
+  const weekly = timing({ repeat: 'weekly', repeatWeekdays: [1] })
+  const change = (occurrenceDate: string, status: EventException['status'], startDate?: string): EventException => ({
+    eventId: 'e',
+    occurrenceDate,
+    status,
+    overrides: startDate ? { startDate } : {},
+  })
+
+  it('is the day asked for when the series has it', () => {
+    expect(nearestSeriesDate(weekly, [], '2026-11-02', '2026-11-25')).toBe('2026-11-02')
+    // Also cancelled: from there it can be seen and put back.
+    expect(nearestSeriesDate(weekly, [change('2026-11-02', 'cancelled')], '2026-11-02', '2026-11-25')).toBe('2026-11-02')
+  })
+
+  it('finds the day that was moved to the one asked for', () => {
+    expect(nearestSeriesDate(weekly, [change('2026-11-30', 'modified', '2026-12-02')], '2026-12-02', '2026-11-25')).toBe('2026-11-30')
+  })
+
+  it('without a day of the series, is the next one that happens', () => {
+    expect(nearestSeriesDate(weekly, [], null, '2026-11-25')).toBe('2026-11-30')
+    expect(nearestSeriesDate(weekly, [change('2026-11-30', 'cancelled')], null, '2026-11-25')).toBe('2026-12-07')
+    expect(nearestSeriesDate(weekly, [], '2026-12-03', '2026-11-25')).toBe('2026-12-07')
+  })
+
+  it('is the start when it is over, or it does not repeat', () => {
+    expect(nearestSeriesDate({ ...weekly, repeatUntil: '2026-11-02' }, [], null, '2026-11-25')).toBe('2026-10-19')
+    expect(nearestSeriesDate(timing(), [], '2026-11-25', '2026-11-25')).toBe('2026-10-19')
+  })
+})
+
+describe('mayHappenOn', () => {
+  it('never leaves out something that happens', () => {
+    const moved: EventException = { eventId: 'e', occurrenceDate: '2026-10-19', status: 'modified', overrides: { startDate: '2026-11-03' } }
+    const cases: [EventTiming, EventException[]][] = [
+      [timing(), []],
+      [timing({ startTime: '23:00', endTime: '01:00' }), []],
+      [timing({ repeat: 'daily', repeatUntil: '2026-10-25', startTime: '23:00', endTime: '01:00' }), []],
+      [timing({ repeat: 'weekly', repeatWeekdays: [1, 3] }), []],
+      [timing({ repeat: 'weekly', repeatWeekdays: [1], repeatUntil: '2026-10-26' }), [moved]],
+    ]
+    for (const [t, exceptions] of cases) {
+      for (let i = -5; i < 40; i++) {
+        const day = addDays('2026-10-19', i)
+        if (occurrencesBetween(t, exceptions, day, day).length) expect(mayHappenOn(t, exceptions, day)).toBe(true)
+      }
+    }
+  })
+
+  it('leaves out what is over or has not begun', () => {
+    expect(mayHappenOn(timing(), [], '2026-10-18')).toBe(false)
+    expect(mayHappenOn(timing(), [], '2026-10-21')).toBe(false)
+    expect(mayHappenOn(timing({ repeat: 'daily', repeatUntil: '2026-10-25' }), [], '2026-10-27')).toBe(false)
   })
 })

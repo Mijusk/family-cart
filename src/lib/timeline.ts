@@ -13,6 +13,8 @@ export const GAP_PX = 34
 export const MIN_GAP_MINUTES = 120
 /** A block is never shorter than this, so a short occurrence still shows its title. */
 export const MIN_BLOCK_PX = 22
+/** The time that shortest block stands for: what starts before it goes in another column. */
+const MIN_BLOCK_MINUTES = (MIN_BLOCK_PX / HOUR_PX) * 60
 /** Room above the first hour and below the last one. */
 const PAD_PX = 12
 
@@ -108,7 +110,7 @@ export function timeline(items: TimelineItem[], day: IsoDate): Timeline {
   }
   const gaps = pieces.flatMap((p, k) => (p.shrunk ? [{ top: tops[k]!, minutes: p.to - p.from }] : []))
 
-  // Columns: within each group of occurrences that overlap one another, the first column free.
+  // Columns: within each group of occurrences whose blocks overlap one another, the first column free.
   const blocks: TimelineBlock[] = []
   let group: TimelineBlock[] = []
   let groupEnd = -1
@@ -122,8 +124,9 @@ export function timeline(items: TimelineItem[], day: IsoDate): Timeline {
     if (o.start >= groupEnd) closeGroup()
     let column = columnEnds.findIndex((end) => end <= o.start)
     if (column === -1) column = columnEnds.push(0) - 1
-    columnEnds[column] = o.end
-    groupEnd = Math.max(groupEnd, o.end)
+    const blockEnd = Math.max(o.end, o.start + MIN_BLOCK_MINUTES)
+    columnEnds[column] = blockEnd
+    groupEnd = Math.max(groupEnd, blockEnd)
     const top = place(o.start)
     const block = { item: o.item, top, height: Math.max(place(o.end) - top, MIN_BLOCK_PX), column, columns: 1 }
     group.push(block)

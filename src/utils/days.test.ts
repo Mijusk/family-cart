@@ -88,6 +88,8 @@ describe('labels', () => {
 describe('isIsoDate', () => {
   it('accepts real days only', () => {
     expect(isIsoDate('2026-10-21')).toBe(true)
+    expect(isIsoDate('2028-02-29')).toBe(true)
+    expect(isIsoDate('2026-02-31')).toBe(false)
     expect(isIsoDate('2026-13-01')).toBe(false)
     expect(isIsoDate('21/10/2026')).toBe(false)
     expect(isIsoDate('2026-10-21T10:00')).toBe(false)

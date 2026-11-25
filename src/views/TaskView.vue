@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { dueLabel } from '@/lib/tasks'
 import { goBack } from '@/router/back'
@@ -46,16 +46,18 @@ watch(
   { immediate: true },
 )
 
-const saving = ref(false)
 async function save(change: TaskChange) {
   if (!task.value) return
-  saving.value = true
+  const { id } = task.value
   try {
-    await store.updateTask(task.value.id, change)
+    await store.updateTask(id, change)
   } catch (e) {
     toast.show(friendlyError(e))
-  } finally {
-    saving.value = false
+    // What was written stays in its field, to try again on leaving it.
+    await nextTick()
+    if (task.value?.id !== id || editingText.value) return
+    if (change.title) title.value = change.title
+    if (change.notes) notes.value = change.notes
   }
 }
 
@@ -75,6 +77,23 @@ function saveNotes() {
   const value = notes.value.trim() || null
   if (task.value && value !== task.value.notes) void save({ notes: value })
 }
+
+/** Going away from inside a field (the phone's back gesture, switching apps) saves what is in it too. */
+function saveTyping() {
+  const field = editingText.value
+  if (field === 'title' && title.value.trim()) saveTitle()
+  else if (field === 'notes') saveNotes()
+  // Still in that field if the person comes back to it.
+  editingText.value = field
+}
+onBeforeRouteLeave(saveTyping)
+onBeforeRouteUpdate(saveTyping)
+
+function onVisibility() {
+  if (document.visibilityState === 'hidden') saveTyping()
+}
+document.addEventListener('visibilitychange', onVisibility)
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
 
 // ── Who and when ──────────────────────────────────────────────
 

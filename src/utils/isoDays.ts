@@ -107,5 +107,5 @@ export function relativeDay(day: IsoDate, now: IsoDate): string {
 
 /** A real 'YYYY-MM-DD' day (from a URL, say). */
 export function isIsoDate(value: unknown): value is IsoDate {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && addDays(value, 0) === value
 }

@@ -37,6 +37,8 @@ export const useTasksStore = defineStore('tasks', () => {
   /** People named by the tasks (owners, assignees, authors) beyond the current group. */
   const people = ref<Record<string, Person>>({})
   let loadedGroupId: string | null = null
+  /** The group the last load that worked was for; null if none has. */
+  let shownGroupId: string | null = null
   /** Every load gets a number; only the latest one is applied. */
   let loadSeq = 0
   /**
@@ -162,9 +164,11 @@ export const useTasksStore = defineStore('tasks', () => {
       keepLocalAdds(seq)
       await loadPeople()
       status.value = 'ready'
+      shownGroupId = groupId
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
+      // A refresh of what is already on screen (the phone back with a bad signal, say): it stays.
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = groupId === shownGroupId ? 'ready' : 'error'
       throw e
     }
   }
@@ -325,13 +329,12 @@ export const useTasksStore = defineStore('tasks', () => {
 
   // ── Lists ──────────────────────────────────────────────────
 
-  /** A new list for me, or for a profile I manage, shared with the groups given. */
-  async function createList(name: string, ownerId: string, groupIds: string[]): Promise<TaskList> {
+  /** A new private list for me, or for a profile I manage. */
+  async function createList(name: string, ownerId: string): Promise<TaskList> {
     const { data, error } = await supabase.from('task_lists').insert({ owner_id: ownerId, name }).select().single()
     if (error) throw error
     const list = toTaskList(data)
     lists.value.push(list)
-    for (const groupId of groupIds) await setShare(list.id, groupId, true)
     return list
   }
 
@@ -455,6 +458,7 @@ export const useTasksStore = defineStore('tasks', () => {
     channelGroupId = null
     clearTimeout(reloadTimer)
     loadedGroupId = null
+    shownGroupId = null
     localAdds.clear()
     status.value = 'idle'
     lists.value = []

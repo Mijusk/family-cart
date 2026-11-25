@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
-import { useListStore, type Suggestion } from '@/stores/list'
+import { ITEM_NAME_MAX, ITEM_NOTE_MAX, useListStore, type Suggestion } from '@/stores/list'
 import AppIcon from './AppIcon.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import QuantityChip from './QuantityChip.vue'
@@ -108,6 +108,7 @@ function onKeydown(event: KeyboardEvent) {
           v-model="name"
           class="field name"
           :placeholder="placeholder"
+          :maxlength="ITEM_NAME_MAX"
           enterkeyhint="done"
           role="combobox"
           aria-autocomplete="list"
@@ -143,7 +144,7 @@ function onKeydown(event: KeyboardEvent) {
       class="field"
       placeholder="Nota: marca, tamaño, talla…"
       aria-label="Nota"
-      maxlength="120"
+      :maxlength="ITEM_NOTE_MAX"
     />
 
     <div v-if="duplicate" class="duplicate" role="status">
@@ -185,6 +186,7 @@ function onKeydown(event: KeyboardEvent) {
 <style scoped>
 .add {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 14px var(--gutter) 16px;
   background: var(--surface);
@@ -260,8 +262,9 @@ function onKeydown(event: KeyboardEvent) {
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .note-toggle {
@@ -269,7 +272,7 @@ function onKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 6px;
   height: var(--tap);
-  padding: 0 12px;
+  padding: 0 8px;
   border-radius: 999px;
   color: var(--text-2);
   font-weight: 500;

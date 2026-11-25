@@ -15,7 +15,9 @@ const MAX_PRODUCTS = 30
 /** Items without a folder, as the app calls them. */
 const GENERAL = 'General'
 
-const STATUS: Record<string, string> = { pending: 'por comprar', in_cart: 'en el carro' }
+const STATUS: Record<string, string> = { pending: 'por comprar', not_found: 'por comprar (no se encontró la última vez)', in_cart: 'en el carro' }
+/** Still to buy, as isOnList() in src/stores/list.ts. */
+const ON_LIST = ['pending', 'not_found'] as const
 
 const GROUP_INPUT = z.guid().optional().describe('Si estás en varios grupos con compra, cuál (de quien_soy).')
 
@@ -53,7 +55,7 @@ export function registerShoppingTools(server: McpServer, ctx: Context) {
           .from('items')
           .select('name, quantity, note, status, folder_id')
           .eq('group_id', group.id)
-          .in('status', ['pending', 'in_cart'])
+          .in('status', [...ON_LIST, 'in_cart'])
           .order('added_at'),
       ])
       if (items.error) throw items.error
@@ -181,7 +183,7 @@ export function registerShoppingTools(server: McpServer, ctx: Context) {
         const note = item.value.note
         if (note && note !== same.note) same.note = (same.note ? `${same.note} · ${note}` : note).slice(0, 120)
       }
-      const pendingQuery = ctx.db.from('items').select('id, name').eq('group_id', group.id).eq('status', 'pending')
+      const pendingQuery = ctx.db.from('items').select('id, name').eq('group_id', group.id).in('status', [...ON_LIST])
       const { data: pending, error } = await (folderId ? pendingQuery.eq('folder_id', folderId) : pendingQuery.is('folder_id', null))
       if (error) throw error
 

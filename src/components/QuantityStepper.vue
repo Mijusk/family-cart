@@ -2,7 +2,8 @@
 import AppIcon from './AppIcon.vue'
 
 const MIN = 1
-const MAX = 99
+/** What the database takes: lines added together go past 99. */
+const MAX = 999
 
 const quantity = defineModel<number>({ required: true })
 defineProps<{ label?: string }>()
@@ -24,6 +25,7 @@ function onInput(event: Event) {
     </button>
     <input
       class="value"
+      :class="{ wide: quantity > 99 }"
       type="number"
       inputmode="numeric"
       :min="MIN"
@@ -86,6 +88,10 @@ function onInput(event: Event) {
 .value::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.value.wide {
+  width: 3.5ch;
 }
 
 .value:focus {

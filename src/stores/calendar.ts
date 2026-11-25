@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -13,7 +13,7 @@ import {
   toHistoryEntry,
   toPerson,
 } from '@/lib/mappers'
-import { crossesMidnight, occurrencesBetween } from '@/lib/recurrence'
+import { crossesMidnight, mayHappenOn, occurrencesBetween } from '@/lib/recurrence'
 import { addDays, today } from '@/utils/days'
 import type {
   BusyEvent,
@@ -51,6 +51,9 @@ export type EventDraft = Pick<
   | 'reminderOnly'
 >
 
+/** Postgres: a row with that key is already there. */
+const UNIQUE_VIOLATION = '23505'
+
 /** Days loaded around what a view shows, so moving to the next week or month needs no load. */
 const RANGE_MARGIN_DAYS = 31
 /** How far the loaded days grow past what a view shows when it has to. */
@@ -66,8 +69,9 @@ export const useCalendarStore = defineStore('calendar', () => {
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const calendars = ref<Calendar[]>([])
   const shares = ref<CalendarShare[]>([])
-  const events = ref<CalendarEvent[]>([])
-  const exceptions = ref<EventException[]>([])
+  // Shallow (replaced, never changed inside): a month goes through all of them 42 times.
+  const events = shallowRef<CalendarEvent[]>([])
+  const exceptions = shallowRef<EventException[]>([])
   /** Extra groups per event. */
   const eventGroups = ref<Record<string, string[]>>({})
   /** Participants per event (person ids). */
@@ -75,7 +79,7 @@ export const useCalendarStore = defineStore('calendar', () => {
   /** Owner and folder color of every visible event, even when its folder is private. */
   const owners = ref<Record<string, { ownerId: string; color: string }>>({})
   const editableIds = ref<Set<string>>(new Set())
-  const busyEvents = ref<BusyEvent[]>([])
+  const busyEvents = shallowRef<BusyEvent[]>([])
   /** People named anywhere in the calendar (owners, participants, authors). */
   const people = ref<Record<string, Person>>({})
   /** Group whose busy slots are loaded; answers for another group are discarded. */
@@ -86,6 +90,8 @@ export const useCalendarStore = defineStore('calendar', () => {
   let range = { from: addDays(today(new Date()), -RANGE_STEP_DAYS), to: addDays(today(new Date()), RANGE_STEP_DAYS) }
   /** Events opened outside the range (from a notification, say), loaded with all their exceptions. */
   const pinnedIds = new Set<string>()
+  /** What the last load that worked brought (see loadKey); null if none has. */
+  let shownKey: string | null = null
 
   const editableCalendars = computed(() =>
     calendars.value.filter((c) => editableIds.value.has(c.id)).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
@@ -103,8 +109,18 @@ export const useCalendarStore = defineStore('calendar', () => {
     return editableIds.value.has(event.calendarId)
   }
 
+  const exceptionsByEvent = computed(() => {
+    const byEvent = new Map<string, EventException[]>()
+    for (const x of exceptions.value) {
+      const list = byEvent.get(x.eventId)
+      if (list) list.push(x)
+      else byEvent.set(x.eventId, [x])
+    }
+    return byEvent
+  })
+
   function exceptionsOf(eventId: string): EventException[] {
-    return exceptions.value.filter((x) => x.eventId === eventId)
+    return exceptionsByEvent.value.get(eventId) ?? []
   }
 
   /** A person's name; the signed-in person shows as `self` ("Tú", "ti"…), or their name if null. */
@@ -117,9 +133,15 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   // ── Loading ────────────────────────────────────────────────
 
+  /** What a load of this group has to bring: its days, and the opened events that aren't here yet. */
+  function loadKey(groupId: string): string {
+    return [groupId, range.from, range.to, ...[...pinnedIds].filter((id) => !eventById(id))].join()
+  }
+
   async function load(groupId: string) {
     loadedGroupId = groupId
     const seq = ++loadSeq
+    const key = loadKey(groupId)
     subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
     try {
@@ -167,9 +189,11 @@ export const useCalendarStore = defineStore('calendar', () => {
       busyEvents.value = busy.data!.map(toBusyEvent)
       await loadPeople()
       status.value = 'ready'
+      shownKey = loadKey(groupId)
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
+      // A refresh of what is already on screen (the phone back with a bad signal, say): it stays.
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = key === shownKey ? 'ready' : 'error'
       throw e
     }
   }
@@ -245,9 +269,11 @@ export const useCalendarStore = defineStore('calendar', () => {
   function occurrencesOn(day: IsoDate): Occurrence[] {
     const result: Occurrence[] = []
     for (const event of events.value) {
+      const changes = exceptionsOf(event.id)
+      if (!mayHappenOn(event, changes, day)) continue
       const owner = owners.value[event.id]
       if (!owner) continue
-      for (const o of occurrencesBetween(event, exceptionsOf(event.id), day, day)) {
+      for (const o of occurrencesBetween(event, changes, day, day)) {
         const shown = { ...event, ...o.overrides }
         result.push({
           key: `${event.id}:${o.seriesDate}`,
@@ -270,6 +296,7 @@ export const useCalendarStore = defineStore('calendar', () => {
       }
     }
     for (const busy of busyEvents.value) {
+      if (!mayHappenOn(busy, busy.exceptions, day)) continue
       for (const o of occurrencesBetween(busy, busy.exceptions, day, day)) {
         const shown = { ...busy, ...o.overrides }
         result.push({
@@ -369,36 +396,33 @@ export const useCalendarStore = defineStore('calendar', () => {
   // ── Events ─────────────────────────────────────────────────
 
   /**
-   * Creates or updates a whole event (the series, if it repeats), its extra groups and who goes. The saved
-   * row goes into the store at once, so the screens show it; a reload in the background (and
+   * Creates or updates a whole event (the series, if it repeats), its extra groups and who goes. A new
+   * one comes with the id it will have (newId), so trying again after a failure halfway goes on with the
+   * same event instead of creating another. The saved row goes into the store at once, so the screens show it; a reload in the background (and
    * Realtime) brings the rest (exceptions, history…). That reload failing doesn't undo the save.
    */
-  async function saveEvent(draft: EventDraft, groupIds: string[], participantIds: string[], id?: string): Promise<string> {
+  async function saveEvent(draft: EventDraft, groupIds: string[], participantIds: string[], id: string): Promise<void> {
     const row = fromEvent(draft)
-    const { data, error } = id
+    let res = eventById(id)
       ? await supabase.from('events').update(row).eq('id', id).select().single()
-      : await supabase.from('events').insert(row).select().single()
-    if (error) throw error
-    await setEventGroups(data.id, groupIds)
-    await setParticipants(data.id, participantIds)
-    putEvent(toEvent(data), groupIds, participantIds)
+      : await supabase.from('events').insert({ id, ...row }).select().single()
+    // Inserted by an earlier try whose answer never arrived.
+    if (res.error?.code === UNIQUE_VIOLATION) res = await supabase.from('events').update(row).eq('id', id).select().single()
+    if (res.error) throw res.error
+    putEvent(toEvent(res.data))
+    await setEventGroups(id, groupIds)
+    await setParticipants(id, participantIds)
     void reload().catch(() => {})
-    return data.id
   }
 
   /** A saved event, shown before the reload brings it. */
-  function putEvent(event: CalendarEvent, groupIds: string[], participantIds: string[]) {
+  function putEvent(event: CalendarEvent) {
     // Saved on a day outside the range, the next load would leave it out.
     pinnedIds.add(event.id)
-    const i = events.value.findIndex((e) => e.id === event.id)
-    if (i === -1) events.value.push(event)
-    else events.value[i] = event
+    events.value = [...events.value.filter((e) => e.id !== event.id), event]
     // Its folder is one I can edit, so it is loaded; the owner and color are the folder's.
     const folder = calendarById(event.calendarId)
     if (folder) owners.value[event.id] = { ownerId: folder.ownerId, color: folder.color }
-    // setEventGroups and setParticipants left exactly these.
-    eventGroups.value[event.id] = groupIds
-    participants.value[event.id] = participantIds
   }
 
   async function setEventGroups(eventId: string, groupIds: string[]) {
@@ -408,10 +432,12 @@ export const useCalendarStore = defineStore('calendar', () => {
     if (added.length) {
       const { error } = await supabase.from('event_shares').insert(added.map((group_id) => ({ event_id: eventId, group_id })))
       if (error) throw error
+      eventGroups.value[eventId] = [...current, ...added]
     }
     if (removed.length) {
       const { error } = await supabase.from('event_shares').delete().eq('event_id', eventId).in('group_id', removed)
       if (error) throw error
+      eventGroups.value[eventId] = groupIds
     }
   }
 
@@ -422,16 +448,18 @@ export const useCalendarStore = defineStore('calendar', () => {
     if (added.length) {
       const { error } = await supabase.from('event_participants').insert(added.map((person_id) => ({ event_id: eventId, person_id })))
       if (error) throw error
+      participants.value[eventId] = [...current, ...added]
     }
     if (removed.length) {
       const { error } = await supabase.from('event_participants').delete().eq('event_id', eventId).in('person_id', removed)
       if (error) throw error
+      participants.value[eventId] = personIds
     }
   }
 
   /** Changes or cancels one occurrence of a repeating event. */
   async function setException(eventId: string, seriesDate: IsoDate, change: Pick<EventException, 'status' | 'overrides'> | null) {
-    const existing = exceptions.value.find((x) => x.eventId === eventId && x.occurrenceDate === seriesDate)
+    const existing = exceptionsOf(eventId).find((x) => x.occurrenceDate === seriesDate)
     const fields = change && { status: change.status, overrides: fromOverrides(change.overrides) as never }
     const { error } = !change
       ? await supabase.from('event_exceptions').delete().eq('event_id', eventId).eq('occurrence_date', seriesDate)
@@ -456,7 +484,7 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   /** Cancels one day; returns how to undo it. */
   async function cancelOccurrence(eventId: string, seriesDate: IsoDate): Promise<() => Promise<void>> {
-    const before = exceptions.value.find((x) => x.eventId === eventId && x.occurrenceDate === seriesDate) ?? null
+    const before = exceptionsOf(eventId).find((x) => x.occurrenceDate === seriesDate) ?? null
     await setException(eventId, seriesDate, { status: 'cancelled', overrides: {} })
     return () => setException(eventId, seriesDate, before)
   }
@@ -595,6 +623,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     channelGroupId = null
     clearTimeout(reloadTimer)
     loadedGroupId = null
+    shownKey = null
     pinnedIds.clear()
     status.value = 'idle'
     calendars.value = []

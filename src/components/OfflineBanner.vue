@@ -4,7 +4,8 @@ import { online } from '@/lib/offline'
 import { useGroupStore } from '@/stores/group'
 import { useListStore } from '@/stores/list'
 
-// A thin bar while there is no connection, or the app shows the copy saved on this device.
+// A thin bar while there is no connection (or what there is doesn't reach the server), or the app
+// shows the copy saved on this device.
 
 const groupStore = useGroupStore()
 const list = useListStore()
@@ -18,8 +19,8 @@ const detail = computed(() => {
 </script>
 
 <template>
-  <div v-if="!online || groupStore.savedCopy" class="offline" role="status">
-    <strong>{{ online ? 'Conectando…' : 'Sin conexión' }}</strong>
+  <div v-if="!online || groupStore.savedCopy || list.unreachable" class="offline" role="status">
+    <strong>{{ online && !list.unreachable ? 'Conectando…' : 'Sin conexión' }}</strong>
     <span>{{ detail }}</span>
   </div>
 </template>

@@ -131,9 +131,11 @@ function add() {
   if (!name) return
   const groupIds = draft.groupIds.filter((id) => groups.value.some((g) => g.id === id))
   void act('add', async () => {
-    const created = await store.createList(name, owner.value.personId, groupIds)
+    const created = await store.createList(name, owner.value.personId)
     adding.value = false
     Object.assign(editing, { id: created.id, name: created.name })
+    // Open for editing already: one that fails can be ticked again there.
+    for (const groupId of groupIds) await store.setShare(created.id, groupId, true)
   })
 }
 </script>

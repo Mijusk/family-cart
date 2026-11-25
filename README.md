@@ -1,5 +1,6 @@
 # family-cart
-App web para gestionar la lista de la compra en familia en tiempo real: cualquier miembro añade lo que falta, se marca al comprarlo y queda un historial para volver a añadir productos habituales. Vue 3 + Pinia, pensada mobile-first.
+**Family-App**: la lista de la compra compartida, las tareas y el calendario de una familia, en tiempo real, con avisos en el móvil,
+respiración y estiramientos guiados. Vue 3 + Pinia + Supabase, pensada mobile-first.
 
 ## Desarrollo
 
@@ -33,7 +34,7 @@ http://127.0.0.1:54324.
 | `npm run db:reset` | Borra la base de datos y la recrea desde `supabase/migrations` + `supabase/seed.sql` |
 | `npm run db:types` | Regenera `src/lib/database.types.ts` después de cambiar el esquema |
 | `npm run db:test` | Comprueba los permisos (RLS y funciones) contra los datos de ejemplo; no cambia nada |
-| `npm test` | Tests unitarios (Vitest): repeticiones, fechas, textos, escala de la semana, tareas |
+| `npm test` | Tests unitarios (Vitest): repeticiones, fechas, textos, escala de la semana, tareas y stores |
 | `npm run build` | Type-check (vue-tsc) + build de producción |
 
 GitHub Actions (`.github/workflows/ci.yml`) pasa en cada PR los tests y el build y, con Supabase
@@ -59,8 +60,8 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
   (`pending`/`active`). Quien crea el grupo es administrador. Entrar con el enlace deja una solicitud
   pendiente que un administrador acepta; mientras tanto no se ve nada del grupo. El historial
   (`added_by`, `purchased_by`, `trips.member_id`) apunta siempre al miembro.
-- **Secciones:** cada grupo activa calendario, lista de la compra o las dos (`groups.calendar_enabled`,
-  `groups.shopping_enabled`), desde los ajustes del grupo.
+- **Secciones:** cada grupo activa calendario, tareas y lista de la compra, al menos una (`groups.calendar_enabled`,
+  `groups.tasks_enabled`, `groups.shopping_enabled`), desde los ajustes del grupo.
 - **Permisos:** RLS en todas las tablas: solo ves y tocas los datos de tus grupos, y solo los
   administradores cambian el grupo y sus miembros. Las operaciones de grupo (crear, pedir unirse,
   aceptar, roles, salir) y las de la compra (sumar cantidades, finalizar/cancelar) son funciones SQL
@@ -69,7 +70,8 @@ TypeScript está fijado a 6.x porque `vue-tsc` todavía no es compatible con Typ
   en orden) y escuchan Realtime; al reconectar (móvil que vuelve de segundo plano) recargan todo.
 - **Sin conexión:** el service worker guarda la app, así que abre sin red, y el móvil guarda la última
   lista de la compra que mandó el servidor. Sin red se puede seguir añadiendo y marcando: los cambios
-  esperan en cola y se guardan al volver la conexión (con la app abierta). Un aviso arriba lo indica.
+  esperan en cola y se guardan al volver la conexión (con la app abierta), también si hay cobertura pero no
+  llegan al servidor. Un aviso arriba lo indica.
 - **Catálogo de autocompletado:** lo mantiene un trigger sobre `items`.
 - **Varios grupos:** una persona puede estar en varios grupos (familia, pareja…). Se cambia
   tocando el nombre del grupo arriba; el último abierto se recuerda en `localStorage`. Al salir de un
@@ -87,12 +89,14 @@ supabase/
   seed.sql          cuentas y grupo de ejemplo para desarrollo
   tests/            comprobaciones de permisos (npm run db:test)
 docs/
-  calendario.md     diseño del calendario familiar (en desarrollo)
+  calendario.md     diseño del calendario; también tareas.md, notificaciones.md, ia.md (conector para chats de IA),
+                    respiracion.md y estiramientos.md
 src/
   types.ts          modelo de datos en camelCase
   lib/              cliente de Supabase, cuentas (auth.ts), tipos generados y conversión filas ↔ modelo
-  stores/           group (sesión, grupo, miembros), list (lista, catálogo, compras), toast (avisos con deshacer)
-  views/            Entrar, Lista, Modo compra, Historial, Calendario, Grupo, Cuenta, Bienvenida, Unirse
+  stores/           group (sesión, grupo, miembros), list (compra), calendar, tasks, inbox (avisos), stretching
+                    (rachas), toast (avisos con deshacer)
+  views/            una por pantalla
   components/       formulario de añadir, filas, selector de cantidad, barra inferior, avisos
   styles/base.css   tokens de color/tipografía y estilos base
 ```

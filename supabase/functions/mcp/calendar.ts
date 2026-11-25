@@ -430,7 +430,7 @@ export function registerCalendarTools(server: McpServer, ctx: Context) {
           ? `El ${day} vuelve a ser como los demás días: ${event.title}, ${timeText(event)}.`
           : `Cambiado solo el ${day}: ${shown.title} · ${weekdayShortDay(shown.startDate)}, ${timeText(shown)}` +
               `${shown.location ? ` · ${shown.location}` : ''}. Los demás días siguen igual.\n` +
-              `Ábrelo en Family-App: ${eventLink(event.id, shown.startDate)}`,
+              `Ábrelo en Family-App: ${eventLink(event.id, input.fecha)}`,
       )
     },
   )

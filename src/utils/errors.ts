@@ -31,6 +31,9 @@ export function friendlyError(error: unknown): string {
   if (/someone else's folder is shared in full/i.test(message))
     return 'La carpeta de otra persona se comparte en completo con el grupo, para que puedas editarla.'
   if (/share level without a group|invalid share level/i.test(message)) return 'Para compartir la carpeta, elige un grupo y si es en completo u ocupado.'
+  // Shopping
+  if (/trip is closed/i.test(message)) return 'Esa compra ya estaba cerrada: lo último que marcaste no se ha guardado.'
+
   // Tasks
   if (/task list is deleted/i.test(message)) return 'Esa lista está en la papelera. Restáurala primero.'
   if (/task not found|task list not found/i.test(message)) return 'Esa tarea o lista ya no existe o no tienes permiso para cambiarla.'

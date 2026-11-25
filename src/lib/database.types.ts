@@ -91,6 +91,25 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"claim_codes": {
+                  Row: {
+                    "code": string,"created_at": string,"person_id": string
+                  }
+                  Insert: {
+                    "code": string,"created_at"?: string,"person_id": string
+                  }
+                  Update: {
+                    "code"?: string,"created_at"?: string,"person_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "claim_codes_person_id_fkey"
+      columns: ["person_id"]
+isOneToOne: true
+      referencedRelation: "people"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"event_exceptions": {
                   Row: {
                     "created_at": string,"created_by": string | null,"event_id": string,"occurrence_date": string,"overrides": NonNullable<Json>,"status": string,"updated_at": string,"updated_by": string | null
@@ -360,13 +379,13 @@ isOneToOne: false
                   ]
                 },"people": {
                   Row: {
-                    "breathing_reminder_time": string | null,"claim_code": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": (string)[],"notifications_seen_at": string,"updated_at": string,"updated_by": string | null,"user_id": string | null
+                    "breathing_reminder_time": string | null,"color": string,"created_at": string,"created_by": string | null,"display_name": string,"id": string,"last_calendar_id": string | null,"muted_notifications": (string)[],"notifications_seen_at": string,"updated_at": string,"updated_by": string | null,"user_id": string | null
                   }
                   Insert: {
-                    "breathing_reminder_time"?: string | null,"claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "breathing_reminder_time"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name": string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Update: {
-                    "breathing_reminder_time"?: string | null,"claim_code"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
+                    "breathing_reminder_time"?: string | null,"color"?: string,"created_at"?: string,"created_by"?: string | null,"display_name"?: string,"id"?: string,"last_calendar_id"?: string | null,"muted_notifications"?: (string)[],"notifications_seen_at"?: string,"updated_at"?: string,"updated_by"?: string | null,"user_id"?: string | null
                   }
                   Relationships: [
                     {

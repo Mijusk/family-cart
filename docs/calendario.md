@@ -60,8 +60,11 @@ Las tres capas (rutina diaria, horario semanal, eventos puntuales) no necesitan 
 
 **people**
 - `id`, `user_id` (auth.users, único, `null` si no tiene cuenta), `display_name`, `color`
-- `claim_code` (para que un hijo reclame su perfil), `last_calendar_id` (llega con el calendario)
+- `last_calendar_id` (llega con el calendario)
 - `created_by`, `created_at`, `updated_by`, `updated_at`
+
+**claim_codes** (para que un hijo reclame su perfil)
+- `person_id`, `code`, `created_at`. Nadie la lee, solo las RPC: los demás miembros no pueden ver el código.
 
 **groups**
 - `id`, `name`, `invite_code`, `timezone`

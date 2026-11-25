@@ -9,11 +9,13 @@ import { useOnResume } from '@/composables/resume'
 import { sectionRedirect } from '@/router'
 import { useGroupStore } from '@/stores/group'
 import { useInboxStore } from '@/stores/inbox'
+import { useStretchingStore } from '@/stores/stretching'
 
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
 const inbox = useInboxStore()
+const stretching = useStretchingStore()
 
 /** The greeting, the bell and the menu go with the tab bar. */
 const withChrome = computed(() => groupStore.status === 'ready' && !route.meta.hideNav)
@@ -113,9 +115,14 @@ watch(
   { immediate: true },
 )
 
-// A notification arriving with the app open (public/sw.js says so) goes onto the list.
+// From public/sw.js: a notification arriving with the app open goes onto the list, and tapping one
+// opens its screen here (the answer tells the worker not to load the page itself).
 function onWorkerMessage(e: MessageEvent) {
   if (e.data?.type === 'notification' && groupStore.status === 'ready') void inbox.load()
+  if (e.data?.type === 'open' && typeof e.data.path === 'string' && e.data.path.startsWith('/')) {
+    e.ports[0]?.postMessage('ok')
+    void router.push(e.data.path)
+  }
 }
 onMounted(() => navigator.serviceWorker?.addEventListener('message', onWorkerMessage))
 onUnmounted(() => navigator.serviceWorker?.removeEventListener('message', onWorkerMessage))
@@ -125,7 +132,11 @@ useOnResume(() => {
   if (groupStore.status === 'error' && groupStore.offline) void retry()
   else {
     void groupStore.catchUp()
-    if (groupStore.status === 'ready') void inbox.load()
+    if (groupStore.status === 'ready') {
+      void inbox.load()
+      // Also sends a routine finished without connection.
+      void stretching.load()
+    }
   }
 })
 

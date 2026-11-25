@@ -45,7 +45,11 @@ const weeks = computed(() => {
 /** The day tapped (?dia=), kept in the URL so it is still open when coming back from an event. */
 const selected = computed({
   get: () => (isIsoDate(route.query.dia) && route.query.dia.startsWith(month.value.slice(0, 7)) ? route.query.dia : null),
-  set: (day: string | null) => void router.replace({ query: { ...(isThisMonth.value ? {} : { mes: month.value }), ...(day ? { dia: day } : {}) } }),
+  set: (day: string | null) => {
+    // A day of the month before or after, at the edges of the grid, goes to its month.
+    const shown = day ? startOfMonth(day) : month.value
+    void router.replace({ query: { ...(shown === startOfMonth(today()) ? {} : { mes: shown }), ...(day ? { dia: day } : {}) } })
+  },
 })
 
 function moveMonth(n: number) {
@@ -130,7 +134,7 @@ function label(day: string): string {
             role="gridcell"
             :class="{ outside: !day.startsWith(month.slice(0, 7)), today: day === today(), selected: day === selected }"
             :aria-label="label(day)"
-            :aria-pressed="day === selected"
+            :aria-selected="day === selected"
             @click="selected = day === selected ? null : day"
           >
             <span class="num">{{ dayOfMonth(day) }}</span>

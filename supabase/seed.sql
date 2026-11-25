@@ -45,11 +45,13 @@ where p.user_id = v.user_id::uuid;
 
 -- ── Profiles without an account ──────────────────────────────────────────────
 
-insert into public.people (id, display_name, color, claim_code, created_by) values
-  ('00000000-0000-4000-8000-0000000000d1', 'Abuela Carmen', '#8f6a1f', null,
+insert into public.people (id, display_name, color, created_by) values
+  ('00000000-0000-4000-8000-0000000000d1', 'Abuela Carmen', '#8f6a1f',
     (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1')),
-  ('00000000-0000-4000-8000-0000000000d2', 'Pablo', '#277a7a', 'PABLO7Q4KM',
+  ('00000000-0000-4000-8000-0000000000d2', 'Pablo', '#277a7a',
     (select id from public.people where user_id = '00000000-0000-4000-8000-0000000000c1'));
+
+insert into public.claim_codes (person_id, code) values ('00000000-0000-4000-8000-0000000000d2', 'PABLO7Q4KM');
 
 -- ── Group ────────────────────────────────────────────────────────────────────
 

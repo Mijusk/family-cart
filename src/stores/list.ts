@@ -17,7 +17,7 @@ import {
 import { readSnapshot, saveSnapshot, whenOnline } from '@/lib/offline'
 import { deletePhoto, newPhotoPath, showPhotoLocally, uploadPhoto } from '@/lib/photos'
 import type { Item, Product, ShoppingFolder, Trip } from '@/types'
-import { isNetworkError } from '@/utils/errors'
+import { errorText, friendlyError, isNetworkError } from '@/utils/errors'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
 import { useGroupStore } from './group'
@@ -47,11 +47,17 @@ export interface TripSummary {
   items: Item[]
 }
 
+/** What the database takes for an item (its checks in the schema). */
+export const ITEM_NAME_MAX = 80
+export const ITEM_NOTE_MAX = 120
+
 /** How far back the history goes. */
 const HISTORY_DAYS = 60
-/** Tries for a write that doesn't reach the server although the phone says it is online. */
+/** Tries before saying that a write doesn't reach the server although the phone says it is online. */
 const NETWORK_TRIES = 3
+/** Wait before trying again, doubled each time after those tries, up to the longest. */
 const RETRY_MS = 3_000
+const LONGEST_RETRY_MS = 24_000
 
 /** Shown for items without a folder. */
 export const GENERAL_FOLDER = 'General'
@@ -64,6 +70,18 @@ interface SavedList {
   /** Missing in copies saved before there were folders. */
   folders?: ShoppingFolder[]
 }
+
+type WriteRequest = () => PromiseLike<{ error: unknown; status?: number }>
+
+/**
+ * Answers that are about this moment, not about the request: the server (or the proxy in front of
+ * it) down, or a session whose token ran out and couldn't be renewed yet (401; what someone signed
+ * in can't do is a 403). Signing out drops the queue.
+ */
+const isTemporary = (status?: number) => status !== undefined && [401, 429, 502, 503, 504, 520, 521, 522, 523, 524].includes(status)
+/** The row is already there, or the trip already closed: what a write that did arrive leaves behind. */
+const isAlreadyDone = (error: unknown) => /duplicate key.*_pkey|trip not found/i.test(errorText(error))
+const isTripClosed = (error: unknown) => /trip is closed/i.test(errorText(error))
 
 const byNewest = (a: Item, b: Item) => b.addedAt.localeCompare(a.addedAt)
 const isOnList = (item: Item) => item.status === 'pending' || item.status === 'not_found'
@@ -78,7 +96,8 @@ function upsert<T extends { id: string }>(list: Ref<T[]>, row: T) {
  * Every action updates local state first (so the UI reacts instantly) and then writes to
  * Supabase. Realtime echoes the row back to every device, including this one, where
  * upsert() makes the echo a no-op. If a write fails, the store reloads from the server.
- * Without connection, writes wait in order until it comes back (while the app stays open).
+ * Without connection, or with one too weak to reach the server, writes wait in order until it
+ * comes back (while the app stays open).
  */
 export const useListStore = defineStore('list', () => {
   const groupStore = useGroupStore()
@@ -91,7 +110,11 @@ export const useListStore = defineStore('list', () => {
   const folders = ref<ShoppingFolder[]>([])
   /** Writes not saved yet: waiting for the connection, or on their way. */
   const pendingWrites = ref(0)
+  /** The phone says it is online, but the writes don't get to the server (a weak signal). */
+  const unreachable = ref(false)
   let channel: RealtimeChannel | null = null
+  /** The group's list is here, as opposed to still on its way (empty meanwhile). */
+  let loaded = false
 
   // ── Getters ────────────────────────────────────────────────
 
@@ -169,7 +192,8 @@ export const useListStore = defineStore('list', () => {
     if (gid !== groupId.value) unload()
     groupId.value = gid
     await refresh()
-    subscribe(gid)
+    // Another group was opened meanwhile.
+    if (groupId.value === gid) subscribe(gid)
   }
 
   /** Opening without connection: the list as it was last saved on this device, if it was. */
@@ -178,6 +202,7 @@ export const useListStore = defineStore('list', () => {
     groupId.value = gid
     const saved = groupStore.userId ? readSnapshot<SavedList>(groupStore.userId, `list:${gid}`) : null
     if (!saved) return
+    loaded = true
     // Copies saved before there were folders: everything in «General».
     items.value = saved.items.map((i) => ({ ...i, folderId: i.folderId ?? null }))
     products.value = saved.products
@@ -197,7 +222,7 @@ export const useListStore = defineStore('list', () => {
       saveTimer = setTimeout(() => {
         const gid = groupId.value
         const uid = groupStore.userId
-        if (!gid || !uid || pendingWrites.value) return
+        if (!gid || !uid || !loaded || pendingWrites.value) return
         saveSnapshot(uid, `list:${gid}`, {
           items: items.value,
           products: products.value,
@@ -213,6 +238,7 @@ export const useListStore = defineStore('list', () => {
   function unload() {
     if (channel) void supabase.removeChannel(channel)
     channel = null
+    loaded = false
     groupId.value = null
     items.value = []
     products.value = []
@@ -246,6 +272,7 @@ export const useListStore = defineStore('list', () => {
       if (tripsRes.error) throw tripsRes.error
       if (foldersRes.error) throw foldersRes.error
       if (seq !== writeSeq) continue
+      loaded = true
       items.value = itemsRes.data.map(toItem)
       products.value = productsRes.data.map(toProduct)
       trips.value = tripsRes.data.map(toTrip)
@@ -273,7 +300,7 @@ export const useListStore = defineStore('list', () => {
         if (p.eventType !== 'DELETE') upsert(trips, toTrip(p.new))
       })
       .on<ProductRow>('postgres_changes', { event: '*', schema: 'public', table: 'products', filter }, (p) => {
-        if (p.eventType !== 'DELETE') upsert(products, toProduct(p.new))
+        if (p.eventType !== 'DELETE') putProduct(toProduct(p.new))
       })
       .on<ShoppingFolderRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shopping_folders', filter }, (p) =>
         upsert(folders, toShoppingFolder(p.new)),
@@ -304,41 +331,61 @@ export const useListStore = defineStore('list', () => {
   let writes: Promise<void> = Promise.resolve()
   /** Bumped on every queued write, so refresh() can tell if its snapshot is already outdated. */
   let writeSeq = 0
-  function persist(request: () => PromiseLike<{ error: unknown }>) {
+  /** Bumped when the queue is dropped: what was queued before it is never sent. */
+  let queue = 0
+  function persist(request: WriteRequest) {
+    const mine = queue
     writeSeq++
     pendingWrites.value++
     writes = writes.then(async () => {
       try {
-        await send(request)
+        if (mine === queue) await send(request, () => mine === queue)
       } finally {
-        pendingWrites.value--
+        if (mine === queue) pendingWrites.value--
       }
     })
   }
 
+  /** Signed out: what was still waiting belonged to that account. */
+  function dropWrites() {
+    queue++
+    writes = Promise.resolve()
+    pendingWrites.value = 0
+    unreachable.value = false
+  }
+
   /**
-   * One write, once there is connection. If it doesn't reach the server it waits for the
-   * connection and tries again (a few times if the phone says it is online, as on a weak signal).
+   * One write, once there is connection. One that doesn't reach the server (no connection, a weak
+   * signal, the server down for a moment) is tried again until it does: giving up would undo what
+   * the person did.
    */
-  async function send(request: () => PromiseLike<{ error: unknown }>) {
-    for (let tries = 1; ; tries++) {
+  async function send(request: WriteRequest, wanted: () => boolean) {
+    for (let tries = 1; wanted(); tries++) {
       await whenOnline()
+      if (!wanted()) return
       let error: unknown
+      let status: number | undefined
       try {
-        ;({ error } = await request())
+        ;({ error, status } = await request())
       } catch (e) {
         error = e // a rejected write must not stall the queue
       }
-      if (!error) return
-      if (isNetworkError(error)) {
+      if (!wanted()) return
+      if (isNetworkError(error) || isTemporary(status)) {
         if (!navigator.onLine) continue
-        if (tries < NETWORK_TRIES) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_MS))
-          continue
+        if (tries === NETWORK_TRIES && !unreachable.value) {
+          unreachable.value = true
+          toast.show('Sin conexión con el servidor: se guardará en cuanto se pueda.')
         }
+        const wait = Math.min(LONGEST_RETRY_MS, RETRY_MS * 2 ** Math.max(0, tries - NETWORK_TRIES))
+        await new Promise((resolve) => setTimeout(resolve, wait))
+        continue
       }
+      unreachable.value = false
+      // Saved by an earlier try whose answer never arrived.
+      if (!error || (tries > 1 && isAlreadyDone(error))) return
       console.error(error)
-      toast.show('No se pudo guardar el cambio. Revisa la conexión.')
+      toast.show(isTripClosed(error) ? friendlyError(error) : 'No se pudo guardar el cambio y se ha deshecho.')
       // Not awaited: refresh() waits for this queue to drain, which includes this very write.
       void refresh().catch(console.error)
       return
@@ -346,6 +393,13 @@ export const useListStore = defineStore('list', () => {
   }
 
   // ── Internal helpers ───────────────────────────────────────
+
+  /** The server's row of a product takes the place of the local copy, which has its own id. */
+  function putProduct(product: Product) {
+    const index = products.value.findIndex((p) => p.id === product.id || p.normalizedName === product.normalizedName)
+    if (index === -1) products.value.push(product)
+    else products.value[index] = product
+  }
 
   /** Optimistic copy of what the items trigger does on the server. */
   function rememberProductLocally(name: string, quantity: number) {
@@ -399,8 +453,9 @@ export const useListStore = defineStore('list', () => {
   }
 
   /**
-   * Runs inside a queued write. If the upload fails the item goes back to its previous
-   * photo (or none) and the user is told; the rest of the change is still saved.
+   * Runs inside a queued write, which waits and tries again if it doesn't reach the server. If the
+   * upload fails for any other reason the item goes back to its previous photo (or none) and the
+   * user is told; the rest of the change is still saved.
    */
   async function uploadFor(id: string, path: string, photo: Blob, previous: string | null): Promise<boolean> {
     let error: unknown
@@ -409,11 +464,13 @@ export const useListStore = defineStore('list', () => {
     } catch (e) {
       error = e
     }
-    if (!error) return true
+    // Its path is new every time: if it is there, an earlier try uploaded it.
+    if (!error || /already exists/i.test(errorText(error))) return true
+    if (isNetworkError(error)) throw error
     console.error(error)
     const item = findItem(id)
     if (item?.photoPath === path) item.photoPath = previous
-    toast.show('No se pudo subir la foto. Revisa la conexión.')
+    toast.show('No se pudo subir la foto.')
     return false
   }
 
@@ -517,7 +574,7 @@ export const useListStore = defineStore('list', () => {
     const extraNote = note?.trim() || null
     item.quantity = Math.min(999, item.quantity + add)
     if (extraNote && extraNote !== item.note) {
-      item.note = item.note ? `${item.note} · ${extraNote}` : extraNote
+      item.note = (item.note ? `${item.note} · ${extraNote}` : extraNote).slice(0, ITEM_NOTE_MAX)
     }
     rememberProductLocally(item.name, add)
     rememberFolderLocally(item.folderId)
@@ -602,7 +659,7 @@ export const useListStore = defineStore('list', () => {
   /** A new folder for the group; one with the same name (case and accents don't count) is reused. */
   function createFolder(name: string): ShoppingFolder | null {
     const clean = cleanDisplayName(name).slice(0, 40)
-    if (!clean) return null
+    if (!clean || isGeneral(clean)) return null
     const existing = findFolderByName(clean)
     if (existing) return existing
     const folder: ShoppingFolder = {
@@ -617,12 +674,15 @@ export const useListStore = defineStore('list', () => {
     return folder
   }
 
+  /** «General» is where things without a folder go: no folder of the group can be called that. */
+  const isGeneral = (name: string) => normalizeName(name) === normalizeName(GENERAL_FOLDER)
+
   /** False if another folder already has that name. */
   function renameFolder(id: string, name: string): boolean {
     const folder = folders.value.find((f) => f.id === id)
     const clean = cleanDisplayName(name).slice(0, 40)
     if (!folder || !clean) return true
-    if (findFolderByName(clean, id)) return false
+    if (isGeneral(clean) || findFolderByName(clean, id)) return false
     if (clean === folder.name) return true
     folder.name = clean
     persist(() => supabase.from('shopping_folders').update({ name: clean }).eq('id', id))
@@ -775,6 +835,8 @@ export const useListStore = defineStore('list', () => {
     findPendingDuplicate,
     suggest,
     pendingWrites,
+    unreachable,
+    dropWrites,
     load,
     openSaved,
     refresh,

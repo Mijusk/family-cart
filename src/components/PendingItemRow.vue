@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useGroupStore } from '@/stores/group'
-import { GENERAL_FOLDER, useListStore } from '@/stores/list'
+import { GENERAL_FOLDER, ITEM_NAME_MAX, ITEM_NOTE_MAX, useListStore } from '@/stores/list'
 import type { Item } from '@/types'
 import { timeAgo } from '@/utils/date'
 import AppIcon from './AppIcon.vue'
@@ -66,9 +66,9 @@ function remove() {
     <form v-if="editing" class="edit" @submit.prevent="save" @keydown.esc="emit('close')">
       <div class="name-row">
         <PhotoPicker v-model="draft.photo" :size="48" />
-        <input v-model="draft.name" class="field" aria-label="Nombre" required />
+        <input v-model="draft.name" class="field" aria-label="Nombre" :maxlength="ITEM_NAME_MAX" required />
       </div>
-      <input v-model="draft.note" class="field" placeholder="Nota (opcional)" aria-label="Nota" maxlength="120" />
+      <input v-model="draft.note" class="field" placeholder="Nota (opcional)" aria-label="Nota" :maxlength="ITEM_NOTE_MAX" />
       <select v-if="list.folders.length" v-model="draft.folderId" class="field" aria-label="Carpeta">
         <option :value="null">{{ GENERAL_FOLDER }}</option>
         <option v-for="folder in list.sortedFolders" :key="folder.id" :value="folder.id">{{ folder.name }}</option>

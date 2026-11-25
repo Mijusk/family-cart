@@ -9,6 +9,7 @@ import { errorText, isNetworkError } from '@/utils/errors'
 import { useCalendarStore } from './calendar'
 import { useListStore } from './list'
 import { useTasksStore } from './tasks'
+import { useToastStore } from './toast'
 
 /**
  * loading → signed-out | no-group | ready; error if Supabase can't be reached.
@@ -71,6 +72,9 @@ function writeActiveGroup(groupId: string | null) {
     // Not remembered; see readActiveGroup.
   }
 }
+
+/** It never got to the server, as opposed to the server answering with an error. */
+const isUnreachable = (e: unknown) => isNetworkError(e) || isAuthRetryableFetchError(e)
 
 export const useGroupStore = defineStore('group', () => {
   const status = ref<SessionStatus>('loading')
@@ -170,6 +174,8 @@ export const useGroupStore = defineStore('group', () => {
       status.value = 'loading'
       errorMessage.value = null
     }
+    // Without connection there is no point in waiting for every request to give up first.
+    if (!quiet && !navigator.onLine && openSavedCopy()) return
     try {
       const { data, error } = await supabase.auth.getSession()
       // Offline: show the retry screen. Any other auth error (an expired or revoked session) means
@@ -183,6 +189,7 @@ export const useGroupStore = defineStore('group', () => {
         status.value = 'signed-out'
         return
       }
+      if (userId.value && userId.value !== user.id) useListStore().dropWrites()
       userId.value = user.id
       email.value = user.email ?? null
       // Sessions from before email accounts (anonymous devices) have no person: start over.
@@ -199,7 +206,7 @@ export const useGroupStore = defineStore('group', () => {
       await pickGroup()
       savedCopy.value = false
     } catch (e) {
-      const unreachable = isNetworkError(e) || isAuthRetryableFetchError(e)
+      const unreachable = isUnreachable(e)
       // Still without connection: the next 'online' (or coming back to the app) tries again.
       if (quiet && unreachable) return console.error(e)
       if (!quiet && unreachable && openSavedCopy()) return
@@ -208,8 +215,8 @@ export const useGroupStore = defineStore('group', () => {
   }
 
   /**
-   * Without connection, opens the last group as it was saved on this device; false if there is
-   * no copy (never opened here, or signed out since).
+   * Without connection, opens the last group as it was saved on this device, or else any other that
+   * was; false if there is no copy (never opened here, or signed out since).
    */
   function openSavedCopy(): boolean {
     // A session that couldn't be refreshed offline still belongs to the last account here.
@@ -218,8 +225,9 @@ export const useGroupStore = defineStore('group', () => {
     if (!uid || !session) return false
     const wanted = readActiveGroup()
     const active = session.memberships.filter((m) => m.status === 'active')
-    const target = active.find((m) => m.groupId === wanted) ?? active[0]
-    const saved = target && readSnapshot<SavedGroup>(uid, `group:${target.groupId}`)
+    const copyOf = (m: Membership) => readSnapshot<SavedGroup>(uid, `group:${m.groupId}`)
+    const target = [...active].sort((a, b) => Number(b.groupId === wanted) - Number(a.groupId === wanted)).find(copyOf)
+    const saved = target && copyOf(target)
     if (!target || !saved) return false
     userId.value = uid
     email.value = session.email
@@ -264,12 +272,13 @@ export const useGroupStore = defineStore('group', () => {
     status.value = 'error'
     savedCopy.value = false
     errorMessage.value = errorText(e) || 'Error desconocido'
-    offline.value = isNetworkError(e) || isAuthRetryableFetchError(e)
+    offline.value = isUnreachable(e)
     initPromise = null
   }
 
   function clearSession() {
     closeGroup()
+    useListStore().dropWrites()
     if (myChannel) void supabase.removeChannel(myChannel)
     myChannel = null
     userId.value = null
@@ -370,9 +379,16 @@ export const useGroupStore = defineStore('group', () => {
     if (!target || groupId === current.value?.id) return
     status.value = 'loading'
     try {
+      if (!navigator.onLine) throw new TypeError('Failed to fetch') // It would, after several tries.
       await openGroup(target)
     } catch (e) {
-      fail(e)
+      writeActiveGroup(groupId)
+      if (!isUnreachable(e) || !openSavedCopy()) return fail(e)
+      console.error(e)
+      if (current.value!.id === groupId) return
+      // Not saved here: back in one that is, also once there is connection.
+      writeActiveGroup(current.value!.id)
+      useToastStore().show(`Sin conexión, ${target.groupName} no se puede abrir en este dispositivo.`)
     }
   }
 

@@ -41,6 +41,18 @@ export function crossesMidnight(t: { allDay: boolean; startTime: string | null; 
   return !t.allDay && !!t.startTime && !!t.endTime && t.endTime < t.startTime
 }
 
+/**
+ * A cheap first look, to leave out most events of a day before expanding them: false when nothing
+ * of this one can start on `day` or run into it from the night before.
+ */
+export function mayHappenOn(t: EventTiming, exceptions: EventException[], day: IsoDate): boolean {
+  // A changed day can have been moved anywhere.
+  if (exceptions.some((x) => x.overrides.startDate)) return true
+  if (t.startDate > day) return false
+  const last = t.repeat === 'none' ? t.startDate : t.repeatUntil
+  return !last || last >= day || last >= addDays(day, -1)
+}
+
 /** One occurrence after applying its exception. */
 export interface ExpandedOccurrence {
   seriesDate: IsoDate
@@ -82,6 +94,24 @@ export function occurrencesBetween(
     if (x.status === 'modified' && x.overrides.startDate && isSeriesDate(t, x.occurrenceDate)) consider(x.occurrenceDate)
   }
   return result.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+}
+
+/** How far ahead nearestSeriesDate looks: a monthly event on the 31st comes round well before. */
+const LOOK_AHEAD_DAYS = 400
+
+/**
+ * The date of the series to show an event on, opened from a link with `day` (or none): that day, the
+ * one an exception moved to that day, or else the next one from it (from `today` without a day) that
+ * still happens; its start if there is none left.
+ */
+export function nearestSeriesDate(t: EventTiming, exceptions: EventException[], day: IsoDate | null, today: IsoDate): IsoDate {
+  if (t.repeat === 'none') return t.startDate
+  if (day && isSeriesDate(t, day)) return day
+  const moved = day && exceptions.find((x) => x.status === 'modified' && x.overrides.startDate === day && isSeriesDate(t, x.occurrenceDate))
+  if (moved) return moved.occurrenceDate
+  const from = day ?? today
+  const cancelled = new Set(exceptions.filter((x) => x.status === 'cancelled').map((x) => x.occurrenceDate))
+  return seriesDates(t, from, addDays(from, LOOK_AHEAD_DAYS)).find((d) => !cancelled.has(d)) ?? t.startDate
 }
 
 /** How long a «Recordatorio» lasts: it is stored with an end (events_times), never shown. */

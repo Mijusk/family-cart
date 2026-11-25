@@ -1,0 +1,213 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { callsTo, fakeSupabase } from './testSupabase'
+
+const fake = vi.hoisted(() => ({ current: null as unknown as ReturnType<typeof import('./testSupabase').fakeSupabase> }))
+vi.mock('@/lib/supabase', () => ({
+  supabase: new Proxy({}, { get: (_, key) => Reflect.get(fake.current.client, key) }),
+}))
+
+// The connection coming back, without a window to say so.
+const waiters = vi.hoisted(() => [] as (() => void)[])
+vi.mock('@/lib/offline', async (original) => ({
+  ...(await original<typeof import('@/lib/offline')>()),
+  whenOnline: () => (navigator.onLine ? Promise.resolve() : new Promise<void>((resolve) => waiters.push(resolve))),
+}))
+const wakeWaiters = () => waiters.splice(0).forEach((resolve) => resolve())
+
+import { useGroupStore } from './group'
+import { useListStore } from './list'
+import { useToastStore } from './toast'
+
+const down = { error: { message: 'TypeError: Failed to fetch' } }
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.stubGlobal('navigator', { onLine: true })
+  vi.stubGlobal('window', { isSecureContext: true })
+  setActivePinia(createPinia())
+  fake.current = fakeSupabase()
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
+
+async function openList() {
+  const list = useListStore()
+  await list.load('g1')
+  return list
+}
+
+describe('writes on a weak signal', () => {
+  it('keep trying until they reach the server, in order', async () => {
+    const list = await openList()
+    const { answers, calls } = fake.current
+    answers.items = down
+    const leche = list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    list.addItem({ name: 'pan', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(list.pendingWrites).toBe(2)
+    expect(list.unreachable).toBe(true)
+    expect(list.pendingItems.map((i) => i.name)).toContain('Leche')
+
+    answers.items = {}
+    const before = calls.length
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(list.pendingWrites).toBe(0)
+    expect(list.unreachable).toBe(false)
+    const sent = callsTo(calls.slice(before), 'items', 'insert')
+    expect(sent).toHaveLength(2)
+    expect(sent[0]!.steps[0]![1][0]).toMatchObject({ id: leche.id, name: 'Leche' })
+  })
+
+  it('also when the server is down for a moment', async () => {
+    const list = await openList()
+    const { answers, calls } = fake.current
+    answers.items = { error: { message: 'Bad gateway' }, status: 502 }
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    answers.items = {}
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(list.pendingWrites).toBe(0)
+    expect(callsTo(calls, 'items', 'insert').length).toBeGreaterThan(1)
+  })
+
+  it('take a row that is already there as saved, after a first try', async () => {
+    const list = await openList()
+    const { answers } = fake.current
+    answers.items = down
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(1_000)
+    answers.items = { error: { message: 'duplicate key value violates unique constraint "items_pkey"' } }
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(list.pendingWrites).toBe(0)
+    expect(list.pendingItems.map((i) => i.name)).toEqual(['Leche'])
+    expect(useToastStore().current?.message).toBe('Añadido: Leche')
+  })
+
+  it('that the server turns down are told and undone', async () => {
+    const list = await openList()
+    const { answers } = fake.current
+    answers.items = (call) =>
+      call.steps.some(([m]) => m === 'insert') ? { error: { message: 'permission denied' }, status: 403 } : {}
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(list.pendingWrites).toBe(0)
+    expect(list.pendingItems).toHaveLength(0)
+    expect(useToastStore().current?.message).toMatch(/se ha deshecho/)
+  })
+
+  it('wait for the session to be renewed when its token ran out', async () => {
+    const list = await openList()
+    const { answers, calls } = fake.current
+    answers.items = { error: { message: 'permission denied for table items', code: '42501' }, status: 401 }
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    expect(list.pendingWrites).toBe(1)
+    answers.items = {}
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(list.pendingWrites).toBe(0)
+    expect(callsTo(calls, 'items', 'insert').length).toBeGreaterThan(1)
+  })
+
+  it('keep the photo until it can be uploaded, once', async () => {
+    const list = await openList()
+    const { answers, calls } = fake.current
+    answers['storage.upload'] = down
+    list.addItem({ name: 'leche', folderId: null, quantity: 1, photo: new Blob(['x']) })
+    await vi.advanceTimersByTimeAsync(1_000)
+    // Uploaded this time, but the item is not.
+    answers['storage.upload'] = {}
+    answers.items = down
+    await vi.advanceTimersByTimeAsync(4_000)
+    answers['storage.upload'] = { error: { message: 'The resource already exists' } }
+    answers.items = {}
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(list.pendingWrites).toBe(0)
+    const row = callsTo(calls, 'items', 'insert').at(-1)!.steps[0]![1][0] as { photo_path: string | null }
+    expect(row.photo_path).toMatch(/^g1\//)
+    expect(list.pendingItems[0]!.photoPath).toBe(row.photo_path)
+  })
+
+  it('waiting without connection are not sent after signing out', async () => {
+    const list = await openList()
+    vi.stubGlobal('navigator', { onLine: false })
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(1_000)
+    list.dropWrites()
+    vi.stubGlobal('navigator', { onLine: true })
+    const before = fake.current.calls.length
+    wakeWaiters()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(fake.current.calls.slice(before)).toHaveLength(0)
+  })
+
+  it('are dropped on signing out', async () => {
+    const list = await openList()
+    const { answers, calls } = fake.current
+    answers.items = down
+    list.addItem({ name: 'leche', folderId: null, quantity: 1 })
+    await vi.advanceTimersByTimeAsync(1_000)
+    list.dropWrites()
+    answers.items = {}
+    const before = calls.length
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(calls.slice(before)).toHaveLength(0)
+    expect(list.pendingWrites).toBe(0)
+  })
+})
+
+describe('the catalog', () => {
+  it("has a new product once when the server's row arrives", async () => {
+    const list = await openList()
+    list.addItem({ name: 'Plátanos', folderId: null, quantity: 1 })
+    expect(list.suggest('plat', null)).toHaveLength(1)
+    fake.current.emit('products', {
+      eventType: 'INSERT',
+      new: { id: 'server-id', group_id: 'g1', normalized_name: 'platanos', display_name: 'Plátanos', last_quantity: 1, times_used: 1 },
+    })
+    expect(list.suggest('plat', null).map((s) => s.product.id)).toEqual(['server-id'])
+  })
+})
+
+describe('opening another group', () => {
+  it('before the first one has loaded listens only to the second', async () => {
+    const { answers, channels } = fake.current
+    let arrive = () => {}
+    answers.items = () => new Promise((resolve) => (arrive = () => resolve({})))
+    const list = useListStore()
+    const first = list.load('g1')
+    await vi.advanceTimersByTimeAsync(10)
+    answers.items = {}
+    await list.load('g2')
+    arrive()
+    await first
+    expect(channels).toEqual(['list:g2'])
+  })
+})
+
+describe('the copy on the device', () => {
+  it('is not replaced by an empty list while the list is still loading', async () => {
+    const stored = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+    })
+    useGroupStore().userId = 'u1'
+    const { answers } = fake.current
+    answers.items = { data: [{ id: 'i1', group_id: 'g1', name: 'Leche', status: 'pending', folder_id: null, added_at: '2026-11-25' }] }
+    const list = await openList()
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // Away and back, with a network that never answers.
+    list.unload()
+    answers.items = () => new Promise(() => {})
+    void list.load('g1')
+    await vi.advanceTimersByTimeAsync(10_000)
+    list.openSaved('g1')
+    expect(list.pendingItems.map((i) => i.name)).toEqual(['Leche'])
+  })
+})

@@ -110,7 +110,11 @@ function add() {
   if (!title || !listId) return
   // With "Mías" on, a new task is mine, or it would vanish from the view.
   const mine = onlyMine.value && store.assignees(listId).some((a) => a.personId === groupStore.me?.id)
-  store.addTask(listId, title.slice(0, 120), mine ? { assignees: [groupStore.me!.id] } : {}).catch((e) => toast.show(friendlyError(e)))
+  store.addTask(listId, title.slice(0, 120), mine ? { assignees: [groupStore.me!.id] } : {}).catch((e) => {
+    // Back in the box to try again, unless the next one is already being written.
+    if (!newTitle.value) newTitle.value = title
+    toast.show(friendlyError(e))
+  })
   newTitle.value = ''
   titleInput.value?.focus()
 }

@@ -58,6 +58,13 @@ describe('timeline', () => {
     expect(timeline([item('10:00', '10:05')], day).blocks[0]!.height).toBe(MIN_BLOCK_PX)
   })
 
+  it('short occurrences one right after the other go side by side, not one on top of the other', () => {
+    const t = timeline([item('12:00', '12:15'), item('12:15', '12:30'), item('12:30', '13:30')], day)
+    expect(t.blocks.map((b) => [b.column, b.columns])).toEqual([[0, 2], [1, 2], [0, 2]])
+    const apart = timeline([item('12:00', '12:30'), item('12:30', '13:00')], day)
+    expect(apart.blocks.map((b) => b.columns)).toEqual([1, 1])
+  })
+
   it('crossing midnight: to the end of the day, and from its start the next day', () => {
     const tonight = timeline([item('23:00', '01:00')], day)
     expect(tonight.hours.at(-1)!.label).toBe('00:00')
