@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { dueLabel } from '@/lib/tasks'
@@ -46,16 +46,18 @@ watch(
   { immediate: true },
 )
 
-const saving = ref(false)
 async function save(change: TaskChange) {
   if (!task.value) return
-  saving.value = true
+  const { id } = task.value
   try {
-    await store.updateTask(task.value.id, change)
+    await store.updateTask(id, change)
   } catch (e) {
     toast.show(friendlyError(e))
-  } finally {
-    saving.value = false
+    // What was written stays in its field, to try again on leaving it.
+    await nextTick()
+    if (task.value?.id !== id || editingText.value) return
+    if (change.title) title.value = change.title
+    if (change.notes) notes.value = change.notes
   }
 }
 

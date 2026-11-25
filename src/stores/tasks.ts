@@ -329,13 +329,12 @@ export const useTasksStore = defineStore('tasks', () => {
 
   // ── Lists ──────────────────────────────────────────────────
 
-  /** A new list for me, or for a profile I manage, shared with the groups given. */
-  async function createList(name: string, ownerId: string, groupIds: string[]): Promise<TaskList> {
+  /** A new private list for me, or for a profile I manage. */
+  async function createList(name: string, ownerId: string): Promise<TaskList> {
     const { data, error } = await supabase.from('task_lists').insert({ owner_id: ownerId, name }).select().single()
     if (error) throw error
     const list = toTaskList(data)
     lists.value.push(list)
-    for (const groupId of groupIds) await setShare(list.id, groupId, true)
     return list
   }
 

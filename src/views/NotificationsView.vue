@@ -36,11 +36,12 @@ const days = computed(() => {
 
 const isNew = (n: InboxNotification) => seenBefore.value !== null && inbox.isUnread(n, seenBefore.value)
 
-onMounted(async () => {
+async function open() {
   await inbox.load()
   seenBefore.value = inbox.seenAt
   await inbox.markSeen()
-})
+}
+onMounted(open)
 </script>
 
 <template>
@@ -57,7 +58,7 @@ onMounted(async () => {
     <p v-if="inbox.status === 'loading'" class="empty muted" aria-busy="true">Cargando…</p>
     <div v-else-if="inbox.status === 'error'" class="empty" role="alert">
       <p class="muted">No se han podido cargar los avisos.</p>
-      <button type="button" class="btn btn-ghost" @click="inbox.load()">Reintentar</button>
+      <button type="button" class="btn btn-ghost" @click="open">Reintentar</button>
     </div>
     <div v-else-if="!days.length" class="empty">
       <span class="empty-icon"><AppIcon name="bell" :size="28" /></span>
