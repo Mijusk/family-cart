@@ -109,6 +109,8 @@ export const useListStore = defineStore('list', () => {
   /** The phone says it is online, but the writes don't get to the server (a weak signal). */
   const unreachable = ref(false)
   let channel: RealtimeChannel | null = null
+  /** The group's list is here, as opposed to still on its way (empty meanwhile). */
+  let loaded = false
 
   // ── Getters ────────────────────────────────────────────────
 
@@ -195,6 +197,7 @@ export const useListStore = defineStore('list', () => {
     groupId.value = gid
     const saved = groupStore.userId ? readSnapshot<SavedList>(groupStore.userId, `list:${gid}`) : null
     if (!saved) return
+    loaded = true
     // Copies saved before there were folders: everything in «General».
     items.value = saved.items.map((i) => ({ ...i, folderId: i.folderId ?? null }))
     products.value = saved.products
@@ -214,7 +217,7 @@ export const useListStore = defineStore('list', () => {
       saveTimer = setTimeout(() => {
         const gid = groupId.value
         const uid = groupStore.userId
-        if (!gid || !uid || pendingWrites.value) return
+        if (!gid || !uid || !loaded || pendingWrites.value) return
         saveSnapshot(uid, `list:${gid}`, {
           items: items.value,
           products: products.value,
@@ -230,6 +233,7 @@ export const useListStore = defineStore('list', () => {
   function unload() {
     if (channel) void supabase.removeChannel(channel)
     channel = null
+    loaded = false
     groupId.value = null
     items.value = []
     products.value = []
@@ -263,6 +267,7 @@ export const useListStore = defineStore('list', () => {
       if (tripsRes.error) throw tripsRes.error
       if (foldersRes.error) throw foldersRes.error
       if (seq !== writeSeq) continue
+      loaded = true
       items.value = itemsRes.data.map(toItem)
       products.value = productsRes.data.map(toProduct)
       trips.value = tripsRes.data.map(toTrip)

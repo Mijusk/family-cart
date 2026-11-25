@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
+import { goBack } from '@/router/back'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import { friendlyError } from '@/utils/errors'
@@ -156,10 +157,10 @@ async function cancelRequest(groupId: string, name: string) {
       </template>
     </header>
 
-    <RouterLink v-if="mode === 'choose' && groupStore.status === 'ready'" :to="{ name: 'group' }" class="back-link">
+    <button v-if="mode === 'choose' && groupStore.status === 'ready'" type="button" class="back-link" @click="goBack({ name: 'group' })">
       <AppIcon name="back" :size="16" />
       Volver a {{ groupStore.group.name }}
-    </RouterLink>
+    </button>
 
     <section v-if="mode === 'choose' && groupStore.pendingMemberships.length" class="pending" aria-live="polite">
       <h2 class="pending-title">Esperando aprobación</h2>

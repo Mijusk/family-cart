@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import PersonAvatar from '@/components/PersonAvatar.vue'
 import { signOut } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
+import { goBack } from '@/router/back'
 import { disablePush, enablePush, NOTIFICATION_KINDS, pushState, type PushState } from '@/lib/push'
 import { useGroupStore } from '@/stores/group'
+import { useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
 import { PERSON_COLORS } from '@/utils/colors'
 import { longDate } from '@/utils/date'
@@ -15,6 +16,7 @@ import { cleanDisplayName } from '@/utils/text'
 import type { NotificationKind } from '@/types'
 
 const groupStore = useGroupStore()
+const list = useListStore()
 const toast = useToastStore()
 
 const me = computed(() => groupStore.me!)
@@ -137,6 +139,12 @@ async function copyConnectorUrl() {
 
 /** The group store hears the sign-out and starts over; App.vue then shows the sign-in screen. */
 async function logOut() {
+  const n = list.pendingWrites
+  const unsaved =
+    n === 1
+      ? 'Hay un cambio de la compra sin guardar: si cierras sesión ahora, se perderá.'
+      : `Hay ${n} cambios de la compra sin guardar: si cierras sesión ahora, se perderán.`
+  if (n && !window.confirm(`${unsaved} ¿Cerrar sesión?`)) return
   leaving.value = true
   try {
     await signOut()
@@ -150,10 +158,10 @@ async function logOut() {
 <template>
   <div class="page">
     <header class="page-header">
-      <RouterLink :to="groupStore.status === 'ready' ? { name: 'group' } : { name: 'welcome' }" class="back-link">
+      <button type="button" class="back-link" @click="goBack(groupStore.status === 'ready' ? { name: 'group' } : { name: 'welcome' })">
         <AppIcon name="back" :size="16" />
         Volver
-      </RouterLink>
+      </button>
       <div class="who">
         <PersonAvatar :name="me.displayName" :color="me.color" :size="56" />
         <div>

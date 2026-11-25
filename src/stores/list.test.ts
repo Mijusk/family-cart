@@ -7,6 +7,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: new Proxy({}, { get: (_, key) => Reflect.get(fake.current.client, key) }),
 }))
 
+import { useGroupStore } from './group'
 import { useListStore } from './list'
 import { useToastStore } from './toast'
 
@@ -116,5 +117,28 @@ describe('the catalog', () => {
       new: { id: 'server-id', group_id: 'g1', normalized_name: 'platanos', display_name: 'Plátanos', last_quantity: 1, times_used: 1 },
     })
     expect(list.suggest('plat', null).map((s) => s.product.id)).toEqual(['server-id'])
+  })
+})
+
+describe('the copy on the device', () => {
+  it('is not replaced by an empty list while the list is still loading', async () => {
+    const stored = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => stored.get(k) ?? null,
+      setItem: (k: string, v: string) => void stored.set(k, v),
+    })
+    useGroupStore().userId = 'u1'
+    const { answers } = fake.current
+    answers.items = { data: [{ id: 'i1', group_id: 'g1', name: 'Leche', status: 'pending', folder_id: null, added_at: '2026-11-25' }] }
+    const list = await openList()
+    await vi.advanceTimersByTimeAsync(2_000)
+
+    // Away and back, with a network that never answers.
+    list.unload()
+    answers.items = () => new Promise(() => {})
+    void list.load('g1')
+    await vi.advanceTimersByTimeAsync(10_000)
+    list.openSaved('g1')
+    expect(list.pendingItems.map((i) => i.name)).toEqual(['Leche'])
   })
 })

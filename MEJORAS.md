@@ -30,14 +30,14 @@ se ha comprobado y qué queda.
 | 11 | Racha sin conexión: dos envíos a la vez pueden perder una sesión pendiente, y no se reintenta al volver a la app | `stores/stretching.ts` `flush()` | **hecho** |
 | 12 | Tocar una notificación con la app abierta la recarga entera: se pierde lo que se estuviera escribiendo y los cambios de la compra en cola | `public/sw.js` `notificationclick` | **hecho** |
 | 13 | Con red muy lenta, abrir la app se queda en blanco esperando aunque esté guardada | `public/sw.js` `networkFirst` sin límite de tiempo | **hecho** |
-| 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | pendiente |
+| 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | **hecho** |
 | 15 | Seguridad: la pantalla `/autorizar` se puede meter en un iframe (clickjacking) | `vercel.json` sin cabeceras | pendiente |
 | 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | pendiente |
 | 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | pendiente |
 | 18 | Semana y Hoy: dos eventos cortos seguidos se pintan uno encima del otro | `lib/timeline.ts`, `MIN_BLOCK_PX` | pendiente |
-| 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | pendiente |
+| 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | **hecho** |
 | 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | pendiente |
-| 21 | Cuenta y «Añadir otro grupo» vuelven siempre a Grupo (la regla es `goBack()`) | `AccountView.vue`, `WelcomeView.vue` | pendiente |
+| 21 | Cuenta y «Añadir otro grupo» vuelven siempre a Grupo (la regla es `goBack()`) | `AccountView.vue`, `WelcomeView.vue` | **hecho** |
 | 22 | Vite con avisos de seguridad altos (solo desarrollo, pero `npm run dev` escucha en la red local) | `npm audit` | pendiente |
 | 23 | Los avisos recorren cada minuto todos los eventos con recordatorio, también los pasados | SQL `enqueue_event_reminders` | pendiente |
 | 24 | README: secciones y documentos desactualizados | `README.md` | pendiente |
@@ -57,6 +57,9 @@ se ha comprobado y qué queda.
 - **9.** `ver_compra` enseña también lo no encontrado y `anadir_compra` suma a esa línea. `deno check` pasa; se publica al desplegar la función.
 - **10.** Los días se piden por páginas de 1000. Test con 1500 días seguidos.
 - **11.** La sesión terminada se guarda primero en el dispositivo y se envía una sola vez, en orden; se reintenta al volver a la app. Tests en `stretching.test.ts`.
+- **19.** Al cerrar sesión con cambios de la compra en cola, pregunta antes. Comprobado en Chromium.
+- **21.** Cuenta y «Añadir otro grupo» vuelven con `goBack()`. Comprobado en Chromium.
+- **14.** Sin conexión, cambiar de grupo abre la copia guardada al momento (antes, 7 s y pantalla de error); si ese grupo no se ha abierto en el dispositivo, vuelve al que estaba y lo dice. Abrir la app sin red tampoco espera ya. Además, la copia guardada ya no se puede sustituir por una lista vacía a medio cargar (test en `list.test.ts`, que falla sin el arreglo).
 
 ## Decisiones tomadas
 
