@@ -44,7 +44,8 @@ function save() {
   if (!draft.value.trim()) return
   if (mode.value === 'new') {
     const folder = list.createFolder(draft.value)
-    if (folder) emit('show', folder.id)
+    // None is made for «General», which is already there.
+    emit('show', folder?.id ?? null)
   } else if (openFolder.value && !list.renameFolder(openFolder.value.id, draft.value)) {
     error.value = 'Ya hay una carpeta con ese nombre.'
     return

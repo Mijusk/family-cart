@@ -2,7 +2,8 @@
 import AppIcon from './AppIcon.vue'
 
 const MIN = 1
-const MAX = 99
+/** What the database takes: lines added together go past 99. */
+const MAX = 999
 
 const quantity = defineModel<number>({ required: true })
 defineProps<{ label?: string }>()

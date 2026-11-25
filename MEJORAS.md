@@ -49,6 +49,7 @@ se ha comprobado y qué queda.
 | 30 | Tareas: si falla al guardar (sin red), se pierde el título nuevo o la nota escrita | `TasksView.vue` `add()`, `TaskView.vue` `save()` | **hecho** |
 | 31 | Nueva lista de tareas: si falla compartirla, reintentar crea otra | `stores/tasks.ts` `createList()` | **hecho** |
 | 32 | Avisos: si la primera carga falla, al reintentar no se marcan como vistos | `NotificationsView.vue` | **hecho** |
+| 33 | Se aceptan fechas que no existen (31 de febrero), editar una cantidad mayor de 99 la baja a 99 al salir del campo, y se puede crear una carpeta «General» que se confunde con la de siempre | `utils/isoDays.ts`, `QuantityStepper.vue`, `stores/list.ts` | **hecho** |
 
 ## Hecho
 
@@ -84,6 +85,7 @@ se ha comprobado y qué queda.
 - **31.** La lista se crea una vez y queda abierta para volver a marcar el grupo. Comprobado en Chromium.
 - **32.** Reintentar hace lo mismo que abrir la pantalla.
 - **30.** Lo escrito se queda en su campo para reintentar. Comprobado en Chromium cortando la red.
+- **33.** Fechas: test en `days.test.ts`. Cantidad hasta 999 (lo que admite la base) y «General» reservada: solo types, tests y build; no probadas a mano.
 
 ## Decisiones tomadas
 
@@ -103,8 +105,10 @@ se ha comprobado y qué queda.
 - `npm test`: 202 tests (171 al empezar), con tests nuevos de los stores de calendario, tareas, compra y rachas.
 - Permisos: 365 ok, 0 failed (360 al empezar). `npm run build` y `deno check` de la función `mcp`: bien.
 - `npm audit`: 0 (2 altos al empezar). Calcular un mes con 330 eventos: 26 ms (270 ms al empezar).
-- Revisiones: la segunda dio los puntos 25–32; la tercera (flujos completos con fallos de red) y la cuarta (migraciones,
-  respiración y estiramientos) no encontraron nada más que mereciera la pena.
+- Revisiones: la segunda dio los puntos 25–32. La tercera (flujos con fallos de red) y la cuarta (migraciones, respiración y
+  estiramientos) fueron **parciales**, aunque el primer resumen las daba por revisiones sin nada. En aquel recorrido de
+  pantallas, además, cuatro no se vieron de verdad: las dos papeleras, Respiración (id que no existe) y el permiso de IA.
+  La quinta lo repite con datos en todas: las 28 cargan con su título, sin errores ni desbordes; dio el punto 33.
 
 ## Pendiente de Luis
 

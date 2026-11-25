@@ -659,7 +659,7 @@ export const useListStore = defineStore('list', () => {
   /** A new folder for the group; one with the same name (case and accents don't count) is reused. */
   function createFolder(name: string): ShoppingFolder | null {
     const clean = cleanDisplayName(name).slice(0, 40)
-    if (!clean) return null
+    if (!clean || isGeneral(clean)) return null
     const existing = findFolderByName(clean)
     if (existing) return existing
     const folder: ShoppingFolder = {
@@ -674,12 +674,15 @@ export const useListStore = defineStore('list', () => {
     return folder
   }
 
+  /** «General» is where things without a folder go: no folder of the group can be called that. */
+  const isGeneral = (name: string) => normalizeName(name) === normalizeName(GENERAL_FOLDER)
+
   /** False if another folder already has that name. */
   function renameFolder(id: string, name: string): boolean {
     const folder = folders.value.find((f) => f.id === id)
     const clean = cleanDisplayName(name).slice(0, 40)
     if (!folder || !clean) return true
-    if (findFolderByName(clean, id)) return false
+    if (isGeneral(clean) || findFolderByName(clean, id)) return false
     if (clean === folder.name) return true
     folder.name = clean
     persist(() => supabase.from('shopping_folders').update({ name: clean }).eq('id', id))
