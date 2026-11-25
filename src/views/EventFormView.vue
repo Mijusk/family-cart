@@ -14,6 +14,7 @@ import type { RepeatKind } from '@/types'
 import { FOLDER_COLORS } from '@/utils/colors'
 import { isIsoDate, longDay, today, WEEKDAY_INITIALS, WEEKDAY_NAMES, weekday } from '@/utils/days'
 import { friendlyError } from '@/utils/errors'
+import { newId } from '@/utils/id'
 import { cleanDisplayName } from '@/utils/text'
 
 // Creates an event (/calendario/nuevo, ?copia=<id> to duplicate one), edits a whole event
@@ -32,6 +33,9 @@ const queryDay = computed(() => (isIsoDate(route.query.dia) ? route.query.dia : 
 const onlyDay = computed(() => !!editingId.value && route.query.solo === 'dia')
 
 const NEW_FOLDER = '__new'
+
+/** A new event's id, the same every time «Guardar» is tried. */
+const newEventId = newId()
 
 /** Others with this event open in the form; last save wins, so they get a warning. */
 const editors = useEditors(editingId, () => {
@@ -373,7 +377,8 @@ async function save() {
     const groupIds = form.groupIds.filter((id) => offered.includes(id) && !calendar.sharedGroupIds(calendarId).includes(id))
     // The owner goes anyway.
     const participantIds = form.participantIds.filter((p) => p !== folderOwnerId.value)
-    const id = await calendar.saveEvent(draft, groupIds, participantIds, editingId.value ?? undefined)
+    const id = editingId.value ?? newEventId
+    await calendar.saveEvent(draft, groupIds, participantIds, id)
     saved = true
     // Back to where the form was opened from: the event, or the calendar view.
     if (editingId.value) {

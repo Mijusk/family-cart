@@ -3,7 +3,7 @@
 
 export interface FakeAnswer {
   data?: unknown
-  error?: { message: string } | null
+  error?: { message: string; code?: string } | null
 }
 
 export interface FakeCall {

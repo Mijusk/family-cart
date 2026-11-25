@@ -51,6 +51,9 @@ export type EventDraft = Pick<
   | 'reminderOnly'
 >
 
+/** Postgres: a row with that key is already there. */
+const UNIQUE_VIOLATION = '23505'
+
 /** Days loaded around what a view shows, so moving to the next week or month needs no load. */
 const RANGE_MARGIN_DAYS = 31
 /** How far the loaded days grow past what a view shows when it has to. */
@@ -379,25 +382,27 @@ export const useCalendarStore = defineStore('calendar', () => {
   // ── Events ─────────────────────────────────────────────────
 
   /**
-   * Creates or updates a whole event (the series, if it repeats), its extra groups and who goes. The saved
-   * row goes into the store at once, so the screens show it; a reload in the background (and
+   * Creates or updates a whole event (the series, if it repeats), its extra groups and who goes. A new
+   * one comes with the id it will have (newId), so trying again after a failure halfway goes on with the
+   * same event instead of creating another. The saved row goes into the store at once, so the screens show it; a reload in the background (and
    * Realtime) brings the rest (exceptions, history…). That reload failing doesn't undo the save.
    */
-  async function saveEvent(draft: EventDraft, groupIds: string[], participantIds: string[], id?: string): Promise<string> {
+  async function saveEvent(draft: EventDraft, groupIds: string[], participantIds: string[], id: string): Promise<void> {
     const row = fromEvent(draft)
-    const { data, error } = id
+    let res = eventById(id)
       ? await supabase.from('events').update(row).eq('id', id).select().single()
-      : await supabase.from('events').insert(row).select().single()
-    if (error) throw error
-    await setEventGroups(data.id, groupIds)
-    await setParticipants(data.id, participantIds)
-    putEvent(toEvent(data), groupIds, participantIds)
+      : await supabase.from('events').insert({ id, ...row }).select().single()
+    // Inserted by an earlier try whose answer never arrived.
+    if (res.error?.code === UNIQUE_VIOLATION) res = await supabase.from('events').update(row).eq('id', id).select().single()
+    if (res.error) throw res.error
+    putEvent(toEvent(res.data))
+    await setEventGroups(id, groupIds)
+    await setParticipants(id, participantIds)
     void reload().catch(() => {})
-    return data.id
   }
 
   /** A saved event, shown before the reload brings it. */
-  function putEvent(event: CalendarEvent, groupIds: string[], participantIds: string[]) {
+  function putEvent(event: CalendarEvent) {
     // Saved on a day outside the range, the next load would leave it out.
     pinnedIds.add(event.id)
     const i = events.value.findIndex((e) => e.id === event.id)
@@ -406,9 +411,6 @@ export const useCalendarStore = defineStore('calendar', () => {
     // Its folder is one I can edit, so it is loaded; the owner and color are the folder's.
     const folder = calendarById(event.calendarId)
     if (folder) owners.value[event.id] = { ownerId: folder.ownerId, color: folder.color }
-    // setEventGroups and setParticipants left exactly these.
-    eventGroups.value[event.id] = groupIds
-    participants.value[event.id] = participantIds
   }
 
   async function setEventGroups(eventId: string, groupIds: string[]) {
@@ -418,10 +420,12 @@ export const useCalendarStore = defineStore('calendar', () => {
     if (added.length) {
       const { error } = await supabase.from('event_shares').insert(added.map((group_id) => ({ event_id: eventId, group_id })))
       if (error) throw error
+      eventGroups.value[eventId] = [...current, ...added]
     }
     if (removed.length) {
       const { error } = await supabase.from('event_shares').delete().eq('event_id', eventId).in('group_id', removed)
       if (error) throw error
+      eventGroups.value[eventId] = groupIds
     }
   }
 
@@ -432,10 +436,12 @@ export const useCalendarStore = defineStore('calendar', () => {
     if (added.length) {
       const { error } = await supabase.from('event_participants').insert(added.map((person_id) => ({ event_id: eventId, person_id })))
       if (error) throw error
+      participants.value[eventId] = [...current, ...added]
     }
     if (removed.length) {
       const { error } = await supabase.from('event_participants').delete().eq('event_id', eventId).in('person_id', removed)
       if (error) throw error
+      participants.value[eventId] = personIds
     }
   }
 
