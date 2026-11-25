@@ -88,8 +88,38 @@ se ha comprobado y qué queda.
 ## Decisiones tomadas
 
 - Verificar los permisos con PGlite en vez de Docker, por memoria. CI los pasa con Supabase de verdad en el PR.
+- La interfaz se ha comprobado con la app compilada en Chromium (móvil, 360 y 390 px) y un Supabase simulado: no hay
+  Realtime ni base de datos de verdad en esas pruebas.
+- La migración `20261126120000_private_claim_codes` queda escrita y probada, sin aplicar. Va en su propio commit (`48455ce`):
+  si no la quieres ahora, se puede quitar sin tocar lo demás (la app funciona igual con ella y sin ella).
+- Un cambio de la compra se reintenta sin fin mientras no llegue (antes se deshacía a los 9 s): perder lo marcado en el
+  súper es peor que esperar. Se descarta solo al cerrar sesión, y antes pregunta.
+- Al dividir lo que se ve en columnas, un evento de menos de 30 min cuenta como media hora (su bloque ya se pinta así).
+- En un evento semanal nuevo, el día marcado sigue a la fecha; al editar una serie, no (ahí la fecha dice cuándo empieza).
+- Se deja el atenuado de los días pasados en Semana aunque axe lo marque: está en docs/calendario.md.
+
+## Estado final
+
+- `npm test`: 202 tests (171 al empezar), con tests nuevos de los stores de calendario, tareas, compra y rachas.
+- Permisos: 365 ok, 0 failed (360 al empezar). `npm run build` y `deno check` de la función `mcp`: bien.
+- `npm audit`: 0 (2 altos al empezar). Calcular un mes con 330 eventos: 26 ms (270 ms al empezar).
+- Revisiones: la segunda dio los puntos 25–32; la tercera (flujos completos con fallos de red) y la cuarta (migraciones,
+  respiración y estiramientos) no encontraron nada más que mereciera la pena.
 
 ## Pendiente de Luis
 
 1. **`npx supabase db push`** de `20261125120000_family_streaks` (según la memoria del proyecto, sin aplicar en la nube).
    Hasta entonces, Rachas solo enseña la propia.
+2. **Revisar la rama y decir cuándo abrir el PR** (no se ha hecho push).
+3. Tras fusionar: `npx supabase db push` (aplica también `20261126120000_private_claim_codes`) y
+   `npx supabase functions deploy mcp --no-verify-jwt --use-api` (punto 9). En tu PC, `npm install` (Vite) y
+   `npm run db:reset && npm run db:types` para confirmar `database.types.ts`. Ojo: `npm install` quitará `ical.js`, que está
+   en tu `node_modules` pero no en `package.json` (parece de `feat/feed-ics`).
+4. Probar en un móvil de verdad: tocar un aviso con la app abierta, y la lista de la compra con mala cobertura.
+5. Decisiones de producto, sin tocar:
+   - Guardar en el dispositivo la cola de la compra, para no perderla si se cierra la app sin red (hoy solo vive con la app abierta).
+   - Copia sin conexión del calendario y las tareas (hoy solo la compra).
+   - «Quitarme de este evento» para un participante: los permisos ya lo dejan, no hay botón.
+   - Canales de Realtime privados: quien sepa el id de un evento o grupo puede escuchar «está editando» y el aviso vacío de
+     cambios (no lleva títulos). Necesita políticas en `realtime.messages`.
+   - Un solo gris más oscuro para los días de otro mes en Mes (contraste 2,2; AA pide 4,5).
