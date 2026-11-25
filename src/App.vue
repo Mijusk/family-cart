@@ -9,11 +9,13 @@ import { useOnResume } from '@/composables/resume'
 import { sectionRedirect } from '@/router'
 import { useGroupStore } from '@/stores/group'
 import { useInboxStore } from '@/stores/inbox'
+import { useStretchingStore } from '@/stores/stretching'
 
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
 const inbox = useInboxStore()
+const stretching = useStretchingStore()
 
 /** The greeting, the bell and the menu go with the tab bar. */
 const withChrome = computed(() => groupStore.status === 'ready' && !route.meta.hideNav)
@@ -130,7 +132,11 @@ useOnResume(() => {
   if (groupStore.status === 'error' && groupStore.offline) void retry()
   else {
     void groupStore.catchUp()
-    if (groupStore.status === 'ready') void inbox.load()
+    if (groupStore.status === 'ready') {
+      void inbox.load()
+      // Also sends a routine finished without connection.
+      void stretching.load()
+    }
   }
 })
 
