@@ -17,7 +17,7 @@ import {
 import { readSnapshot, saveSnapshot, whenOnline } from '@/lib/offline'
 import { deletePhoto, newPhotoPath, showPhotoLocally, uploadPhoto } from '@/lib/photos'
 import type { Item, Product, ShoppingFolder, Trip } from '@/types'
-import { isNetworkError } from '@/utils/errors'
+import { errorText, friendlyError, isNetworkError } from '@/utils/errors'
 import { newId } from '@/utils/id'
 import { cleanDisplayName, normalizeName } from '@/utils/text'
 import { useGroupStore } from './group'
@@ -49,9 +49,11 @@ export interface TripSummary {
 
 /** How far back the history goes. */
 const HISTORY_DAYS = 60
-/** Tries for a write that doesn't reach the server although the phone says it is online. */
+/** Tries before saying that a write doesn't reach the server although the phone says it is online. */
 const NETWORK_TRIES = 3
+/** Wait before trying again, doubled each time after those tries, up to the longest. */
 const RETRY_MS = 3_000
+const LONGEST_RETRY_MS = 24_000
 
 /** Shown for items without a folder. */
 export const GENERAL_FOLDER = 'General'
@@ -64,6 +66,14 @@ interface SavedList {
   /** Missing in copies saved before there were folders. */
   folders?: ShoppingFolder[]
 }
+
+type WriteRequest = () => PromiseLike<{ error: unknown; status?: number }>
+
+/** Answers of a server (or the proxy in front of it) that is down for now, not about the request. */
+const isServerDown = (status?: number) => status !== undefined && [429, 502, 503, 504, 520, 521, 522, 523, 524].includes(status)
+/** The row is already there, or the trip already closed: what a write that did arrive leaves behind. */
+const isAlreadyDone = (error: unknown) => /duplicate key.*_pkey|trip not found/i.test(errorText(error))
+const isTripClosed = (error: unknown) => /trip is closed/i.test(errorText(error))
 
 const byNewest = (a: Item, b: Item) => b.addedAt.localeCompare(a.addedAt)
 const isOnList = (item: Item) => item.status === 'pending' || item.status === 'not_found'
@@ -78,7 +88,8 @@ function upsert<T extends { id: string }>(list: Ref<T[]>, row: T) {
  * Every action updates local state first (so the UI reacts instantly) and then writes to
  * Supabase. Realtime echoes the row back to every device, including this one, where
  * upsert() makes the echo a no-op. If a write fails, the store reloads from the server.
- * Without connection, writes wait in order until it comes back (while the app stays open).
+ * Without connection, or with one too weak to reach the server, writes wait in order until it
+ * comes back (while the app stays open).
  */
 export const useListStore = defineStore('list', () => {
   const groupStore = useGroupStore()
@@ -91,6 +102,8 @@ export const useListStore = defineStore('list', () => {
   const folders = ref<ShoppingFolder[]>([])
   /** Writes not saved yet: waiting for the connection, or on their way. */
   const pendingWrites = ref(0)
+  /** The phone says it is online, but the writes don't get to the server (a weak signal). */
+  const unreachable = ref(false)
   let channel: RealtimeChannel | null = null
 
   // ── Getters ────────────────────────────────────────────────
@@ -273,7 +286,7 @@ export const useListStore = defineStore('list', () => {
         if (p.eventType !== 'DELETE') upsert(trips, toTrip(p.new))
       })
       .on<ProductRow>('postgres_changes', { event: '*', schema: 'public', table: 'products', filter }, (p) => {
-        if (p.eventType !== 'DELETE') upsert(products, toProduct(p.new))
+        if (p.eventType !== 'DELETE') putProduct(toProduct(p.new))
       })
       .on<ShoppingFolderRow>('postgres_changes', { event: 'INSERT', schema: 'public', table: 'shopping_folders', filter }, (p) =>
         upsert(folders, toShoppingFolder(p.new)),
@@ -304,41 +317,60 @@ export const useListStore = defineStore('list', () => {
   let writes: Promise<void> = Promise.resolve()
   /** Bumped on every queued write, so refresh() can tell if its snapshot is already outdated. */
   let writeSeq = 0
-  function persist(request: () => PromiseLike<{ error: unknown }>) {
+  /** Bumped when the queue is dropped: what was queued before it is never sent. */
+  let queue = 0
+  function persist(request: WriteRequest) {
+    const mine = queue
     writeSeq++
     pendingWrites.value++
     writes = writes.then(async () => {
       try {
-        await send(request)
+        if (mine === queue) await send(request, () => mine === queue)
       } finally {
-        pendingWrites.value--
+        if (mine === queue) pendingWrites.value--
       }
     })
   }
 
+  /** Signed out: what was still waiting belonged to that account. */
+  function dropWrites() {
+    queue++
+    writes = Promise.resolve()
+    pendingWrites.value = 0
+    unreachable.value = false
+  }
+
   /**
-   * One write, once there is connection. If it doesn't reach the server it waits for the
-   * connection and tries again (a few times if the phone says it is online, as on a weak signal).
+   * One write, once there is connection. One that doesn't reach the server (no connection, a weak
+   * signal, the server down for a moment) is tried again until it does: giving up would undo what
+   * the person did.
    */
-  async function send(request: () => PromiseLike<{ error: unknown }>) {
-    for (let tries = 1; ; tries++) {
+  async function send(request: WriteRequest, wanted: () => boolean) {
+    for (let tries = 1; wanted(); tries++) {
       await whenOnline()
       let error: unknown
+      let status: number | undefined
       try {
-        ;({ error } = await request())
+        ;({ error, status } = await request())
       } catch (e) {
         error = e // a rejected write must not stall the queue
       }
-      if (!error) return
-      if (isNetworkError(error)) {
+      if (!wanted()) return
+      if (isNetworkError(error) || isServerDown(status)) {
         if (!navigator.onLine) continue
-        if (tries < NETWORK_TRIES) {
-          await new Promise((resolve) => setTimeout(resolve, RETRY_MS))
-          continue
+        if (tries === NETWORK_TRIES && !unreachable.value) {
+          unreachable.value = true
+          toast.show('Sin conexión con el servidor: se guardará en cuanto se pueda.')
         }
+        const wait = Math.min(LONGEST_RETRY_MS, RETRY_MS * 2 ** Math.max(0, tries - NETWORK_TRIES))
+        await new Promise((resolve) => setTimeout(resolve, wait))
+        continue
       }
+      unreachable.value = false
+      // Saved by an earlier try whose answer never arrived.
+      if (!error || (tries > 1 && isAlreadyDone(error))) return
       console.error(error)
-      toast.show('No se pudo guardar el cambio. Revisa la conexión.')
+      toast.show(isTripClosed(error) ? friendlyError(error) : 'No se pudo guardar el cambio y se ha deshecho.')
       // Not awaited: refresh() waits for this queue to drain, which includes this very write.
       void refresh().catch(console.error)
       return
@@ -346,6 +378,13 @@ export const useListStore = defineStore('list', () => {
   }
 
   // ── Internal helpers ───────────────────────────────────────
+
+  /** The server's row of a product takes the place of the local copy, which has its own id. */
+  function putProduct(product: Product) {
+    const index = products.value.findIndex((p) => p.id === product.id || p.normalizedName === product.normalizedName)
+    if (index === -1) products.value.push(product)
+    else products.value[index] = product
+  }
 
   /** Optimistic copy of what the items trigger does on the server. */
   function rememberProductLocally(name: string, quantity: number) {
@@ -775,6 +814,8 @@ export const useListStore = defineStore('list', () => {
     findPendingDuplicate,
     suggest,
     pendingWrites,
+    unreachable,
+    dropWrites,
     load,
     openSaved,
     refresh,

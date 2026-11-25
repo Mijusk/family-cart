@@ -183,6 +183,7 @@ export const useGroupStore = defineStore('group', () => {
         status.value = 'signed-out'
         return
       }
+      if (userId.value && userId.value !== user.id) useListStore().dropWrites()
       userId.value = user.id
       email.value = user.email ?? null
       // Sessions from before email accounts (anonymous devices) have no person: start over.
@@ -270,6 +271,7 @@ export const useGroupStore = defineStore('group', () => {
 
   function clearSession() {
     closeGroup()
+    useListStore().dropWrites()
     if (myChannel) void supabase.removeChannel(myChannel)
     myChannel = null
     userId.value = null

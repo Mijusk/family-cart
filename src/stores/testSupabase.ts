@@ -4,6 +4,7 @@
 export interface FakeAnswer {
   data?: unknown
   error?: { message: string; code?: string } | null
+  status?: number
 }
 
 export interface FakeCall {
@@ -36,7 +37,7 @@ export function fakeSupabase() {
             calls.push(call)
             const answer = answers[target]
             return Promise.resolve(typeof answer === 'function' ? answer(call) : answer)
-              .then((r) => ({ data: r?.error ? null : (r?.data ?? []), error: r?.error ?? null }))
+              .then((r) => ({ data: r?.error ? null : (r?.data ?? []), error: r?.error ?? null, status: r?.status ?? 200 }))
               .then(resolve, reject)
           }
         },
@@ -45,14 +46,25 @@ export function fakeSupabase() {
     return builder
   }
 
-  const channel = { on: () => channel, subscribe: () => channel }
+  const listeners: { table: string; run: (payload: unknown) => void }[] = []
+  const channel = {
+    on(_type: string, filter: { table?: string }, run: (payload: unknown) => void) {
+      if (filter.table) listeners.push({ table: filter.table, run })
+      return channel
+    },
+    subscribe: () => channel,
+  }
+  /** A change arriving through Realtime. */
+  function emit(table: string, payload: unknown) {
+    for (const l of listeners) if (l.table === table) l.run(payload)
+  }
   const client = {
     from: (table: string) => query(table),
     rpc: (name: string, args?: unknown) => query(name, ['rpc', [args]]),
     channel: () => channel,
     removeChannel: () => {},
   }
-  return { client, answers, calls }
+  return { client, answers, calls, emit }
 }
 
 /** Queries of a table (or RPC) that used this method. */
