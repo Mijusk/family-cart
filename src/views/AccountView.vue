@@ -337,6 +337,14 @@ async function logOut() {
   flex-direction: column;
 }
 
+/* The longest ones don't fit in one line on a small phone. */
+.kinds .choice {
+  flex-shrink: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: normal;
+}
+
 .ai {
   flex-direction: column;
 }

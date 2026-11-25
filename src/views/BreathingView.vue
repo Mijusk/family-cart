@@ -387,6 +387,7 @@ function onTimeChange() {
 
 .reminder-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;

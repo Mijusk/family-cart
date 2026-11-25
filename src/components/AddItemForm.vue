@@ -186,6 +186,7 @@ function onKeydown(event: KeyboardEvent) {
 <style scoped>
 .add {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   padding: 14px var(--gutter) 16px;
   background: var(--surface);
@@ -261,8 +262,9 @@ function onKeydown(event: KeyboardEvent) {
 
 .controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .note-toggle {
@@ -270,7 +272,7 @@ function onKeydown(event: KeyboardEvent) {
   align-items: center;
   gap: 6px;
   height: var(--tap);
-  padding: 0 12px;
+  padding: 0 8px;
   border-radius: 999px;
   color: var(--text-2);
   font-weight: 500;

@@ -50,6 +50,7 @@ se ha comprobado y qué queda.
 | 31 | Nueva lista de tareas: si falla compartirla, reintentar crea otra | `stores/tasks.ts` `createList()` | **hecho** |
 | 32 | Avisos: si la primera carga falla, al reintentar no se marcan como vistos | `NotificationsView.vue` | **hecho** |
 | 33 | Se aceptan fechas que no existen (31 de febrero), editar una cantidad mayor de 99 la baja a 99 al salir del campo, y se puede crear una carpeta «General» que se confunde con la de siempre | `utils/isoDays.ts`, `QuantityStepper.vue`, `stores/list.ts` | **hecho** |
+| 34 | En pantallas de 320 px, Compra, Cuenta y Respiración se salen por la derecha | `AddItemForm.vue`, `AccountView.vue`, `BreathingView.vue` | **hecho** |
 
 ## Hecho
 
@@ -85,7 +86,8 @@ se ha comprobado y qué queda.
 - **31.** La lista se crea una vez y queda abierta para volver a marcar el grupo. Comprobado en Chromium.
 - **32.** Reintentar hace lo mismo que abrir la pantalla.
 - **30.** Lo escrito se queda en su campo para reintentar. Comprobado en Chromium cortando la red.
-- **33.** Fechas: test en `days.test.ts`. Cantidad hasta 999 (lo que admite la base) y «General» reservada: solo types, tests y build; no probadas a mano.
+- **33.** Fechas: test en `days.test.ts`. Cantidad hasta 999 (lo que admite la base) y «General» reservada: comprobadas en Chromium.
+- **34.** Sin desbordes a 320 px; a 360, 375 y 390 el formulario de añadir sigue en una fila (medido en Chromium).
 
 ## Decisiones tomadas
 
@@ -108,7 +110,7 @@ se ha comprobado y qué queda.
 - Revisiones: la segunda dio los puntos 25–32. La tercera (flujos con fallos de red) y la cuarta (migraciones, respiración y
   estiramientos) fueron **parciales**, aunque el primer resumen las daba por revisiones sin nada. En aquel recorrido de
   pantallas, además, cuatro no se vieron de verdad: las dos papeleras, Respiración (id que no existe) y el permiso de IA.
-  La quinta lo repite con datos en todas: las 28 cargan con su título, sin errores ni desbordes; dio el punto 33.
+  La quinta lo repite con datos en todas: las 28 cargan con su título, sin errores ni desbordes; dio el punto 33. A 320 px salió el 34; a 1280 px, nada.
 
 ## Pendiente de Luis
 
@@ -126,4 +128,4 @@ se ha comprobado y qué queda.
    - «Quitarme de este evento» para un participante: los permisos ya lo dejan, no hay botón.
    - Canales de Realtime privados: quien sepa el id de un evento o grupo puede escuchar «está editando» y el aviso vacío de
      cambios (no lleva títulos). Necesita políticas en `realtime.messages`.
-   - Un solo gris más oscuro para los días de otro mes en Mes (contraste 2,2; AA pide 4,5).
+   - Un gris más oscuro para los días de otro mes en Mes (contraste 2,2; AA pide 4,5).

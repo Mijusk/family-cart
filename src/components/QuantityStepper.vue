@@ -25,6 +25,7 @@ function onInput(event: Event) {
     </button>
     <input
       class="value"
+      :class="{ wide: quantity > 99 }"
       type="number"
       inputmode="numeric"
       :min="MIN"
@@ -87,6 +88,10 @@ function onInput(event: Event) {
 .value::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+.value.wide {
+  width: 3.5ch;
 }
 
 .value:focus {
