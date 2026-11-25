@@ -19,7 +19,7 @@ en `docs/ia.md`.
 ## Modelo de datos (ver `supabase/migrations/`)
 
 - `auth.users` → `people` (una por humano; `user_id` null = perfil sin cuenta, p. ej. un
-  niño; se reclama con `claim_code`) → `members` (persona en grupo: `role` admin/member,
+  niño; se reclama con el código de `claim_codes`, que nadie lee: solo las RPC) → `members` (persona en grupo: `role` admin/member,
   `status` pending/active, `left_at`; nunca se borran) → `groups` (`timezone`,
   `shopping_enabled`, `tasks_enabled`, `calendar_enabled`; al menos una activa).
 - Compra: `products`, `items`, `trips` apuntan a `members` para conservar el historial. Carpetas de la
@@ -78,7 +78,7 @@ npm run db:start   # Supabase local (requiere Docker Desktop arrancado); crea la
 npm run db:reset   # aplica migraciones + seed.sql
 npm run db:test    # tests de permisos; debe acabar en "N ok, 0 failed"
 npm run db:types   # regenera src/lib/database.types.ts desde la BD local
-npm test           # tests unitarios (Vitest) de las funciones puras
+npm test           # tests unitarios (Vitest): funciones puras y stores (con `src/stores/testSupabase.ts`)
 npm run build      # vue-tsc + vite build
 ```
 
@@ -105,11 +105,12 @@ Tareas: "Pendientes" de Marta compartida con el grupo y "Amigos con quien quedar
   coincidir (contraste suficiente con texto blanco).
 - Preparada para PWA/Capacitor más adelante: nada que dependa solo de escritorio.
 - Sin conexión: `public/sw.js` guarda la app (páginas primero a la red, `/assets/` con hash desde
-  la caché; la lista la escribe el build en `/sw-precache.js`). `src/lib/offline.ts` guarda en el
+  la caché; la lista la escribe el build en `/sw-precache.js`; con red muy lenta, a los 4 s abre la copia). `src/lib/offline.ts` guarda en el
   dispositivo lo último que mandó el servidor (sesión, grupo, lista de la compra), por cuenta, y
   lo borra al cerrar sesión. Sin red al abrir, `group.savedCopy` abre esa copia y al volver la red
   carga de verdad sin pantalla de carga. Los cambios de la compra esperan en la cola de
-  `persist()` hasta que vuelva la red (mientras la app siga abierta). Calendario y tareas no
+  `persist()` hasta que vuelva la red, o hasta que lleguen si hay mala cobertura (mientras la app siga
+  abierta). Calendario y tareas no
   tienen copia: sin red muestran su error con «Reintentar».
 
 ## Forma de trabajar

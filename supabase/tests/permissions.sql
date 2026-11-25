@@ -377,6 +377,20 @@ values ('00000000-0000-4000-8000-0000000000f7', date_trunc('week', current_date)
 select tests.check('reminders: a day moved to another time follows it',
   enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '09:00') at time zone 'Europe/Madrid') = 0
   and enqueue_event_reminders(((date_trunc('week', current_date)::date + 8) + time '10:30') at time zone 'Europe/Madrid') = 1);
+insert into event_exceptions (event_id, occurrence_date, status, overrides)
+values ('00000000-0000-4000-8000-0000000000f7', date_trunc('week', current_date)::date + 14, 'modified',
+        jsonb_build_object('start_date', date_trunc('week', current_date)::date + 19));
+select tests.check('reminders: a day moved to another date, told on it',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 19) + time '09:00') at time zone 'Europe/Madrid') = 1);
+select tests.check('reminders: …with the link to its date in the series',
+  exists (select 1 from notifications where kind = 'event_reminder'
+               and url = '/calendario/evento/00000000-0000-4000-8000-0000000000f7?dia=' || (date_trunc('week', current_date)::date + 14)));
+update events set repeat_until = date_trunc('week', current_date)::date + 14 where id = '00000000-0000-4000-8000-0000000000f7';
+select tests.check('reminders: also moved past the end of the series',
+  enqueue_event_reminders(((date_trunc('week', current_date)::date + 19) + time '09:00') at time zone 'Europe/Madrid') = 1);
+update events set repeat_until = null where id = '00000000-0000-4000-8000-0000000000f7';
+delete from event_exceptions where event_id = '00000000-0000-4000-8000-0000000000f7' and occurrence_date = date_trunc('week', current_date)::date + 14;
+delete from notifications where dedupe_key like 'event-change:00000000-0000-4000-8000-0000000000f7:%';
 
 -- Changes to events: Pablo's swimming goes to Daniel (with him) and Marta (admin).
 select tests.as_user('marta@ejemplo.com');
@@ -827,7 +841,8 @@ select tests.check('stamp: updated_by is daniel', (select updated_by = my_person
 update people set display_name = 'Pablito' where id = '00000000-0000-4000-8000-0000000000d2';
 select tests.check('daniel: cannot rename Pablo (not admin)', (select display_name from people where id = '00000000-0000-4000-8000-0000000000d2') = 'Pablo');
 select tests.expect_error('daniel: cannot set user_id', $$update people set user_id = null where user_id = auth.uid()$$, 'permission denied');
-select tests.expect_error('daniel: cannot read claim code holder change', $$update people set claim_code = 'X' where id = '00000000-0000-4000-8000-0000000000d2'$$, 'permission denied');
+select tests.expect_error('daniel: cannot read the claim codes of his group', $$select code from claim_codes$$, 'permission denied');
+select tests.expect_error('daniel: cannot make a claim code', $$insert into claim_codes (person_id, code) values ('00000000-0000-4000-8000-0000000000d1', 'X')$$, 'permission denied');
 select tests.expect_error('daniel: cannot insert members', $$insert into members (group_id, person_id) values ('00000000-0000-4000-8000-000000000001', my_person_id())$$, 'permission denied');
 select tests.expect_error('daniel: cannot create profiles', $$select create_profile('00000000-0000-4000-8000-000000000001', 'Intruso')$$, 'not an admin');
 
@@ -857,6 +872,7 @@ select set_member_role('00000000-0000-4000-8000-0000000000a2', 'admin');
 select tests.check('marta: makes daniel admin', (select role from members where id = '00000000-0000-4000-8000-0000000000a2') = 'admin');
 select tests.check('marta: creates a profile', create_profile('00000000-0000-4000-8000-000000000001', 'Bebé') is not null);
 select tests.check('marta: claim code for Pablo', length(create_claim_code('00000000-0000-4000-8000-0000000000d2')) = 10);
+select tests.expect_error('claim codes: not even an admin reads them', $$select code from claim_codes$$, 'permission denied');
 select tests.expect_error('marta: no claim code for Daniel', $$select create_claim_code((select id from people where user_id = '00000000-0000-4000-8000-0000000000c2'))$$, 'person not found');
 select tests.check('storage: own group folder ok', can_use_group_folder('00000000-0000-4000-8000-000000000001/a.jpg'));
 select tests.check('storage: other folder denied', not can_use_group_folder('00000000-0000-4000-8000-000000000999/a.jpg'));
@@ -936,9 +952,9 @@ select tests.as_user('sinnombre@ejemplo.com');
 select tests.check('sign-up without name uses email', (select display_name from people where user_id = auth.uid()) = 'sinnombre');
 select tests.as_user('pablo@ejemplo.com');
 select tests.check('sign-up creates a person with the given name', (select display_name from people where user_id = auth.uid()) = 'Pablo nuevo');
-select tests.check('claim preview works', (select display_name from profile_by_claim_code((select claim_code from people where id = '00000000-0000-4000-8000-0000000000d2'))) is null);
+select tests.check('claim preview works', (select display_name from profile_by_claim_code('NOPENOPE00')) is null);
 reset role;
-select claim_code as code from people where id = '00000000-0000-4000-8000-0000000000d2' \gset
+select code from claim_codes where person_id = '00000000-0000-4000-8000-0000000000d2' \gset
 set role authenticated;
 select tests.as_user('pablo@ejemplo.com');
 select tests.check('claim preview shows the profile', (select display_name from profile_by_claim_code(:'code')) = 'Pablito');
@@ -946,7 +962,9 @@ select tests.expect_error('bad claim code', $$select claim_profile('NOPENOPE00')
 select tests.check('claim profile', claim_profile(lower(:'code')) = '00000000-0000-4000-8000-0000000000d2');
 select tests.check('after claim I am Pablo', my_person_id() = '00000000-0000-4000-8000-0000000000d2');
 select tests.check('after claim I am in the group', is_group_member('00000000-0000-4000-8000-000000000001'));
-select tests.check('claim code is consumed', (select claim_code is null from people where id = '00000000-0000-4000-8000-0000000000d2'));
+reset role;
+select tests.check('claim code is consumed', not exists (select 1 from claim_codes where person_id = '00000000-0000-4000-8000-0000000000d2'));
+set role authenticated;
 select tests.check('only one person for this account', (select count(*) from people where user_id = auth.uid()) = 1);
 
 select tests.as_user('sinnombre@ejemplo.com');

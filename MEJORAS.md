@@ -32,14 +32,14 @@ se ha comprobado y qué queda.
 | 13 | Con red muy lenta, abrir la app se queda en blanco esperando aunque esté guardada | `public/sw.js` `networkFirst` sin límite de tiempo | **hecho** |
 | 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | **hecho** |
 | 15 | Seguridad: la pantalla `/autorizar` se puede meter en un iframe (clickjacking) | `vercel.json` sin cabeceras | **hecho** |
-| 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | pendiente |
+| 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | **hecho** |
 | 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | **hecho** |
 | 18 | Semana y Hoy: dos eventos cortos seguidos se pintan uno encima del otro | `lib/timeline.ts`, `MIN_BLOCK_PX` | **hecho** |
 | 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | **hecho** |
 | 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | **hecho** |
 | 21 | Cuenta y «Añadir otro grupo» vuelven siempre a Grupo (la regla es `goBack()`) | `AccountView.vue`, `WelcomeView.vue` | **hecho** |
 | 22 | Vite con avisos de seguridad altos (solo desarrollo, pero `npm run dev` escucha en la red local) | `npm audit` | **hecho** |
-| 23 | Los avisos recorren cada minuto todos los eventos con recordatorio, también los pasados | SQL `enqueue_event_reminders` | pendiente |
+| 23 | Los avisos recorren cada minuto todos los eventos con recordatorio, también los pasados | SQL `enqueue_event_reminders` | **hecho** |
 | 24 | README: secciones y documentos desactualizados | `README.md` | pendiente |
 
 ## Hecho
@@ -65,6 +65,8 @@ se ha comprobado y qué queda.
 - **15.** `vercel.json`: la app no se puede meter en un iframe (`frame-ancestors 'none'`, `X-Frame-Options`), más `nosniff` y `Referrer-Policy`. Solo se puede ver al desplegar: `curl -I` en la web.
 - **20.** Las tareas se ordenan también con las flechas sobre el asa, que no pierde el foco. Comprobado en Chromium.
 - **22.** `npm audit` queda en 0: Vite 8.3.8, source-map-js 1.2.2 (solo el lockfile, versiones de hace dos semanas o más). Comprobado en una copia aparte con `npm ci`, tests y build. En tu PC entra con `npm install`.
+- **23.** Misma migración: el job de cada minuto solo mira los eventos que pueden tocar.
+- **16.** Migración nueva `20261126120000_private_claim_codes` (sin aplicar en ningún sitio): el código pasa a una tabla que nadie lee y el aviso de un día movido enlaza la fecha de la serie. Compatible con la app desplegada. Sobre Postgres en WASM: 365 permisos bien, y el paso desde datos existentes conserva los códigos. `database.types.ts` editado a mano con el orden del generador.
 
 ## Decisiones tomadas
 
