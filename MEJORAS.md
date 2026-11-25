@@ -114,8 +114,8 @@ se ha comprobado y qué queda.
 
 ## Pendiente de Luis
 
-1. **`npx supabase db push`** de `20261125120000_family_streaks` (según la memoria del proyecto, sin aplicar en la nube).
-   Hasta entonces, Rachas solo enseña la propia.
+1. `20261125120000_family_streaks` ya está aplicada en la nube (comprobado con `supabase migration list` el 25-nov); solo falta
+   `20261126120000_private_claim_codes`.
 2. **Revisar la rama y decir cuándo abrir el PR** (no se ha hecho push).
 3. Tras fusionar: `npx supabase db push` (aplica también `20261126120000_private_claim_codes`) y
    `npx supabase functions deploy mcp --no-verify-jwt --use-api` (punto 9). En tu PC, `npm install` (Vite) y
