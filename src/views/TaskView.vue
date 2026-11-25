@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { dueLabel } from '@/lib/tasks'
 import { goBack } from '@/router/back'
@@ -75,6 +75,23 @@ function saveNotes() {
   const value = notes.value.trim() || null
   if (task.value && value !== task.value.notes) void save({ notes: value })
 }
+
+/** Going away from inside a field (the phone's back gesture, switching apps) saves what is in it too. */
+function saveTyping() {
+  const field = editingText.value
+  if (field === 'title' && title.value.trim()) saveTitle()
+  else if (field === 'notes') saveNotes()
+  // Still in that field if the person comes back to it.
+  editingText.value = field
+}
+onBeforeRouteLeave(saveTyping)
+onBeforeRouteUpdate(saveTyping)
+
+function onVisibility() {
+  if (document.visibilityState === 'hidden') saveTyping()
+}
+document.addEventListener('visibilitychange', onVisibility)
+onBeforeUnmount(() => document.removeEventListener('visibilitychange', onVisibility))
 
 // ── Who and when ──────────────────────────────────────────────
 

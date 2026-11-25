@@ -20,7 +20,7 @@ se ha comprobado y qué queda.
 | 1 | Una recarga en segundo plano que falla (móvil que vuelve con mala cobertura) cambia el calendario o las tareas ya cargados por «No se pudo cargar» | `stores/calendar.ts` y `stores/tasks.ts`: el `catch` de `load()` pone `error` aunque haya datos | **hecho** |
 | 2 | Compra: con mala cobertura (el móvil dice que hay red) un cambio se descarta a los ~9 s y no vuelve a intentarse | `stores/list.ts` `send()`, `NETWORK_TRIES = 3` | **hecho** |
 | 3 | Con la app abierta durante un despliegue, las pantallas que no se habían abierto ya no cargan: tocas y no pasa nada | rutas con `import()`; los ficheros viejos ya no están en Vercel y el service worker nuevo borra su caché | pendiente |
-| 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | pendiente |
+| 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | **hecho** |
 | 5 | Evento nuevo: si se guarda pero fallan los grupos o participantes, reintentar crea un segundo evento | `stores/calendar.ts` `saveEvent()` | **hecho** |
 | 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | pendiente |
 | 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | **hecho** |
@@ -49,6 +49,7 @@ se ha comprobado y qué queda.
 - **2.** Los cambios de la compra se reintentan hasta que llegan (cada 3 s, luego hasta 24 s), también si el servidor está caído un momento; el aviso «Sin conexión» lo dice. Solo se deshace lo que el servidor rechaza. Tests en `list.test.ts`.
 - **8.** La fila del servidor sustituye a la copia local por nombre normalizado. Test en `list.test.ts`.
 - **7.** Los campos de nombre y nota cortan en lo que admite la base de datos (80 y 120), con una sola constante.
+- **4.** La nota o el título a medio escribir se guardan al volver atrás o al esconder la app. Comprobado en Chromium con la app compilada y un Supabase simulado.
 
 ## Decisiones tomadas
 
