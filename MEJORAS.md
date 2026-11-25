@@ -33,7 +33,7 @@ se ha comprobado y qué queda.
 | 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | **hecho** |
 | 15 | Seguridad: la pantalla `/autorizar` se puede meter en un iframe (clickjacking) | `vercel.json` sin cabeceras | pendiente |
 | 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | pendiente |
-| 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | pendiente |
+| 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | **hecho** |
 | 18 | Semana y Hoy: dos eventos cortos seguidos se pintan uno encima del otro | `lib/timeline.ts`, `MIN_BLOCK_PX` | **hecho** |
 | 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | **hecho** |
 | 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | pendiente |
@@ -61,6 +61,7 @@ se ha comprobado y qué queda.
 - **21.** Cuenta y «Añadir otro grupo» vuelven con `goBack()`. Comprobado en Chromium.
 - **14.** Sin conexión, cambiar de grupo abre la copia guardada al momento (antes, 7 s y pantalla de error); si ese grupo no se ha abierto en el dispositivo, vuelve al que estaba y lo dice. Abrir la app sin red tampoco espera ya. Además, la copia guardada ya no se puede sustituir por una lista vacía a medio cargar (test en `list.test.ts`, que falla sin el arreglo).
 - **18.** Los eventos cortos que se pintarían uno encima de otro van en columnas. Test en `timeline.test.ts` y visto en Chromium.
+- **17.** Al cambiar la fecha de un evento semanal nuevo, el día marcado la sigue, y el aviso dice el primer día de verdad. Comprobado en Chromium.
 
 ## Decisiones tomadas
 

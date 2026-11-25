@@ -5,7 +5,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import FolderColorPicker from '@/components/FolderColorPicker.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { REMINDER_PRESETS, reminderLabel } from '@/lib/eventText'
-import { reminderEndTime } from '@/lib/recurrence'
+import { nearestSeriesDate, reminderEndTime } from '@/lib/recurrence'
 import { goBack } from '@/router/back'
 import { useCalendarStore, type EventDraft } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
@@ -220,6 +220,21 @@ watch(
   },
 )
 
+// A new weekly event on one day of the week, the date's: moving the date moves that day with it, or
+// the event would not be on the date shown. Editing a series, the date only says when it starts.
+let lastDate = form.startDate
+watch(
+  () => form.startDate,
+  (date) => {
+    if (!isIsoDate(date)) return // Cleared, while picking another.
+    if (!filling && !editingId.value && form.weekdays.length === 1 && form.weekdays[0] === weekday(lastDate)) {
+      form.weekdays = [weekday(date)]
+    }
+    lastDate = date
+  },
+  { flush: 'sync' },
+)
+
 function toggleWeekday(d: number) {
   form.weekdays = form.weekdays.includes(d) ? form.weekdays.filter((x) => x !== d) : [...form.weekdays, d].sort()
 }
@@ -386,7 +401,8 @@ async function save() {
       toast.show('Evento guardado')
     } else {
       goBack()
-      toast.show(`«${draft.title}» añadido el ${longDay(draft.startDate).toLowerCase()}`)
+      const first = nearestSeriesDate(draft, [], null, draft.startDate)
+      toast.show(`«${draft.title}» añadido el ${longDay(first).toLowerCase()}`)
     }
   } catch (e) {
     error.value = friendlyError(e)
