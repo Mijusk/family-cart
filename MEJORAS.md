@@ -36,7 +36,7 @@ se ha comprobado y qué queda.
 | 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | **hecho** |
 | 18 | Semana y Hoy: dos eventos cortos seguidos se pintan uno encima del otro | `lib/timeline.ts`, `MIN_BLOCK_PX` | **hecho** |
 | 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | **hecho** |
-| 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | pendiente |
+| 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | **hecho** |
 | 21 | Cuenta y «Añadir otro grupo» vuelven siempre a Grupo (la regla es `goBack()`) | `AccountView.vue`, `WelcomeView.vue` | **hecho** |
 | 22 | Vite con avisos de seguridad altos (solo desarrollo, pero `npm run dev` escucha en la red local) | `npm audit` | pendiente |
 | 23 | Los avisos recorren cada minuto todos los eventos con recordatorio, también los pasados | SQL `enqueue_event_reminders` | pendiente |
@@ -63,6 +63,7 @@ se ha comprobado y qué queda.
 - **18.** Los eventos cortos que se pintarían uno encima de otro van en columnas. Test en `timeline.test.ts` y visto en Chromium.
 - **17.** Al cambiar la fecha de un evento semanal nuevo, el día marcado la sigue, y el aviso dice el primer día de verdad. Comprobado en Chromium.
 - **15.** `vercel.json`: la app no se puede meter en un iframe (`frame-ancestors 'none'`, `X-Frame-Options`), más `nosniff` y `Referrer-Policy`. Solo se puede ver al desplegar: `curl -I` en la web.
+- **20.** Las tareas se ordenan también con las flechas sobre el asa, que no pierde el foco. Comprobado en Chromium.
 
 ## Decisiones tomadas
 

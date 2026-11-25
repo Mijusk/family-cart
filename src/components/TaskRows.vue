@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { dueLabel } from '@/lib/tasks'
 import { useTasksStore } from '@/stores/tasks'
@@ -9,7 +9,7 @@ import AppIcon from './AppIcon.vue'
 import PersonAvatar from './PersonAvatar.vue'
 
 // Rows of tasks: tick, open, and (when `sortable`) drag the grip to reorder, with the mouse or
-// pressing and dragging on a phone. Emits the new neighbours; the store turns them into a position.
+// pressing and dragging on a phone, or with the arrow keys. Emits the new neighbours; the store turns them into a position.
 
 const props = defineProps<{ tasks: Task[]; sortable?: boolean; showList?: boolean }>()
 const emit = defineEmits<{ toggle: [task: Task]; move: [id: string, beforeId: string | null, afterId: string | null] }>()
@@ -51,8 +51,24 @@ function end() {
   const d = drag.value
   drag.value = null
   if (!d || d.to === d.from) return
-  const order = props.tasks.filter((t) => t.id !== d.id)
-  emit('move', d.id, order[d.to - 1]?.id ?? null, order[d.to]?.id ?? null)
+  moveTo(d.id, d.to)
+}
+
+function moveTo(id: string, to: number) {
+  const order = props.tasks.filter((t) => t.id !== id)
+  emit('move', id, order[to - 1]?.id ?? null, order[to]?.id ?? null)
+}
+
+/** With the keyboard: up and down arrows on the grip, which keeps the focus. */
+async function onGripKey(event: KeyboardEvent, index: number) {
+  const step = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  const to = index + step
+  if (!step || to < 0 || to >= props.tasks.length) return
+  event.preventDefault()
+  const grip = event.currentTarget as HTMLElement
+  moveTo(props.tasks[index]!.id, to)
+  await nextTick()
+  grip.focus()
 }
 
 /** The dragged row follows the finger; the ones it passes make room for it. */
@@ -124,7 +140,9 @@ function doneLine(task: Task): string {
         v-if="sortable"
         class="grip"
         role="button"
-        :aria-label="`Mover ${task.title}`"
+        tabindex="0"
+        :aria-label="`Mover ${task.title}: flechas arriba y abajo`"
+        @keydown="onGripKey($event, i)"
         @pointerdown="start($event, i)"
         @pointermove="move"
         @pointerup="end"
