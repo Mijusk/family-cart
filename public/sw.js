@@ -2,8 +2,8 @@
 // The send-notifications Edge Function pushes { title, body, url, tag }.
 //
 // Pages go to the network first (a deploy is never stale) and fall back to the last copy, also
-// when the network takes too long. The build's files have a hash in their name, so a cached one is always right: they are cached when
-// this worker installs (the list comes from /sw-precache.js, written by the build) and when used.
+// when the network takes too long. The build's files have a hash in their name, so a cached one is
+// always right: they are cached when this worker installs (the list comes from /sw-precache.js, written by the build) and when used.
 // Supabase is another origin and never goes through here.
 
 try {

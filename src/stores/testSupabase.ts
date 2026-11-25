@@ -46,6 +46,8 @@ export function fakeSupabase() {
     return builder
   }
 
+  /** The channels opened, by name. */
+  const channels: string[] = []
   const listeners: { table: string; run: (payload: unknown) => void }[] = []
   const channel = {
     on(_type: string, filter: { table?: string }, run: (payload: unknown) => void) {
@@ -61,10 +63,14 @@ export function fakeSupabase() {
   const client = {
     from: (table: string) => query(table),
     rpc: (name: string, args?: unknown) => query(name, ['rpc', [args]]),
-    channel: () => channel,
+    channel: (name: string) => {
+      channels.push(name)
+      return channel
+    },
     removeChannel: () => {},
+    storage: { from: () => ({ upload: (...args: unknown[]) => query('storage.upload', ['upload', args]) }) },
   }
-  return { client, answers, calls, emit }
+  return { client, answers, calls, channels, emit }
 }
 
 /** Queries of a table (or RPC) that used this method. */

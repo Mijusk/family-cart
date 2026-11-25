@@ -64,28 +64,27 @@ export const useStretchingStore = defineStore('stretching', () => {
 
   let flushing: Promise<void> | null = null
 
-  /** Sends what waits, in order, one run at a time; a day the database no longer takes is dropped. */
+  /** Sends what waits, one run at a time. */
   function flush(): Promise<void> {
-    flushing ??= (async () => {
-      const user = groupStore.userId
-      try {
-        for (let p = waiting.value[0]; p; p = waiting.value[0]) {
-          if (daysBetween(p.day, today()) <= 1) {
-            const { error } = await supabase.rpc('log_stretch_session', { routine: p.routine, local_day: p.day })
-            if (groupStore.userId !== user) return
-            if (error && !/invalid stretch day/i.test(error.message)) {
-              console.error('stretching', error)
-              return // For the next time.
-            }
-            if (!error) days.value = [...days.value, p.day]
-          }
-          setWaiting(waiting.value.slice(1))
-        }
-      } finally {
-        flushing = null
-      }
-    })()
+    flushing ??= sendWaiting().finally(() => (flushing = null))
     return flushing
+  }
+
+  /** In order; a day the database no longer takes is dropped. */
+  async function sendWaiting() {
+    const user = groupStore.userId
+    for (let p = waiting.value[0]; p; p = waiting.value[0]) {
+      if (daysBetween(p.day, today()) <= 1) {
+        const { error } = await supabase.rpc('log_stretch_session', { routine: p.routine, local_day: p.day })
+        if (groupStore.userId !== user) return
+        if (error && !/invalid stretch day/i.test(error.message)) {
+          console.error('stretching', error)
+          return // For the next time.
+        }
+        if (!error) days.value = [...days.value, p.day]
+      }
+      setWaiting(waiting.value.slice(1))
+    }
   }
 
   let loading: Promise<void> | null = null

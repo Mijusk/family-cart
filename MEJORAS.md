@@ -45,6 +45,10 @@ se ha comprobado y qué queda.
 | 26 | Accesibilidad: Mes usa `aria-pressed` donde no vale y la barra de Modo compra no tiene nombre (axe) | `MonthView.vue`, `ShoppingView.vue` | **hecho** |
 | 27 | «Crear un grupo / Tengo un código» se ve roto: píldoras sobre fondo gris | `WelcomeView.vue`: su `.choice` choca con la `.choice` global | **hecho** |
 | 28 | Mes: tocar un día de otro mes (los grises) no hace nada | `MonthView.vue` `selected` | **hecho** |
+| 29 | Fallos encontrados al revisar los cambios de esta rama: la racha dejaba de enviarse tras una carga sin nada pendiente, lo que esperaba red se enviaba aunque se cerrara sesión; y de antes: la foto se perdía al reintentar, un cambio con el token caducado se deshacía, y al cambiar deprisa de grupo se escuchaba el anterior | `stores/stretching.ts`, `stores/list.ts` | **hecho** |
+| 30 | Tareas: si falla al guardar (sin red), se pierde el título nuevo o la nota escrita | `TasksView.vue` `add()`, `TaskView.vue` `save()` | pendiente |
+| 31 | Nueva lista de tareas: si falla compartirla, reintentar crea otra | `stores/tasks.ts` `createList()` | pendiente |
+| 32 | Avisos: si la primera carga falla, al reintentar no se marcan como vistos | `NotificationsView.vue` | pendiente |
 
 ## Hecho
 
@@ -76,6 +80,7 @@ se ha comprobado y qué queda.
 - **26.** Corregido; axe (WCAG AA) sobre 28 rutas a 360 px, sin desbordes. Quedan solo el atenuado de los días pasados (decisión de Luis) y de los días de otro mes.
 - **27.** La pantalla usa su propia clase. Visto en Chromium a 360 px.
 - **28.** Tocar un día de otro mes lleva a ese mes con el día abierto. Comprobado en Chromium.
+- **29.** Corregidos, cada uno con su test en `stretching.test.ts` y `list.test.ts` (fallaban antes).
 
 ## Decisiones tomadas
 

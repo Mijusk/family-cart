@@ -73,8 +73,12 @@ interface SavedList {
 
 type WriteRequest = () => PromiseLike<{ error: unknown; status?: number }>
 
-/** Answers of a server (or the proxy in front of it) that is down for now, not about the request. */
-const isServerDown = (status?: number) => status !== undefined && [429, 502, 503, 504, 520, 521, 522, 523, 524].includes(status)
+/**
+ * Answers that are about this moment, not about the request: the server (or the proxy in front of
+ * it) down, or a session whose token ran out and couldn't be renewed yet (401; what someone signed
+ * in can't do is a 403). Signing out drops the queue.
+ */
+const isTemporary = (status?: number) => status !== undefined && [401, 429, 502, 503, 504, 520, 521, 522, 523, 524].includes(status)
 /** The row is already there, or the trip already closed: what a write that did arrive leaves behind. */
 const isAlreadyDone = (error: unknown) => /duplicate key.*_pkey|trip not found/i.test(errorText(error))
 const isTripClosed = (error: unknown) => /trip is closed/i.test(errorText(error))
@@ -188,7 +192,8 @@ export const useListStore = defineStore('list', () => {
     if (gid !== groupId.value) unload()
     groupId.value = gid
     await refresh()
-    subscribe(gid)
+    // Another group was opened meanwhile.
+    if (groupId.value === gid) subscribe(gid)
   }
 
   /** Opening without connection: the list as it was last saved on this device, if it was. */
@@ -357,6 +362,7 @@ export const useListStore = defineStore('list', () => {
   async function send(request: WriteRequest, wanted: () => boolean) {
     for (let tries = 1; wanted(); tries++) {
       await whenOnline()
+      if (!wanted()) return
       let error: unknown
       let status: number | undefined
       try {
@@ -365,7 +371,7 @@ export const useListStore = defineStore('list', () => {
         error = e // a rejected write must not stall the queue
       }
       if (!wanted()) return
-      if (isNetworkError(error) || isServerDown(status)) {
+      if (isNetworkError(error) || isTemporary(status)) {
         if (!navigator.onLine) continue
         if (tries === NETWORK_TRIES && !unreachable.value) {
           unreachable.value = true
@@ -447,8 +453,9 @@ export const useListStore = defineStore('list', () => {
   }
 
   /**
-   * Runs inside a queued write. If the upload fails the item goes back to its previous
-   * photo (or none) and the user is told; the rest of the change is still saved.
+   * Runs inside a queued write, which waits and tries again if it doesn't reach the server. If the
+   * upload fails for any other reason the item goes back to its previous photo (or none) and the
+   * user is told; the rest of the change is still saved.
    */
   async function uploadFor(id: string, path: string, photo: Blob, previous: string | null): Promise<boolean> {
     let error: unknown
@@ -457,11 +464,13 @@ export const useListStore = defineStore('list', () => {
     } catch (e) {
       error = e
     }
-    if (!error) return true
+    // Its path is new every time: if it is there, an earlier try uploaded it.
+    if (!error || /already exists/i.test(errorText(error))) return true
+    if (isNetworkError(error)) throw error
     console.error(error)
     const item = findItem(id)
     if (item?.photoPath === path) item.photoPath = previous
-    toast.show('No se pudo subir la foto. Revisa la conexión.')
+    toast.show('No se pudo subir la foto.')
     return false
   }
 

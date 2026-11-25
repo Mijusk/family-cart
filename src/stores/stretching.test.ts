@@ -69,6 +69,13 @@ describe('a routine finished without connection', () => {
     expect(sent().map((a) => (a as { routine: string }).routine)).toEqual(['wake', 'work'])
   })
 
+  it('is sent also when there was nothing to send before', async () => {
+    const stretching = useStretchingStore()
+    await stretching.load()
+    await stretching.logSession('wake')
+    expect(sent()).toHaveLength(1)
+  })
+
   it('waits on the device for the next time the app opens', async () => {
     fake.current.answers.log_stretch_session = down
     await useStretchingStore().logSession('wake')
