@@ -130,7 +130,7 @@ function label(day: string): string {
             role="gridcell"
             :class="{ outside: !day.startsWith(month.slice(0, 7)), today: day === today(), selected: day === selected }"
             :aria-label="label(day)"
-            :aria-pressed="day === selected"
+            :aria-selected="day === selected"
             @click="selected = day === selected ? null : day"
           >
             <span class="num">{{ dayOfMonth(day) }}</span>

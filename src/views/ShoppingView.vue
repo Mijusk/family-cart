@@ -120,7 +120,7 @@ function cancel() {
         </p>
       </div>
       <button v-if="list.myActiveTrip" type="button" class="cancel" @click="cancel">Cancelar</button>
-      <div class="progress" role="progressbar" :aria-valuenow="cart.length" aria-valuemin="0" :aria-valuemax="total">
+      <div class="progress" role="progressbar" aria-label="En el carrito" :aria-valuenow="cart.length" aria-valuemin="0" :aria-valuemax="total">
         <span :style="{ transform: `scaleX(${progress})` }" />
       </div>
     </header>
