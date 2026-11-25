@@ -1,0 +1,56 @@
+# Mejoras autónomas
+
+Rama `mejoras/auto-2026-11-25`, sin push. Cada mejora, un commit. Este fichero dice qué se ha hecho, cómo
+se ha comprobado y qué queda.
+
+## Punto de partida (25-nov, `main` en `25b0c20`)
+
+- `npm test`: 171 tests en 16 ficheros, todos bien.
+- `npm run build` (vue-tsc + vite): bien. JS de entrada: `group` 338 kB (98,8 kB gzip) + `index` 38 kB.
+- Permisos (`supabase/tests/permissions.sql`): **360 ok, 0 failed**. Docker no está arrancado y el PC va justo de
+  memoria, así que se pasan sobre un Postgres en WASM (PGlite, fuera del repo) con un stub de Supabase, como
+  dice CLAUDE.md. Aplica todas las migraciones + seed desde cero.
+- No hay lint ni tests de interfaz. `npm audit`: 2 avisos altos, los dos en Vite (solo desarrollo).
+- `.env.local` apunta a `127.0.0.1:54321` (local). Nada de esta rama habla con Supabase Cloud.
+
+## Backlog (por impacto / esfuerzo + riesgo)
+
+| # | Qué | Dónde / evidencia | Estado |
+| --- | --- | --- | --- |
+| 1 | Una recarga en segundo plano que falla (móvil que vuelve con mala cobertura) cambia el calendario o las tareas ya cargados por «No se pudo cargar» | `stores/calendar.ts` y `stores/tasks.ts`: el `catch` de `load()` pone `error` aunque haya datos | pendiente |
+| 2 | Compra: con mala cobertura (el móvil dice que hay red) un cambio se descarta a los ~9 s y no vuelve a intentarse | `stores/list.ts` `send()`, `NETWORK_TRIES = 3` | pendiente |
+| 3 | Con la app abierta durante un despliegue, las pantallas que no se habían abierto ya no cargan: tocas y no pasa nada | rutas con `import()`; los ficheros viejos ya no están en Vercel y el service worker nuevo borra su caché | pendiente |
+| 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | pendiente |
+| 5 | Evento nuevo: si se guarda pero fallan los grupos o participantes, reintentar crea un segundo evento | `stores/calendar.ts` `saveEvent()` | pendiente |
+| 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | pendiente |
+| 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | pendiente |
+| 8 | Autocompletado: un producto nuevo sale dos veces hasta recargar | `stores/list.ts`: id local ≠ id del trigger, `upsert` por id | pendiente |
+| 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | pendiente |
+| 10 | Rachas: la API corta en 1000 filas; con el tiempo la racha de la familia saldría a 0 | `stores/stretching.ts` | pendiente |
+| 11 | Racha sin conexión: dos envíos a la vez pueden perder una sesión pendiente, y no se reintenta al volver a la app | `stores/stretching.ts` `flush()` | pendiente |
+| 12 | Tocar una notificación con la app abierta la recarga entera: se pierde lo que se estuviera escribiendo y los cambios de la compra en cola | `public/sw.js` `notificationclick` | pendiente |
+| 13 | Con red muy lenta, abrir la app se queda en blanco esperando aunque esté guardada | `public/sw.js` `networkFirst` sin límite de tiempo | pendiente |
+| 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | pendiente |
+| 15 | Seguridad: la pantalla `/autorizar` se puede meter en un iframe (clickjacking) | `vercel.json` sin cabeceras | pendiente |
+| 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | pendiente |
+| 17 | Evento semanal nuevo: al cambiar la fecha, el día marcado sigue siendo el de antes | `EventFormView.vue` | pendiente |
+| 18 | Semana y Hoy: dos eventos cortos seguidos se pintan uno encima del otro | `lib/timeline.ts`, `MIN_BLOCK_PX` | pendiente |
+| 19 | Cerrar sesión con cambios de la compra sin guardar los pierde sin avisar | `AccountView.vue` | pendiente |
+| 20 | Accesibilidad: ordenar tareas no se puede con teclado | `TaskRows.vue` | pendiente |
+| 21 | Cuenta y «Añadir otro grupo» vuelven siempre a Grupo (la regla es `goBack()`) | `AccountView.vue`, `WelcomeView.vue` | pendiente |
+| 22 | Vite con avisos de seguridad altos (solo desarrollo, pero `npm run dev` escucha en la red local) | `npm audit` | pendiente |
+| 23 | Los avisos recorren cada minuto todos los eventos con recordatorio, también los pasados | SQL `enqueue_event_reminders` | pendiente |
+| 24 | README: secciones y documentos desactualizados | `README.md` | pendiente |
+
+## Hecho
+
+(se rellena con cada commit)
+
+## Decisiones tomadas
+
+- Verificar los permisos con PGlite en vez de Docker, por memoria. CI los pasa con Supabase de verdad en el PR.
+
+## Pendiente de Luis
+
+1. **`npx supabase db push`** de `20261125120000_family_streaks` (según la memoria del proyecto, sin aplicar en la nube).
+   Hasta entonces, Rachas solo enseña la propia.
