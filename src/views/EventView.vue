@@ -4,16 +4,18 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { namesList, useEditors } from '@/lib/editors'
 import { historyText, reminderLabel, repeatLabel, timeLabel } from '@/lib/eventText'
+import { nearestSeriesDate } from '@/lib/recurrence'
 import { goBack } from '@/router/back'
 import { useCalendarStore } from '@/stores/calendar'
 import { useGroupStore } from '@/stores/group'
 import { useToastStore } from '@/stores/toast'
 import type { HistoryEntry } from '@/types'
 import { timeAgo } from '@/utils/date'
-import { isIsoDate, longDay, relativeDay } from '@/utils/days'
+import { isIsoDate, longDay, relativeDay, today } from '@/utils/days'
 import { friendlyError } from '@/utils/errors'
 
-// One event, as it is on one day of its series (?dia=YYYY-MM-DD, the series date).
+// One event, as it is on one day of its series (?dia=YYYY-MM-DD, the series date; a notification
+// may bring the day it was moved to, or none).
 
 const groupStore = useGroupStore()
 const calendar = useCalendarStore()
@@ -23,7 +25,10 @@ const router = useRouter()
 
 const eventId = computed(() => String(route.params.id))
 const event = computed(() => calendar.eventById(eventId.value))
-const seriesDate = computed(() => (isIsoDate(route.query.dia) ? route.query.dia : event.value?.startDate ?? ''))
+const seriesDate = computed(() => {
+  const day = isIsoDate(route.query.dia) ? route.query.dia : null
+  return event.value ? nearestSeriesDate(event.value, calendar.exceptionsOf(eventId.value), day, today()) : (day ?? '')
+})
 
 watch(
   () => [eventId.value, route.query.dia] as const,

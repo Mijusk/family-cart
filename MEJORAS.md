@@ -22,7 +22,7 @@ se ha comprobado y qué queda.
 | 3 | Con la app abierta durante un despliegue, las pantallas que no se habían abierto ya no cargan: tocas y no pasa nada | rutas con `import()`; los ficheros viejos ya no están en Vercel y el service worker nuevo borra su caché | **hecho** |
 | 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | **hecho** |
 | 5 | Evento nuevo: si se guarda pero fallan los grupos o participantes, reintentar crea un segundo evento | `stores/calendar.ts` `saveEvent()` | **hecho** |
-| 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | pendiente |
+| 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | **hecho** |
 | 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | **hecho** |
 | 8 | Autocompletado: un producto nuevo sale dos veces hasta recargar | `stores/list.ts`: id local ≠ id del trigger, `upsert` por id | **hecho** |
 | 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | pendiente |
@@ -53,6 +53,7 @@ se ha comprobado y qué queda.
 - **3.** Si al abrir una pantalla falta su fichero (despliegue nuevo), la app se recarga ya en ella; sin conexión, con cambios en cola o si vuelve a fallar, lo dice con un aviso. Comprobado en Chromium con el fichero devolviendo 404.
 - **13.** Con copia guardada, una página espera 4 s a la red y luego abre la copia (antes, sin límite). Comprobado con un servidor que tarda 15 s: abre en 4,1 s; sin red, en 0,1 s.
 - **12.** Tocar un aviso con la app abierta cambia de pantalla sin recargar (y pregunta si hay algo a medias); si la ventana no contesta, la carga como antes. Comprobado en Chromium simulando el toque en el service worker; falta verlo en un móvil de verdad.
+- **6.** El evento se abre en el día bueno aunque el enlace traiga la fecha movida, o en la próxima vez si no trae ninguna (`nearestSeriesDate`, con tests); comprobado en Chromium. El conector IA enlaza ya la fecha de la serie.
 
 ## Decisiones tomadas
 

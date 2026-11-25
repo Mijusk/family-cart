@@ -84,6 +84,24 @@ export function occurrencesBetween(
   return result.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
 }
 
+/** How far ahead nearestSeriesDate looks: a monthly event on the 31st comes round well before. */
+const LOOK_AHEAD_DAYS = 400
+
+/**
+ * The date of the series to show an event on, opened from a link with `day` (or none): that day, the
+ * one an exception moved to that day, or else the next one from it (from `today` without a day) that
+ * still happens; its start if there is none left.
+ */
+export function nearestSeriesDate(t: EventTiming, exceptions: EventException[], day: IsoDate | null, today: IsoDate): IsoDate {
+  if (t.repeat === 'none') return t.startDate
+  if (day && isSeriesDate(t, day)) return day
+  const moved = day && exceptions.find((x) => x.status === 'modified' && x.overrides.startDate === day && isSeriesDate(t, x.occurrenceDate))
+  if (moved) return moved.occurrenceDate
+  const from = day ?? today
+  const cancelled = new Set(exceptions.filter((x) => x.status === 'cancelled').map((x) => x.occurrenceDate))
+  return seriesDates(t, from, addDays(from, LOOK_AHEAD_DAYS)).find((d) => !cancelled.has(d)) ?? t.startDate
+}
+
 /** How long a «Recordatorio» lasts: it is stored with an end (events_times), never shown. */
 export const REMINDER_LENGTH_MINUTES = 15
 
