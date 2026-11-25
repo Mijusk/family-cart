@@ -86,6 +86,8 @@ export const useCalendarStore = defineStore('calendar', () => {
   let range = { from: addDays(today(new Date()), -RANGE_STEP_DAYS), to: addDays(today(new Date()), RANGE_STEP_DAYS) }
   /** Events opened outside the range (from a notification, say), loaded with all their exceptions. */
   const pinnedIds = new Set<string>()
+  /** What the last load that worked brought (see loadKey); null if none has. */
+  let shownKey: string | null = null
 
   const editableCalendars = computed(() =>
     calendars.value.filter((c) => editableIds.value.has(c.id)).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
@@ -117,9 +119,15 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   // ── Loading ────────────────────────────────────────────────
 
+  /** What a load of this group has to bring: its days, and the opened events that aren't here yet. */
+  function loadKey(groupId: string): string {
+    return [groupId, range.from, range.to, ...[...pinnedIds].filter((id) => !eventById(id))].join()
+  }
+
   async function load(groupId: string) {
     loadedGroupId = groupId
     const seq = ++loadSeq
+    const key = loadKey(groupId)
     subscribe(groupId)
     if (status.value !== 'ready') status.value = 'loading'
     try {
@@ -167,9 +175,11 @@ export const useCalendarStore = defineStore('calendar', () => {
       busyEvents.value = busy.data!.map(toBusyEvent)
       await loadPeople()
       status.value = 'ready'
+      shownKey = loadKey(groupId)
     } catch (e) {
       console.error(e)
-      if (groupId === loadedGroupId && seq === loadSeq) status.value = 'error'
+      // A refresh of what is already on screen (the phone back with a bad signal, say): it stays.
+      if (groupId === loadedGroupId && seq === loadSeq) status.value = key === shownKey ? 'ready' : 'error'
       throw e
     }
   }
@@ -595,6 +605,7 @@ export const useCalendarStore = defineStore('calendar', () => {
     channelGroupId = null
     clearTimeout(reloadTimer)
     loadedGroupId = null
+    shownKey = null
     pinnedIds.clear()
     status.value = 'idle'
     calendars.value = []

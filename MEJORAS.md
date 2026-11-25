@@ -17,7 +17,7 @@ se ha comprobado y qué queda.
 
 | # | Qué | Dónde / evidencia | Estado |
 | --- | --- | --- | --- |
-| 1 | Una recarga en segundo plano que falla (móvil que vuelve con mala cobertura) cambia el calendario o las tareas ya cargados por «No se pudo cargar» | `stores/calendar.ts` y `stores/tasks.ts`: el `catch` de `load()` pone `error` aunque haya datos | pendiente |
+| 1 | Una recarga en segundo plano que falla (móvil que vuelve con mala cobertura) cambia el calendario o las tareas ya cargados por «No se pudo cargar» | `stores/calendar.ts` y `stores/tasks.ts`: el `catch` de `load()` pone `error` aunque haya datos | **hecho** |
 | 2 | Compra: con mala cobertura (el móvil dice que hay red) un cambio se descarta a los ~9 s y no vuelve a intentarse | `stores/list.ts` `send()`, `NETWORK_TRIES = 3` | pendiente |
 | 3 | Con la app abierta durante un despliegue, las pantallas que no se habían abierto ya no cargan: tocas y no pasa nada | rutas con `import()`; los ficheros viejos ya no están en Vercel y el service worker nuevo borra su caché | pendiente |
 | 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | pendiente |
@@ -44,7 +44,7 @@ se ha comprobado y qué queda.
 
 ## Hecho
 
-(se rellena con cada commit)
+- **1.** Si falla una recarga de lo que ya está en pantalla, se queda; el error solo sale si no hay nada que enseñar (otro grupo, otros días). Tests nuevos de los stores (`calendar.test.ts`), que fallan sin el arreglo.
 
 ## Decisiones tomadas
 
