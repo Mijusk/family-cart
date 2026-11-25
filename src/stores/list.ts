@@ -47,6 +47,10 @@ export interface TripSummary {
   items: Item[]
 }
 
+/** What the database takes for an item (its checks in the schema). */
+export const ITEM_NAME_MAX = 80
+export const ITEM_NOTE_MAX = 120
+
 /** How far back the history goes. */
 const HISTORY_DAYS = 60
 /** Tries before saying that a write doesn't reach the server although the phone says it is online. */
@@ -556,7 +560,7 @@ export const useListStore = defineStore('list', () => {
     const extraNote = note?.trim() || null
     item.quantity = Math.min(999, item.quantity + add)
     if (extraNote && extraNote !== item.note) {
-      item.note = item.note ? `${item.note} · ${extraNote}` : extraNote
+      item.note = (item.note ? `${item.note} · ${extraNote}` : extraNote).slice(0, ITEM_NOTE_MAX)
     }
     rememberProductLocally(item.name, add)
     rememberFolderLocally(item.folderId)

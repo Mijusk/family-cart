@@ -23,7 +23,7 @@ se ha comprobado y qué queda.
 | 4 | Tarea: lo escrito en la nota o el título se pierde al volver con el gesto del móvil o cerrar la app (solo se guarda al salir del campo) | `views/TaskView.vue` | pendiente |
 | 5 | Evento nuevo: si se guarda pero fallan los grupos o participantes, reintentar crea un segundo evento | `stores/calendar.ts` `saveEvent()` | **hecho** |
 | 6 | El aviso de un día movido abre el evento en el día que no es (hora y título de la serie) | SQL `enqueue_event_reminders` enlaza `occ_date`; `EventView` espera la fecha de la serie | pendiente |
-| 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | pendiente |
+| 7 | Compra: un nombre de más de 80 caracteres se pierde con «Revisa la conexión» | `AddItemForm.vue`, `PendingItemRow.vue` sin `maxlength`; la base limita a 80 | **hecho** |
 | 8 | Autocompletado: un producto nuevo sale dos veces hasta recargar | `stores/list.ts`: id local ≠ id del trigger, `upsert` por id | **hecho** |
 | 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | pendiente |
 | 10 | Rachas: la API corta en 1000 filas; con el tiempo la racha de la familia saldría a 0 | `stores/stretching.ts` | pendiente |
@@ -48,6 +48,7 @@ se ha comprobado y qué queda.
 - **5.** El evento nuevo lleva su id desde el formulario: reintentar continúa con el mismo. Tests en `calendar.test.ts` (fallo a medias, y respuesta que no llega).
 - **2.** Los cambios de la compra se reintentan hasta que llegan (cada 3 s, luego hasta 24 s), también si el servidor está caído un momento; el aviso «Sin conexión» lo dice. Solo se deshace lo que el servidor rechaza. Tests en `list.test.ts`.
 - **8.** La fila del servidor sustituye a la copia local por nombre normalizado. Test en `list.test.ts`.
+- **7.** Los campos de nombre y nota cortan en lo que admite la base de datos (80 y 120), con una sola constante.
 
 ## Decisiones tomadas
 

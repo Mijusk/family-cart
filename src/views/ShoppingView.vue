@@ -6,7 +6,7 @@ import PhotoThumb from '@/components/PhotoThumb.vue'
 import QuantityChip from '@/components/QuantityChip.vue'
 import { ALL_FOLDERS, useFolderView } from '@/composables/shoppingFolder'
 import { goBack } from '@/router/back'
-import { useListStore } from '@/stores/list'
+import { ITEM_NAME_MAX, useListStore } from '@/stores/list'
 import { useToastStore } from '@/stores/toast'
 import type { Item } from '@/types'
 
@@ -131,7 +131,7 @@ function cancel() {
         class="field"
         placeholder="Otra cosa…"
         aria-label="Producto para añadir al carrito"
-        maxlength="80"
+        :maxlength="ITEM_NAME_MAX"
         enterkeyhint="done"
       />
       <button type="submit" class="btn btn-primary" :disabled="!newName.trim()">
