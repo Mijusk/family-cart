@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EventException, EventTiming } from '@/types'
-import { crossesMidnight, isSeriesDate, nearestSeriesDate, occurrencesBetween, reminderEndTime, seriesDates } from './recurrence'
+import { addDays } from '@/utils/isoDays'
+import { crossesMidnight, isSeriesDate, mayHappenOn, nearestSeriesDate, occurrencesBetween, reminderEndTime, seriesDates } from './recurrence'
 
 // 2026-10-19 is a Monday.
 function timing(change: Partial<EventTiming> = {}): EventTiming {
@@ -185,5 +186,30 @@ describe('nearestSeriesDate', () => {
   it('is the start when it is over, or it does not repeat', () => {
     expect(nearestSeriesDate({ ...weekly, repeatUntil: '2026-11-02' }, [], null, '2026-11-25')).toBe('2026-10-19')
     expect(nearestSeriesDate(timing(), [], '2026-11-25', '2026-11-25')).toBe('2026-10-19')
+  })
+})
+
+describe('mayHappenOn', () => {
+  it('never leaves out something that happens', () => {
+    const moved: EventException = { eventId: 'e', occurrenceDate: '2026-10-19', status: 'modified', overrides: { startDate: '2026-11-03' } }
+    const cases: [EventTiming, EventException[]][] = [
+      [timing(), []],
+      [timing({ startTime: '23:00', endTime: '01:00' }), []],
+      [timing({ repeat: 'daily', repeatUntil: '2026-10-25', startTime: '23:00', endTime: '01:00' }), []],
+      [timing({ repeat: 'weekly', repeatWeekdays: [1, 3] }), []],
+      [timing({ repeat: 'weekly', repeatWeekdays: [1], repeatUntil: '2026-10-26' }), [moved]],
+    ]
+    for (const [t, exceptions] of cases) {
+      for (let i = -5; i < 40; i++) {
+        const day = addDays('2026-10-19', i)
+        if (occurrencesBetween(t, exceptions, day, day).length) expect(mayHappenOn(t, exceptions, day)).toBe(true)
+      }
+    }
+  })
+
+  it('leaves out what is over or has not begun', () => {
+    expect(mayHappenOn(timing(), [], '2026-10-18')).toBe(false)
+    expect(mayHappenOn(timing(), [], '2026-10-21')).toBe(false)
+    expect(mayHappenOn(timing({ repeat: 'daily', repeatUntil: '2026-10-25' }), [], '2026-10-27')).toBe(false)
   })
 })

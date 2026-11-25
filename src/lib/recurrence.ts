@@ -41,6 +41,18 @@ export function crossesMidnight(t: { allDay: boolean; startTime: string | null; 
   return !t.allDay && !!t.startTime && !!t.endTime && t.endTime < t.startTime
 }
 
+/**
+ * A cheap first look, to leave out most events of a day before expanding them: false when nothing
+ * of this one can start on `day` or run into it from the night before.
+ */
+export function mayHappenOn(t: EventTiming, exceptions: EventException[], day: IsoDate): boolean {
+  // A changed day can have been moved anywhere.
+  if (exceptions.some((x) => x.overrides.startDate)) return true
+  if (t.startDate > day) return false
+  const last = t.repeat === 'none' ? t.startDate : t.repeatUntil
+  return !last || last >= day || last >= addDays(day, -1)
+}
+
 /** One occurrence after applying its exception. */
 export interface ExpandedOccurrence {
   seriesDate: IsoDate

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { RealtimeChannel, RealtimeSystemPayload } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
@@ -13,7 +13,7 @@ import {
   toHistoryEntry,
   toPerson,
 } from '@/lib/mappers'
-import { crossesMidnight, occurrencesBetween } from '@/lib/recurrence'
+import { crossesMidnight, mayHappenOn, occurrencesBetween } from '@/lib/recurrence'
 import { addDays, today } from '@/utils/days'
 import type {
   BusyEvent,
@@ -69,8 +69,9 @@ export const useCalendarStore = defineStore('calendar', () => {
   const status = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const calendars = ref<Calendar[]>([])
   const shares = ref<CalendarShare[]>([])
-  const events = ref<CalendarEvent[]>([])
-  const exceptions = ref<EventException[]>([])
+  // Shallow (replaced, never changed inside): a month goes through all of them 42 times.
+  const events = shallowRef<CalendarEvent[]>([])
+  const exceptions = shallowRef<EventException[]>([])
   /** Extra groups per event. */
   const eventGroups = ref<Record<string, string[]>>({})
   /** Participants per event (person ids). */
@@ -78,7 +79,7 @@ export const useCalendarStore = defineStore('calendar', () => {
   /** Owner and folder color of every visible event, even when its folder is private. */
   const owners = ref<Record<string, { ownerId: string; color: string }>>({})
   const editableIds = ref<Set<string>>(new Set())
-  const busyEvents = ref<BusyEvent[]>([])
+  const busyEvents = shallowRef<BusyEvent[]>([])
   /** People named anywhere in the calendar (owners, participants, authors). */
   const people = ref<Record<string, Person>>({})
   /** Group whose busy slots are loaded; answers for another group are discarded. */
@@ -108,8 +109,18 @@ export const useCalendarStore = defineStore('calendar', () => {
     return editableIds.value.has(event.calendarId)
   }
 
+  const exceptionsByEvent = computed(() => {
+    const byEvent = new Map<string, EventException[]>()
+    for (const x of exceptions.value) {
+      const list = byEvent.get(x.eventId)
+      if (list) list.push(x)
+      else byEvent.set(x.eventId, [x])
+    }
+    return byEvent
+  })
+
   function exceptionsOf(eventId: string): EventException[] {
-    return exceptions.value.filter((x) => x.eventId === eventId)
+    return exceptionsByEvent.value.get(eventId) ?? []
   }
 
   /** A person's name; the signed-in person shows as `self` ("Tú", "ti"…), or their name if null. */
@@ -258,9 +269,11 @@ export const useCalendarStore = defineStore('calendar', () => {
   function occurrencesOn(day: IsoDate): Occurrence[] {
     const result: Occurrence[] = []
     for (const event of events.value) {
+      const changes = exceptionsOf(event.id)
+      if (!mayHappenOn(event, changes, day)) continue
       const owner = owners.value[event.id]
       if (!owner) continue
-      for (const o of occurrencesBetween(event, exceptionsOf(event.id), day, day)) {
+      for (const o of occurrencesBetween(event, changes, day, day)) {
         const shown = { ...event, ...o.overrides }
         result.push({
           key: `${event.id}:${o.seriesDate}`,
@@ -283,6 +296,7 @@ export const useCalendarStore = defineStore('calendar', () => {
       }
     }
     for (const busy of busyEvents.value) {
+      if (!mayHappenOn(busy, busy.exceptions, day)) continue
       for (const o of occurrencesBetween(busy, busy.exceptions, day, day)) {
         const shown = { ...busy, ...o.overrides }
         result.push({
@@ -405,9 +419,7 @@ export const useCalendarStore = defineStore('calendar', () => {
   function putEvent(event: CalendarEvent) {
     // Saved on a day outside the range, the next load would leave it out.
     pinnedIds.add(event.id)
-    const i = events.value.findIndex((e) => e.id === event.id)
-    if (i === -1) events.value.push(event)
-    else events.value[i] = event
+    events.value = [...events.value.filter((e) => e.id !== event.id), event]
     // Its folder is one I can edit, so it is loaded; the owner and color are the folder's.
     const folder = calendarById(event.calendarId)
     if (folder) owners.value[event.id] = { ownerId: folder.ownerId, color: folder.color }
@@ -447,7 +459,7 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   /** Changes or cancels one occurrence of a repeating event. */
   async function setException(eventId: string, seriesDate: IsoDate, change: Pick<EventException, 'status' | 'overrides'> | null) {
-    const existing = exceptions.value.find((x) => x.eventId === eventId && x.occurrenceDate === seriesDate)
+    const existing = exceptionsOf(eventId).find((x) => x.occurrenceDate === seriesDate)
     const fields = change && { status: change.status, overrides: fromOverrides(change.overrides) as never }
     const { error } = !change
       ? await supabase.from('event_exceptions').delete().eq('event_id', eventId).eq('occurrence_date', seriesDate)
@@ -472,7 +484,7 @@ export const useCalendarStore = defineStore('calendar', () => {
 
   /** Cancels one day; returns how to undo it. */
   async function cancelOccurrence(eventId: string, seriesDate: IsoDate): Promise<() => Promise<void>> {
-    const before = exceptions.value.find((x) => x.eventId === eventId && x.occurrenceDate === seriesDate) ?? null
+    const before = exceptionsOf(eventId).find((x) => x.occurrenceDate === seriesDate) ?? null
     await setException(eventId, seriesDate, { status: 'cancelled', overrides: {} })
     return () => setException(eventId, seriesDate, before)
   }
