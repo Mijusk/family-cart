@@ -183,21 +183,21 @@ async function cancelRequest(groupId: string, name: string) {
     </section>
 
     <div v-if="mode === 'choose'" class="choice-list">
-      <button type="button" class="choice" @click="choose('create')">
+      <button type="button" class="option" @click="choose('create')">
         <span class="choice-icon"><AppIcon name="plus" :size="24" /></span>
         <span class="choice-text">
           <strong>Crear un grupo nuevo</strong>
           <span class="muted">Para tu familia, tu pareja…</span>
         </span>
       </button>
-      <button type="button" class="choice" @click="choose('join')">
+      <button type="button" class="option" @click="choose('join')">
         <span class="choice-icon"><AppIcon name="group" :size="24" /></span>
         <span class="choice-text">
           <strong>Tengo un código de grupo</strong>
           <span class="muted">Pide unirte a un grupo que ya existe</span>
         </span>
       </button>
-      <button v-if="canClaim" type="button" class="choice" @click="choose('claim')">
+      <button v-if="canClaim" type="button" class="option" @click="choose('claim')">
         <span class="choice-icon"><AppIcon name="user" :size="24" /></span>
         <span class="choice-text">
           <strong>Tengo un código de perfil</strong>
@@ -359,7 +359,7 @@ async function cancelRequest(groupId: string, name: string) {
   }
 }
 
-.choice {
+.option {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -369,7 +369,7 @@ async function cancelRequest(groupId: string, name: string) {
   text-align: left;
 }
 
-.choice:hover {
+.option:hover {
   background: var(--primary-soft);
 }
 

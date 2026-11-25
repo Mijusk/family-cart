@@ -43,6 +43,8 @@ se ha comprobado y qué queda.
 | 24 | README: secciones y documentos desactualizados | `README.md` | **hecho** |
 | 25 | Mes y Semana: calcular un mes con muchos eventos tarda ~270 ms en un PC (más de 1 s en un móvil) | `stores/calendar.ts` `occurrencesOn()`: recorre todo, con proxies, por cada día | **hecho** |
 | 26 | Accesibilidad: Mes usa `aria-pressed` donde no vale y la barra de Modo compra no tiene nombre (axe) | `MonthView.vue`, `ShoppingView.vue` | **hecho** |
+| 27 | «Crear un grupo / Tengo un código» se ve roto: píldoras sobre fondo gris | `WelcomeView.vue`: su `.choice` choca con la `.choice` global | **hecho** |
+| 28 | Mes: tocar un día de otro mes (los grises) no hace nada | `MonthView.vue` `selected` | pendiente |
 
 ## Hecho
 
@@ -72,6 +74,7 @@ se ha comprobado y qué queda.
 - **24.** README al día: qué es la app, secciones, documentos y stores.
 - **25.** Índice de excepciones, descarte rápido de lo que no puede caer ese día y arrays sin proxies: un mes con 330 eventos y 150 excepciones pasa de 270 ms a 26 ms, con los mismos resultados (960 apariciones). Tests de `mayHappenOn`.
 - **26.** Corregido; axe (WCAG AA) sobre 28 rutas a 360 px, sin desbordes. Quedan solo el atenuado de los días pasados (decisión de Luis) y de los días de otro mes.
+- **27.** La pantalla usa su propia clase. Visto en Chromium a 360 px.
 
 ## Decisiones tomadas
 
