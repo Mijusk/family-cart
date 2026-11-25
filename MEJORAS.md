@@ -28,8 +28,8 @@ se ha comprobado y qué queda.
 | 9 | Conector IA: `ver_compra` no enseña lo marcado «No lo encontré» y `anadir_compra` lo duplica | `functions/mcp/shopping.ts` solo mira `pending` | pendiente |
 | 10 | Rachas: la API corta en 1000 filas; con el tiempo la racha de la familia saldría a 0 | `stores/stretching.ts` | pendiente |
 | 11 | Racha sin conexión: dos envíos a la vez pueden perder una sesión pendiente, y no se reintenta al volver a la app | `stores/stretching.ts` `flush()` | pendiente |
-| 12 | Tocar una notificación con la app abierta la recarga entera: se pierde lo que se estuviera escribiendo y los cambios de la compra en cola | `public/sw.js` `notificationclick` | pendiente |
-| 13 | Con red muy lenta, abrir la app se queda en blanco esperando aunque esté guardada | `public/sw.js` `networkFirst` sin límite de tiempo | pendiente |
+| 12 | Tocar una notificación con la app abierta la recarga entera: se pierde lo que se estuviera escribiendo y los cambios de la compra en cola | `public/sw.js` `notificationclick` | **hecho** |
+| 13 | Con red muy lenta, abrir la app se queda en blanco esperando aunque esté guardada | `public/sw.js` `networkFirst` sin límite de tiempo | **hecho** |
 | 14 | Cambiar de grupo sin conexión deja la pantalla de error aunque ese grupo tenga copia guardada | `stores/group.ts` `switchGroup()` | pendiente |
 | 15 | Seguridad: la pantalla `/autorizar` se puede meter en un iframe (clickjacking) | `vercel.json` sin cabeceras | pendiente |
 | 16 | Seguridad: cualquier miembro puede leer el `claim_code` de un perfil sin cuenta y quedarse con él | `grant select on people`; la app pide `people(*)` | pendiente |
@@ -51,6 +51,8 @@ se ha comprobado y qué queda.
 - **7.** Los campos de nombre y nota cortan en lo que admite la base de datos (80 y 120), con una sola constante.
 - **4.** La nota o el título a medio escribir se guardan al volver atrás o al esconder la app. Comprobado en Chromium con la app compilada y un Supabase simulado.
 - **3.** Si al abrir una pantalla falta su fichero (despliegue nuevo), la app se recarga ya en ella; sin conexión, con cambios en cola o si vuelve a fallar, lo dice con un aviso. Comprobado en Chromium con el fichero devolviendo 404.
+- **13.** Con copia guardada, una página espera 4 s a la red y luego abre la copia (antes, sin límite). Comprobado con un servidor que tarda 15 s: abre en 4,1 s; sin red, en 0,1 s.
+- **12.** Tocar un aviso con la app abierta cambia de pantalla sin recargar (y pregunta si hay algo a medias); si la ventana no contesta, la carga como antes. Comprobado en Chromium simulando el toque en el service worker; falta verlo en un móvil de verdad.
 
 ## Decisiones tomadas
 

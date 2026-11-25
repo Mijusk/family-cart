@@ -113,9 +113,14 @@ watch(
   { immediate: true },
 )
 
-// A notification arriving with the app open (public/sw.js says so) goes onto the list.
+// From public/sw.js: a notification arriving with the app open goes onto the list, and tapping one
+// opens its screen here (the answer tells the worker not to load the page itself).
 function onWorkerMessage(e: MessageEvent) {
   if (e.data?.type === 'notification' && groupStore.status === 'ready') void inbox.load()
+  if (e.data?.type === 'open' && typeof e.data.path === 'string' && e.data.path.startsWith('/')) {
+    e.ports[0]?.postMessage('ok')
+    void router.push(e.data.path)
+  }
 }
 onMounted(() => navigator.serviceWorker?.addEventListener('message', onWorkerMessage))
 onUnmounted(() => navigator.serviceWorker?.removeEventListener('message', onWorkerMessage))
